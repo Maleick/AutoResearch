@@ -4,6 +4,7 @@
 .serena/
 CLAUDE.md
 AGENTS.md
+.worktrees/
 
 # Internal planning/spec docs
 docs/superpowers/
