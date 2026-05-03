@@ -210,6 +210,8 @@ describe(".opencode/", () => {
 describe("INSTALL.md", () => {
   it("has root OpenCode handoff instructions", () => {
     const content = readFileSync(resolve(REPO_ROOT, "INSTALL.md"), "utf-8");
+    expect(content).toContain("## One-Line OpenCode Install");
+    expect(content).toContain("Paste this one line into OpenCode");
     expect(content).toContain("Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md");
     expect(content).toContain('"plugin": ["opencode-autoresearch"]');
     expect(content).toContain("npm install -g opencode-autoresearch");
@@ -218,6 +220,9 @@ describe("INSTALL.md", () => {
 
   it("is linked from README installation section", () => {
     const content = readFileSync(resolve(REPO_ROOT, "README.md"), "utf-8");
+    const version = readJson(resolve(REPO_ROOT, "package.json")).version as string;
+    expect(content).toContain(`v${version}`);
+    expect(content).toContain("paste this one-line install prompt");
     expect(content).toContain("Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md");
     expect(content).toContain("See [`INSTALL.md`](INSTALL.md)");
   });

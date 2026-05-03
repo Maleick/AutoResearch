@@ -2,9 +2,9 @@
 
 Auto Research is an OpenCode plugin and npm package for structured autonomous improve-verify loops. It keeps runtime state local to the target repository and gates changes with mechanical verification.
 
-## OpenCode Handoff
+## One-Line OpenCode Install
 
-Paste this into OpenCode if you want the agent to install and verify the plugin for you. This URL follows the latest `main` instructions:
+Paste this one line into OpenCode to install and verify Auto Research. This URL follows the latest `main` instructions:
 
 ```text
 Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md
