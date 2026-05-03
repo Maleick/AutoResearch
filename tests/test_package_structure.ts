@@ -228,6 +228,16 @@ describe("INSTALL.md", () => {
   });
 });
 
+describe("GitHub Pages custom domain", () => {
+  it("keeps the docs CNAME for the custom domain", () => {
+    const cname = readFileSync(resolve(REPO_ROOT, "docs/CNAME"), "utf-8").trim();
+    const files = readJson(resolve(REPO_ROOT, "package.json")).files as string[];
+
+    expect(cname).toBe("autoresearch.teamoperator.red");
+    expect(files).toContain("docs/CNAME");
+  });
+});
+
 describe("AGENTS.md", () => {
   it("is tracked repository guidance, not local-only context", () => {
     const content = readFileSync(resolve(REPO_ROOT, "AGENTS.md"), "utf-8");
