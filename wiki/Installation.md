@@ -1,22 +1,29 @@
 # Installation
 
-Install the `opencode-autoresearch` npm package globally.
+## Recommended: OpenCode Plugin Install
 
-## Install
+Add Auto Research to the `plugin` array in your global or project-level `opencode.json`:
+
+```json
+{
+  "plugin": ["opencode-autoresearch"]
+}
+```
+
+Restart OpenCode, then run:
+
+```text
+/autoresearch
+```
+
+## Optional CLI Install
 
 ```bash
 npm install -g opencode-autoresearch
-```
-
-## Verify
-
-```bash
 opencode-autoresearch doctor
 ```
 
 ## OpenCode Commands
-
-After install, these are available in OpenCode:
 
 - `/autoresearch` — Default improve-verify loop
 - `/autoresearch:plan` — Planning workflow
@@ -31,7 +38,7 @@ After install, these are available in OpenCode:
 ## CLI Commands
 
 ```bash
-autoresearch init --goal "..." --metric "..." --direction "lower" --verify "npm test"
+autoresearch init --goal "Improve reliability" --metric failures --direction lower --verify "npm test"
 autoresearch status
 autoresearch stop
 autoresearch resume
@@ -40,11 +47,10 @@ autoresearch complete
 
 ## Runtime Artifacts
 
-Artifacts are stored in `.autoresearch/` under the working directory:
-
 - `.autoresearch/state.json` — Current run state
+- `.autoresearch/launch.json` — Background launch manifest
 - `autoresearch-results.tsv` — Iteration log
 - `autoresearch-report.md` — End-of-run report
 - `autoresearch-memory.md` — Reusable memory
 
-See [docs/OPENCODE_INSTALL.md](docs/OPENCODE_INSTALL.md) for full install details.
+See [docs/OPENCODE_INSTALL.md](docs/OPENCODE_INSTALL.md) and [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for full install details.

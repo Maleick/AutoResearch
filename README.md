@@ -96,34 +96,42 @@ See [`skills/autoresearch/references/self-improve-loop.md`](skills/autoresearch/
 
 ## Installation
 
-Install the CLI globally if you want Auto Research available long-term on your PATH:
+Recommended: add Auto Research to the `plugin` array in your global or project-level `opencode.json`:
 
-```bash
-npm install -g opencode-autoresearch
-opencode-autoresearch doctor
+```json
+{
+  "plugin": ["opencode-autoresearch"]
+}
 ```
 
-For a one-time install without keeping a global CLI, use `bunx` instead:
-
-```bash
-bunx opencode-autoresearch install
-bunx opencode-autoresearch doctor
-```
-
-Then start the setup wizard inside OpenCode:
+Restart OpenCode, then run the setup wizard:
 
 ```text
 /autoresearch
 ```
 
+If you also want the CLI available on your shell `PATH`, install the npm package globally:
+
+```bash
+npm install -g opencode-autoresearch
+opencode-autoresearch doctor
+```
+
+For one-time CLI use without a global install:
+
+```bash
+npx opencode-autoresearch doctor
+```
+
+See [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for detailed OpenCode install, update, and troubleshooting notes.
+
 ## Quick Start
 
 ```bash
-# 1. Install the CLI globally
-npm install -g opencode-autoresearch
+# 1. Add the plugin to opencode.json
+# { "plugin": ["opencode-autoresearch"] }
 
-# 2. Verify installation
-opencode-autoresearch doctor
+# 2. Restart OpenCode
 
 # 3. Navigate to your project
 cd ~/Projects/my-project

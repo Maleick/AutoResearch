@@ -1,6 +1,8 @@
-import { readFileSync, existsSync } from "fs";
+import { mkdtempSync, readFileSync, existsSync, mkdirSync, symlinkSync, writeFileSync, rmSync } from "fs";
 import { resolve } from "path";
 import { fileURLToPath } from "url";
+import { execFileSync } from "child_process";
+import { tmpdir } from "os";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
@@ -24,6 +26,19 @@ describe("package.json", () => {
   it("files array excludes scripts/", () => {
     const files = readJson(resolve(REPO_ROOT, "package.json")).files as string[];
     expect(files).not.toContain("scripts/");
+  });
+
+  it("packages repo-level OpenCode install guide", () => {
+    const files = readJson(resolve(REPO_ROOT, "package.json")).files as string[];
+    expect(files).toContain(".opencode/INSTALL.md");
+    expect(files).not.toContain(".opencode");
+    expect(files).toContain("AGENTS.md");
+  });
+
+  it("does not package broad local OpenCode config", () => {
+    const verifier = readFileSync(resolve(REPO_ROOT, "hooks/verify-package.sh"), "utf-8");
+    expect(verifier).toContain('".opencode/INSTALL.md"');
+    expect(verifier).not.toContain('".opencode",');
   });
 
   it("has build and typecheck scripts", () => {
@@ -81,6 +96,23 @@ describe("skills/autoresearch/", () => {
 });
 
 describe("hooks/", () => {
+  const backgroundState = (statePath: string, resultsPath: string) => JSON.stringify({
+    schema_version: 1,
+    run_id: "hook-test",
+    created_at: "2026-05-03T00:00:00Z",
+    updated_at: "2026-05-03T00:00:00Z",
+    status: "running",
+    mode: "background",
+    goal: "test hook safety",
+    scope: "tests",
+    metric: { name: "tests", direction: "lower" },
+    verify: "npm test",
+    label_requirements: { keep: [], stop: [] },
+    artifact_paths: { results: resultsPath, state: statePath },
+    stats: { total_iterations: 0, kept: 0, discarded: 0, needs_human: 0 },
+    flags: { stop_requested: false, needs_human: false, background_active: true, stop_ready: false },
+  }, null, 2) + "\n";
+
   it("has init.sh", () => {
     const content = readFileSync(resolve(REPO_ROOT, "hooks/init.sh"), "utf-8");
     expect(content).toContain("#!/bin/sh");
@@ -94,6 +126,84 @@ describe("hooks/", () => {
   it("has stop.sh", () => {
     const content = readFileSync(resolve(REPO_ROOT, "hooks/stop.sh"), "utf-8");
     expect(content).toContain("stop_requested");
+  });
+
+  it("does not interpolate AUTORESEARCH_STATE into inline JavaScript", () => {
+    const status = readFileSync(resolve(REPO_ROOT, "hooks/status.sh"), "utf-8");
+    const stop = readFileSync(resolve(REPO_ROOT, "hooks/stop.sh"), "utf-8");
+
+    expect(status).toContain("process.env.AUTORESEARCH_STATUS_FILE");
+    expect(stop).toContain("process.env.AUTORESEARCH_STATUS_FILE");
+    expect(status).not.toContain("readFileSync('$STATUS_FILE'");
+    expect(stop).not.toContain("readFileSync('$STATUS_FILE'");
+  });
+
+  it("rejects symlinked stop state files", () => {
+    const tempRoot = mkdtempSync(resolve(tmpdir(), "autoresearch-hook-"));
+    try {
+      const target = resolve(tempRoot, "target-state.json");
+      const link = resolve(tempRoot, ".autoresearch", "state.json");
+      mkdirSync(resolve(tempRoot, ".autoresearch"), { recursive: true });
+      writeFileSync(target, backgroundState(link, resolve(tempRoot, "autoresearch-results.tsv")), "utf-8");
+      symlinkSync(target, link);
+
+      const out = execFileSync("sh", [resolve(REPO_ROOT, "hooks/stop.sh")], {
+        cwd: tempRoot,
+        encoding: "utf-8",
+        env: { ...process.env, AUTORESEARCH_STATE: link },
+      });
+
+      expect(out).toContain("Refusing symlinked state file.");
+      expect(readFileSync(target, "utf-8")).toContain('"stop_requested": false');
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects stop state files outside the workspace", () => {
+    const tempRoot = mkdtempSync(resolve(tmpdir(), "autoresearch-hook-"));
+    const outsideRoot = mkdtempSync(resolve(tmpdir(), "autoresearch-outside-"));
+    try {
+      const outsideState = resolve(outsideRoot, "state.json");
+      writeFileSync(outsideState, backgroundState(outsideState, resolve(outsideRoot, "autoresearch-results.tsv")), "utf-8");
+
+      const out = execFileSync("sh", [resolve(REPO_ROOT, "hooks/stop.sh")], {
+        cwd: tempRoot,
+        encoding: "utf-8",
+        env: { ...process.env, AUTORESEARCH_STATE: outsideState },
+      });
+
+      expect(out).toContain("Refusing state file outside workspace.");
+      expect(readFileSync(outsideState, "utf-8")).toContain('"stop_requested": false');
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+      rmSync(outsideRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe(".opencode/", () => {
+  it("has OpenCode install guide with plugin and npm paths", () => {
+    const content = readFileSync(resolve(REPO_ROOT, ".opencode/INSTALL.md"), "utf-8");
+    expect(content).toContain('"plugin": ["opencode-autoresearch"]');
+    expect(content).toContain("npm install -g opencode-autoresearch");
+    expect(content).toContain("opencode-autoresearch doctor");
+  });
+});
+
+describe("AGENTS.md", () => {
+  it("is tracked repository guidance, not local-only context", () => {
+    const content = readFileSync(resolve(REPO_ROOT, "AGENTS.md"), "utf-8");
+    expect(content).toContain("Auto Research");
+    expect(content).toContain("npm run verify:pack");
+  });
+});
+
+describe("release workflow", () => {
+  it("runs tests before publishing", () => {
+    const content = readFileSync(resolve(REPO_ROOT, ".github/workflows/release.yml"), "utf-8");
+    expect(content).toContain("npm test");
+    expect(content).toContain("npm publish --access public --provenance");
   });
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "opencode-autoresearch",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "description": "Autonomous recursive self-improvement engine for OpenCode. Subagent-first iteration loop with standing-pool orchestration and mechanical verification.",
   "author": {
     "name": "Maleick",
@@ -44,6 +44,7 @@
     "skills",
     "plugins",
     "docs",
+    ".opencode/INSTALL.md",
     ".opencode-plugin",
     "AGENTS.md",
     "VERSION",

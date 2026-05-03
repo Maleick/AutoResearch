@@ -17,9 +17,11 @@ const entries = Array.isArray(packResult) ? packResult : [packResult];
 const files = entries.flatMap((entry) => Array.isArray(entry.files) ? entry.files : []);
 
 const allowedRoots = new Set(["dist", "hooks", "commands", "skills", "plugins", "docs", ".opencode-plugin"]);
-const allowedFiles = new Set(["package.json", "README.md", "LICENSE", "AGENTS.md", "VERSION"]);
+const allowedFiles = new Set(["package.json", "README.md", "LICENSE", "AGENTS.md", "VERSION", ".opencode/INSTALL.md"]);
 const requiredFiles = [
+  ".opencode/INSTALL.md",
   ".opencode-plugin/plugin.json",
+  "AGENTS.md",
   "hooks/init.sh",
   "skills/autoresearch/SKILL.md",
   "commands/autoresearch.md",

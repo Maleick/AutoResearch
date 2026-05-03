@@ -1,12 +1,96 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
-import { existsSync, readFileSync, rmSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const CLI = resolve(REPO_ROOT, "dist/cli.js");
+const STATE_PATH = resolve(REPO_ROOT, ".autoresearch", "state.json");
+const RESULTS_PATH = resolve(REPO_ROOT, "autoresearch-results.tsv");
+const MEMORY_PATH = resolve(REPO_ROOT, "autoresearch-memory.md");
+
+const readIfExists = (path: string): string | undefined =>
+  existsSync(path) ? readFileSync(path, "utf-8") : undefined;
+
+const restoreFile = (path: string, original: string | undefined): void => {
+  if (original === undefined) {
+    try { rmSync(path); } catch {}
+  } else {
+    writeFileSync(path, original, "utf-8");
+  }
+};
 
 describe("CLI Commands", () => {
+  const originalState = readIfExists(STATE_PATH);
+  const originalResults = readIfExists(RESULTS_PATH);
+  const originalMemory = readIfExists(MEMORY_PATH);
+
+  beforeAll(() => {
+    mkdirSync(resolve(REPO_ROOT, ".autoresearch"), { recursive: true });
+    writeFileSync(STATE_PATH, JSON.stringify({
+      schema_version: 1,
+      run_id: "test-run",
+      created_at: "2026-05-03T00:00:00Z",
+      updated_at: "2026-05-03T00:01:00Z",
+      status: "running",
+      mode: "foreground",
+      goal: "test fixture goal",
+      scope: "tests",
+      metric: {
+        name: "tests",
+        direction: "lower",
+        baseline: "1",
+        best: "0",
+        latest: "0",
+      },
+      verify: "npm test",
+      label_requirements: { keep: [], stop: [] },
+      artifact_paths: {
+        results: RESULTS_PATH,
+        state: STATE_PATH,
+      },
+      stats: {
+        total_iterations: 1,
+        kept: 1,
+        discarded: 0,
+        needs_human: 0,
+        consecutive_discards: 0,
+      },
+      flags: {
+        stop_requested: false,
+        needs_human: false,
+        background_active: false,
+        stop_ready: false,
+      },
+      last_iteration: {
+        iteration: 1,
+        decision: "keep",
+        metric_value: "0",
+        change_summary: "seed fixture state",
+        labels: [],
+        timestamp: "2026-05-03T00:01:00Z",
+        keep_labels_satisfied: true,
+        stop_labels_satisfied: true,
+        missing_keep_labels: [],
+        missing_stop_labels: [],
+      },
+    }, null, 2) + "\n", "utf-8");
+    writeFileSync(RESULTS_PATH, [
+      "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote",
+      "2026-05-03T00:01:00Z\t1\tkeep\t0\tpass\tpass\tfixture\tseed fixture state\tfixture\tbaseline",
+    ].join("\n") + "\n", "utf-8");
+    writeFileSync(MEMORY_PATH, "### Pattern: Keep fixture tests isolated\n\nCreate runtime artifacts in test setup instead of relying on local ignored files.\n", "utf-8");
+  });
+
+  afterAll(() => {
+    restoreFile(STATE_PATH, originalState);
+    restoreFile(RESULTS_PATH, originalResults);
+    restoreFile(MEMORY_PATH, originalMemory);
+    if (originalState === undefined) {
+      try { rmSync(resolve(REPO_ROOT, ".autoresearch"), { recursive: true }); } catch {}
+    }
+  });
+
   describe("--verbose flag", () => {
     it("shows verbose output during init", () => {
       const out = execSync(`node ${CLI} init --goal "test" --metric "test" --verify "echo test" --verbose --dry-run 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT });
@@ -27,7 +111,7 @@ describe("CLI Commands", () => {
     it("outputs version info", () => {
       const out = execSync(`node ${CLI} --version`, { encoding: "utf-8" });
       expect(out).toContain("autoresearch");
-      expect(out).toContain("3.3.1");
+      expect(out).toContain("3.3.2");
     });
 
     it("accepts -v shorthand", () => {
@@ -434,7 +518,7 @@ describe("CLI Commands", () => {
   describe("version output", () => {
     it("includes version number", () => {
       const out = execSync(`node ${CLI} --version`, { encoding: "utf-8" });
-      expect(out).toContain("3.3.1");
+      expect(out).toContain("3.3.2");
     });
 
     it("includes runtime info", () => {
