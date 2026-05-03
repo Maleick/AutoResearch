@@ -1,6 +1,6 @@
 {
   "name": "autoresearch",
-  "version": "3.3.2",
+  "version": "3.3.3",
   "description": "Auto Research for OpenCode. Run a structured autonomous iteration loop with a standing subagent pool.",
   "author": {
     "name": "Maleick",
