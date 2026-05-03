@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/version-v3.3.3-58a6ff?style=flat" alt="v3.3.3">
   <a href="https://github.com/Maleick/AutoResearch/stargazers"><img src="https://img.shields.io/github/stars/Maleick/AutoResearch?style=flat&color=58a6ff" alt="Stars"></a>
   <a href="https://github.com/Maleick/AutoResearch/commits/main"><img src="https://img.shields.io/github/last-commit/Maleick/AutoResearch?style=flat" alt="Last Commit"></a>
   <a href="https://github.com/Maleick/AutoResearch/releases"><img src="https://img.shields.io/github/v/release/Maleick/AutoResearch?style=flat" alt="Version"></a>
@@ -96,7 +97,7 @@ See [`skills/autoresearch/references/self-improve-loop.md`](skills/autoresearch/
 
 ## Installation
 
-For OpenCode, paste this handoff into your agent. This URL follows the latest `main` instructions:
+For OpenCode, paste this one-line install prompt into your agent. This URL follows the latest `main` instructions:
 
 ```text
 Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md

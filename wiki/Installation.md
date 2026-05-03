@@ -1,6 +1,6 @@
 # Installation
 
-For OpenCode, paste this handoff into your agent. This URL follows the latest `main` instructions:
+For OpenCode, paste this one-line install prompt into your agent. This URL follows the latest `main` instructions:
 
 ```text
 Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md
