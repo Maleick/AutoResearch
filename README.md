@@ -96,7 +96,13 @@ See [`skills/autoresearch/references/self-improve-loop.md`](skills/autoresearch/
 
 ## Installation
 
-Recommended: add Auto Research to the `plugin` array in your global or project-level `opencode.json`:
+For OpenCode, paste this handoff into your agent. This URL follows the latest `main` instructions:
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md
+```
+
+Recommended plugin install in `opencode.json`:
 
 ```json
 {
@@ -110,20 +116,21 @@ Restart OpenCode, then run the setup wizard:
 /autoresearch
 ```
 
-If you also want the CLI available on your shell `PATH`, install the npm package globally:
+Global npm install path:
 
 ```bash
 npm install -g opencode-autoresearch
 opencode-autoresearch doctor
+opencode-autoresearch --version
 ```
 
-For one-time CLI use without a global install:
+One-time package runner path:
 
 ```bash
 npx opencode-autoresearch doctor
 ```
 
-See [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for detailed OpenCode install, update, and troubleshooting notes.
+See [`INSTALL.md`](INSTALL.md) for prerequisites, verification, updating, and troubleshooting.
 
 ## Quick Start
 

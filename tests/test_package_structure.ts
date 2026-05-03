@@ -28,8 +28,18 @@ describe("package.json", () => {
     expect(files).not.toContain("scripts/");
   });
 
+  it("packages public docs explicitly instead of the whole docs tree", () => {
+    const files = readJson(resolve(REPO_ROOT, "package.json")).files as string[];
+    expect(files).not.toContain("docs");
+    expect(files).not.toContain("plugins");
+    expect(files).toContain("docs/OPENCODE_INSTALL.md");
+    expect(files).toContain("docs/RELEASE.md");
+    expect(files).toContain("plugins/autoresearch.ts");
+  });
+
   it("packages repo-level OpenCode install guide", () => {
     const files = readJson(resolve(REPO_ROOT, "package.json")).files as string[];
+    expect(files).toContain("INSTALL.md");
     expect(files).toContain(".opencode/INSTALL.md");
     expect(files).not.toContain(".opencode");
     expect(files).toContain("AGENTS.md");
@@ -37,8 +47,14 @@ describe("package.json", () => {
 
   it("does not package broad local OpenCode config", () => {
     const verifier = readFileSync(resolve(REPO_ROOT, "hooks/verify-package.sh"), "utf-8");
+    expect(verifier).toContain('"INSTALL.md"');
     expect(verifier).toContain('".opencode/INSTALL.md"');
     expect(verifier).not.toContain('".opencode",');
+    expect(verifier).not.toContain('"docs",');
+    expect(verifier).not.toContain('"plugins",');
+    expect(verifier).toContain('"autoresearch-results.tsv"');
+    expect(verifier).toContain('"autoresearch-report.md"');
+    expect(verifier).toContain('"autoresearch-memory.md"');
   });
 
   it("has build and typecheck scripts", () => {
@@ -188,6 +204,22 @@ describe(".opencode/", () => {
     expect(content).toContain('"plugin": ["opencode-autoresearch"]');
     expect(content).toContain("npm install -g opencode-autoresearch");
     expect(content).toContain("opencode-autoresearch doctor");
+  });
+});
+
+describe("INSTALL.md", () => {
+  it("has root OpenCode handoff instructions", () => {
+    const content = readFileSync(resolve(REPO_ROOT, "INSTALL.md"), "utf-8");
+    expect(content).toContain("Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md");
+    expect(content).toContain('"plugin": ["opencode-autoresearch"]');
+    expect(content).toContain("npm install -g opencode-autoresearch");
+    expect(content).toContain("opencode-autoresearch doctor");
+  });
+
+  it("is linked from README installation section", () => {
+    const content = readFileSync(resolve(REPO_ROOT, "README.md"), "utf-8");
+    expect(content).toContain("Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md");
+    expect(content).toContain("See [`INSTALL.md`](INSTALL.md)");
   });
 });
 

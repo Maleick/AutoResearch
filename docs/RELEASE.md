@@ -12,10 +12,10 @@ This package uses npm publish for releases. GitHub Actions automates the full re
 
 ```bash
 # Update VERSION file
-echo "3.3.2" > VERSION
+echo "3.3.3" > VERSION
 
 # Sync to package.json
-npm version 3.3.2 --no-git-tag-version
+npm version 3.3.3 --no-git-tag-version
 
 # Sync to src/constants.ts
 # Update the VERSION export manually or use sed
@@ -36,25 +36,24 @@ npm test
 Add a new section for the version in `CHANGELOG.md`:
 
 ```markdown
-## [3.3.2] - YYYY-MM-DD
+## [3.3.3] - YYYY-MM-DD
 
 ### Added
-- Recursive self-improvement loop support
-- Mermaid diagrams in documentation
-- Enhanced subagent pool with meta-orchestrator role
+- Root install handoff
+- Public install verification notes
 
 ### Changed
-- Updated README with banner and visual diagrams
-- Improved wiki pages with architecture charts
+- Installation docs
+- Package verification allowlist
 ```
 
 ### 4. Commit and tag
 
 ```bash
 git add -A
-git commit -m "Release v3.3.2"
-git tag v3.3.2
-git push origin main v3.3.2
+git commit -m "Release v3.3.3"
+git tag v3.3.3
+git push origin main v3.3.3
 ```
 
 ### 5. Automated release
@@ -86,7 +85,8 @@ The shipped package includes:
 - `commands/` — OpenCode command surfaces (`autoresearch.md`, `autoresearch/*.md`)
 - `skills/autoresearch/` — Skill bundle with references
 - `hooks/` — Shell hooks for session lifecycle
-- `docs/` — Installation, architecture, and release docs
+- selected `docs/` files — `ARCHITECTURE.md`, `OPENCODE_INSTALL.md`, `QUICKSTART.md`, `RELEASE.md`, documentation site assets, and `CNAME`
+- `INSTALL.md` — Public raw OpenCode install handoff
 - `.opencode/INSTALL.md` — OpenCode native plugin install guide
 - `.opencode-plugin/plugin.json` — OpenCode plugin manifest
 - `AGENTS.md` — Agent guide

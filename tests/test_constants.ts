@@ -6,7 +6,7 @@ const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 describe("Constants", () => {
   it("has correct version", async () => {
     const { VERSION } = await import(resolve(REPO_ROOT, "dist/constants.js"));
-    expect(VERSION).toBe("3.3.2");
+    expect(VERSION).toBe("3.3.3");
   });
 
   it("has correct package name", async () => {

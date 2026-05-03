@@ -1,5 +1,7 @@
 # OpenCode Install
 
+For the public raw install handoff, see [`../INSTALL.md`](../INSTALL.md).
+
 ## Recommended: OpenCode Plugin Install
 
 Add Auto Research to the `plugin` array in your global or project-level `opencode.json`:
@@ -65,7 +67,7 @@ Restart OpenCode after a new Auto Research package release is available. To pin 
 
 ```json
 {
-  "plugin": ["opencode-autoresearch@3.3.2"]
+  "plugin": ["opencode-autoresearch@3.3.3"]
 }
 ```
 

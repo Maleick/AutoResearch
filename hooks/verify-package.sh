@@ -16,9 +16,26 @@ const packResult = JSON.parse(raw);
 const entries = Array.isArray(packResult) ? packResult : [packResult];
 const files = entries.flatMap((entry) => Array.isArray(entry.files) ? entry.files : []);
 
-const allowedRoots = new Set(["dist", "hooks", "commands", "skills", "plugins", "docs", ".opencode-plugin"]);
-const allowedFiles = new Set(["package.json", "README.md", "LICENSE", "AGENTS.md", "VERSION", ".opencode/INSTALL.md"]);
+const allowedRoots = new Set(["dist", "hooks", "commands", "skills", ".opencode-plugin"]);
+const allowedFiles = new Set([
+  "package.json",
+  "README.md",
+  "LICENSE",
+  "AGENTS.md",
+  "VERSION",
+  "INSTALL.md",
+  ".opencode/INSTALL.md",
+  "plugins/autoresearch.ts",
+  "docs/ARCHITECTURE.md",
+  "docs/autoresearch-loop.svg",
+  "docs/CNAME",
+  "docs/index.html",
+  "docs/OPENCODE_INSTALL.md",
+  "docs/QUICKSTART.md",
+  "docs/RELEASE.md",
+]);
 const requiredFiles = [
+  "INSTALL.md",
   ".opencode/INSTALL.md",
   ".opencode-plugin/plugin.json",
   "AGENTS.md",
@@ -28,7 +45,18 @@ const requiredFiles = [
 ];
 
 const normalizePath = (filePath) => filePath.replace(/^package\//, "");
-const isForbidden = (filePath) => filePath === ".autoresearch" || filePath.startsWith(".autoresearch/");
+const forbiddenFiles = new Set([
+  "autoresearch-results.tsv",
+  "autoresearch-report.md",
+  "autoresearch-memory.md",
+  "autoresearch-hook-context.json",
+]);
+const isForbidden = (filePath) =>
+  filePath === ".autoresearch" ||
+  filePath.startsWith(".autoresearch/") ||
+  filePath === ".autoresearch-test-tmp" ||
+  filePath.startsWith(".autoresearch-test-tmp/") ||
+  forbiddenFiles.has(filePath);
 const isAllowed = (filePath) => {
   if (allowedFiles.has(filePath)) return true;
   const [root] = filePath.split("/");

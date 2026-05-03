@@ -111,7 +111,7 @@ describe("CLI Commands", () => {
     it("outputs version info", () => {
       const out = execSync(`node ${CLI} --version`, { encoding: "utf-8" });
       expect(out).toContain("autoresearch");
-      expect(out).toContain("3.3.2");
+      expect(out).toContain("3.3.3");
     });
 
     it("accepts -v shorthand", () => {
@@ -518,7 +518,7 @@ describe("CLI Commands", () => {
   describe("version output", () => {
     it("includes version number", () => {
       const out = execSync(`node ${CLI} --version`, { encoding: "utf-8" });
-      expect(out).toContain("3.3.2");
+      expect(out).toContain("3.3.3");
     });
 
     it("includes runtime info", () => {

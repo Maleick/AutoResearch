@@ -1,5 +1,11 @@
 # Installation
 
+For OpenCode, paste this handoff into your agent. This URL follows the latest `main` instructions:
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md
+```
+
 ## Recommended: OpenCode Plugin Install
 
 Add Auto Research to the `plugin` array in your global or project-level `opencode.json`:
@@ -53,4 +59,4 @@ autoresearch complete
 - `autoresearch-report.md` — End-of-run report
 - `autoresearch-memory.md` — Reusable memory
 
-See [docs/OPENCODE_INSTALL.md](docs/OPENCODE_INSTALL.md) and [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for full install details.
+See [INSTALL.md](https://github.com/Maleick/AutoResearch/blob/main/INSTALL.md), [docs/OPENCODE_INSTALL.md](https://github.com/Maleick/AutoResearch/blob/main/docs/OPENCODE_INSTALL.md), and [`.opencode/INSTALL.md`](https://github.com/Maleick/AutoResearch/blob/main/.opencode/INSTALL.md) for full install details.

@@ -1,5 +1,14 @@
 # Auto Research Changelog
 
+## [3.3.3] - 2026-05-03
+
+### Added
+- **Root install handoff**: Added `INSTALL.md` with a raw OpenCode handoff URL, plugin install instructions, npm CLI alternatives, verification, updating, troubleshooting, and safety notes.
+
+### Changed
+- **Installation docs**: Updated README, OpenCode install docs, and wiki installation guidance to mirror the Code Archaeology install handoff pattern.
+- **Package verification**: Required root `INSTALL.md`, narrowed docs/plugin package allowlists to explicit public files, and kept internal planning files out of package dry-run validation.
+
 ## [3.3.2] - 2026-05-03
 
 ### Added

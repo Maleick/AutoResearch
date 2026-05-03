@@ -1,5 +1,7 @@
 # Installing Auto Research for OpenCode
 
+For the public raw install handoff, see [`../INSTALL.md`](../INSTALL.md).
+
 ## Prerequisites
 
 - [OpenCode.ai](https://opencode.ai) installed
@@ -59,7 +61,7 @@ To pin a version:
 
 ```json
 {
-  "plugin": ["opencode-autoresearch@3.3.2"]
+  "plugin": ["opencode-autoresearch@3.3.3"]
 }
 ```
 
