@@ -28,11 +28,42 @@ flowchart TD
 - `/autoresearch:security` — Security review
 - `/autoresearch:ship` — Ship-readiness workflow
 
+## Hermes Agent Command Surface
+
+Hermes uses `cronjob` and `delegate_task` instead of slash commands:
+
+| OpenCode Command | Hermes Equivalent |
+|-----------------|-------------------|
+| `/autoresearch` | Cron runs iteration loop |
+| `/autoresearch:plan` | Subagent task: plan experiments |
+| `/autoresearch:debug` | Subagent task: debug failures |
+| `/autoresearch:fix` | Subagent task: fix issues |
+| `/autoresearch:learn` | Memory tool + pattern analysis |
+| `/autoresearch:predict` | Subagent task: predict outcomes |
+| `/autoresearch:scenario` | Subagent task: expand scenarios |
+| `/autoresearch:security` | Subagent task: security audit |
+| `/autoresearch:ship` | Subagent task: ship checks |
+
+| CLI Command | Hermes Equivalent |
+|-------------|-------------------|
+| `autoresearch init` | Manual setup (same CLI) |
+| `autoresearch status` | `cat .autoresearch/state.json` |
+| `autoresearch launch` | `cronjob create` |
+| `autoresearch stop` | `cronjob pause` |
+| `autoresearch resume` | `cronjob resume` |
+
+See [`skills/hermes/INTEGRATION.md`](https://github.com/Maleick/AutoResearch/blob/main/skills/hermes/INTEGRATION.md) for the full mapping.
+
 ## New in v3.3.0
 
 - `/autoresearch` now supports **recursive self-improvement** via `meta_orchestrator` role
 - Enhanced subagent pool with `pattern_analyst`, `strategy_advisor`, `regression_guard`
 - Background runs now persist memory across meta-iterations
+
+## New in v3.3.3
+
+- **Hermes Agent support** — cron-based iteration loop with `delegate_task` subagents
+- Dual-runtime documentation and command mapping
 
 ## CLI
 
@@ -105,4 +136,4 @@ flowchart LR
 | `foreground` | Interactive development, user present |
 | `background` | Overnight runs, self-improvement, CI/CD |
 
-Background runs create `.autoresearch/state.json` and can be resumed with `autoresearch resume`.
+Background runs create `.autoresearch/state.json` and can be resumed with `autoresearch resume` (OpenCode) or continue automatically (Hermes cron).

@@ -1,12 +1,12 @@
 # Auto Research Wiki
 
-Auto Research is a **subagent-first autonomous iteration engine** for OpenCode with support for recursive self-improvement loops.
+Auto Research is a **subagent-first autonomous iteration engine** for **OpenCode** and **Hermes Agent** with support for recursive self-improvement loops.
 
 ## Pages
 
 | Page | Purpose |
 | --- | --- |
-| [Installation](Installation.md) | OpenCode install via npm |
+| [Installation](Installation.md) | Install via npm (OpenCode) or skill files (Hermes) |
 | [Commands](Commands.md) | Command surface and mode workflows |
 | [Configuration](Configuration.md) | Core fields, artifacts, and runtime state |
 | [Safety](Safety.md) | Safety model and artifact discipline |
@@ -56,12 +56,19 @@ flowchart LR
 5. **Learn** — Extract patterns for future runs
 6. **Repeat** — Continue until stop condition
 
+## Supported Runtimes
+
+| Runtime | Entry | Subagent Pool | Background |
+|---------|-------|---------------|------------|
+| OpenCode | `/autoresearch` slash commands | Standing pool (unlimited) | `autoresearch launch` |
+| Hermes Agent | Cronjob + `delegate_task` | Batch (max 3) | Native cron |
+
 ## Current Positioning
 
 - Public product name: **Auto Research**
 - Repository: `Maleick/AutoResearch`
 - Package: `opencode-autoresearch`
-- Runtime: OpenCode only (v3.3.0+)
+- Runtimes: OpenCode + Hermes Agent (v3.3.3+)
 - License: MIT
 
 ## Self-Improvement at a Glance

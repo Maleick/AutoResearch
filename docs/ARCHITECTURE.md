@@ -2,7 +2,16 @@
 
 > Current reference for v3.3.3.
 
-Auto Research is an OpenCode-only npm package with recursive self-improvement capabilities. The runtime is Node.js ESM. All workflow semantics are preserved from earlier releases.
+Auto Research is a multi-runtime npm package with recursive self-improvement capabilities. The runtime is Node.js ESM. All workflow semantics are preserved from earlier releases.
+
+## Supported Runtimes
+
+| Runtime | Entry | Subagent Model | Background Mode |
+|---------|-------|----------------|-----------------|
+| OpenCode | `/autoresearch` slash commands | Standing pool (unlimited) | `autoresearch launch` |
+| Hermes Agent | Cronjob + `delegate_task` | Batch pool (max 3) | Native cron |
+
+Both runtimes share the same state format, CLI, and artifact paths.
 
 ## Package Layout
 
@@ -19,11 +28,15 @@ commands/autoresearch.md        # Main command
 commands/autoresearch/*.md     # Mode commands (plan, debug, fix, learn, etc.)
 skills/autoresearch/           # OpenCode skill bundle
 skills/autoresearch/references/# Workflow and runtime references
+skills/hermes/                 # Hermes Agent skill bundle
+  README.md                    # Hermes setup and usage
+  INTEGRATION.md               # Architecture and command mapping
+  autoresearch-prompt.md       # Cron prompt template
 hooks/init.sh                  # SessionStart hook
 hooks/status.sh                # Status hook
 hooks/stop.sh                  # Stop hook
 hooks/verify-package.sh        # Package verification
-INSTALL.md                     # Public raw OpenCode install handoff
+INSTALL.md                     # Public raw install handoff (both runtimes)
 .opencode/INSTALL.md          # OpenCode native plugin install guide
 docs/OPENCODE_INSTALL.md       # OpenCode install guide
 docs/ARCHITECTURE.md           # This document
@@ -39,15 +52,16 @@ AGENTS.md                      # Repository-specific agent guide
 ```mermaid
 flowchart LR
     A[OpenCode /autoresearch] --> B[CLI]
+    H[Hermes Cronjob] --> B
     B --> C[Run Manager]
     C --> D[State JSON]
     C --> E[Results TSV]
     C --> F[Subagent Pool]
     F --> G[Orchestrator]
-    F --> H[Scout]
-    F --> I[Analyst]
-    F --> J[Verifier]
-    F --> K[Synthesizer]
+    F --> I[Scout]
+    F --> J[Analyst]
+    F --> K[Verifier]
+    F --> L[Synthesizer]
 ```
 
 ## Core Loop
@@ -55,7 +69,7 @@ flowchart LR
 ```mermaid
 flowchart TD
     A[Goal + Metric + Verify] --> B[Baseline]
-    B --> C[Standing Pool Init]
+    B --> C[Pool Init]
     C --> D[Iteration N]
     D --> E[Subagent Context]
     E --> F[Focused Change]
@@ -88,7 +102,7 @@ flowchart TD
 
 ## Source of Truth
 
-`src/` is authoritative for runtime behavior. `commands/` and `skills/` define the OpenCode surfaces.
+`src/` is authoritative for runtime behavior. `commands/` and `skills/autoresearch/` define the OpenCode surfaces. `skills/hermes/` defines the Hermes Agent surface.
 
 ## Runtime Artifacts
 
@@ -103,6 +117,8 @@ flowchart TD
 
 ## Command Surface
 
+### OpenCode
+
 | Command | Workflow |
 | --- | --- |
 | `/autoresearch` | Default improve-verify loop |
@@ -114,6 +130,21 @@ flowchart TD
 | `/autoresearch:scenario` | Scenario expansion |
 | `/autoresearch:security` | Security review |
 | `/autoresearch:ship` | Ship-readiness workflow |
+
+### Hermes
+
+| OpenCode Command | Hermes Equivalent |
+|-----------------|-------------------|
+| `/autoresearch` | Cron runs iteration loop |
+| `/autoresearch:plan` | Subagent task: plan experiments |
+| `/autoresearch:debug` | Subagent task: debug failures |
+| `/autoresearch:fix` | Subagent task: fix issues |
+| `/autoresearch:learn` | Memory tool + pattern analysis |
+| `autoresearch init` | Manual setup (same CLI) |
+| `autoresearch status` | `cat .autoresearch/state.json` |
+| `autoresearch launch` | `cronjob create` |
+| `autoresearch stop` | `cronjob pause` |
+| `autoresearch resume` | `cronjob resume` |
 
 ## CLI Commands
 
@@ -161,6 +192,15 @@ The standing pool provides:
 | `research_tracker` | Pattern tracking across iterations |
 | `meta_orchestrator` | Owns meta-goal and child loop decisions (self-improvement) |
 
+### Runtime Differences
+
+| Feature | OpenCode | Hermes |
+|---------|----------|--------|
+| Pool type | Standing (persistent across iterations) | Batch (spawned per phase) |
+| Max concurrent | Unlimited | 3 (Hermes limit) |
+| Real-time | Yes | 15-minute cron intervals |
+| Memory | File-based | `memory` tool + file |
+
 ## Validation
 
 1. `npm run typecheck` — TypeScript strict checks.
@@ -196,3 +236,4 @@ The release workflow is automated via GitHub Actions:
 - Plugin format is `.opencode-plugin/plugin.json`.
 - The Claude and Codex plugin bundles (`plugins/autoresearch/`, `plugins/codex-autoresearch/`) are no longer shipped.
 - Self-improvement loop added in v3.2.0.
+- Hermes Agent support added in v3.3.3.

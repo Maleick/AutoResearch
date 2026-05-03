@@ -1,12 +1,16 @@
 # Installation
 
-For OpenCode, paste this one-line install prompt into your agent. This URL follows the latest `main` instructions:
+Auto Research supports **OpenCode** and **Hermes Agent** runtimes.
+
+## OpenCode Install
+
+Paste this one-line install prompt into your agent. This URL follows the latest `main` instructions:
 
 ```text
 Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md
 ```
 
-## Recommended: OpenCode Plugin Install
+### Recommended: OpenCode Plugin Install
 
 Add Auto Research to the `plugin` array in your global or project-level `opencode.json`:
 
@@ -22,12 +26,36 @@ Restart OpenCode, then run:
 /autoresearch
 ```
 
-## Optional CLI Install
+### Optional CLI Install
 
 ```bash
 npm install -g opencode-autoresearch
-opencode-autoresearch doctor
+autoresearch doctor
 ```
+
+## Hermes Agent Install
+
+```bash
+# 1. Clone AutoResearch
+git clone https://github.com/Maleick/AutoResearch.git
+cd AutoResearch
+npm install
+
+# 2. Install the Hermes skill
+mkdir -p ~/.hermes/skills/autoresearch-hermes
+cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/autoresearch-hermes/SKILL.md
+cp skills/hermes/INTEGRATION.md ~/.hermes/skills/autoresearch-hermes/REFERENCES.md
+
+# 3. Create a cronjob
+hermes cronjob create \
+  --name "autoresearch-loop" \
+  --schedule "every 15m" \
+  --workdir ~/projects/AutoResearch \
+  --skills autoresearch-hermes \
+  --prompt "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+```
+
+See [`skills/hermes/README.md`](https://github.com/Maleick/AutoResearch/blob/main/skills/hermes/README.md) for full Hermes setup and troubleshooting.
 
 ## OpenCode Commands
 
@@ -40,6 +68,18 @@ opencode-autoresearch doctor
 - `/autoresearch:scenario` — Scenario expansion
 - `/autoresearch:security` — Security review
 - `/autoresearch:ship` — Ship-readiness workflow
+
+## Hermes Commands
+
+Hermes uses cronjobs and `delegate_task` instead of slash commands. See [`skills/hermes/INTEGRATION.md`](https://github.com/Maleick/AutoResearch/blob/main/skills/hermes/INTEGRATION.md) for the full command mapping.
+
+| OpenCode Command | Hermes Equivalent |
+|-----------------|-------------------|
+| `/autoresearch` | Cron runs iteration loop |
+| `/autoresearch:plan` | Subagent task: plan experiments |
+| `/autoresearch:debug` | Subagent task: debug failures |
+| `/autoresearch:fix` | Subagent task: fix issues |
+| `/autoresearch:learn` | Memory tool + pattern analysis |
 
 ## CLI Commands
 

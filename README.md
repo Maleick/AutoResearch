@@ -1,7 +1,7 @@
 # Auto Research
 
 <p align="center">
-  <img src="assets/autoresearch-banner.svg" width="900" alt="Auto Research — Autonomous recursive self-improvement engine" />
+  <img src="assets/autoresearch-banner.svg" width="900" alt="Auto Research — Multi-runtime autonomous recursive self-improvement engine" />
 </p>
 
 <p align="center">
@@ -21,7 +21,7 @@
   <a href="#self-improvement-loop">Self-Improvement</a>
 </p>
 
-<p align="center"><strong>Autonomous recursive self-improvement engine for OpenCode.</strong></p>
+<p align="center"><strong>Multi-runtime autonomous recursive self-improvement engine.</strong></p>
 
 ```text
 ┌──────────────────────────────────────────────┐
@@ -35,7 +35,7 @@
 
 ## What It Does
 
-Auto Research is a **subagent-first autonomous iteration engine** that runs structured improve-verify loops inside OpenCode. Unlike simple task runners, it maintains a standing pool of specialized subagents, persists learnings across iterations, and can run recursive self-improvement loops on its own codebase.
+Auto Research is a **subagent-first autonomous iteration engine** that runs structured improve-verify loops inside **OpenCode** or **Hermes Agent**. Unlike simple task runners, it maintains a pool of specialized subagents, persists learnings across iterations, and can run recursive self-improvement loops on its own codebase.
 
 - **Plans** experiments from a measurable goal
 - **Modifies** one focused change per iteration
@@ -60,7 +60,7 @@ flowchart LR
 ```mermaid
 flowchart TD
     A[Goal + Metric + Verify] --> B[Baseline]
-    B --> C[Standing Pool Init]
+    B --> C[Pool Init]
     C --> D[Iteration N]
     D --> E[Subagent Context]
     E --> F[Focused Change]
@@ -97,6 +97,8 @@ See [`skills/autoresearch/references/self-improve-loop.md`](skills/autoresearch/
 
 ## Installation
 
+### OpenCode
+
 For OpenCode, paste this one-line install prompt into your agent. This URL follows the latest `main` instructions:
 
 ```text
@@ -117,12 +119,38 @@ Restart OpenCode, then run the setup wizard:
 /autoresearch
 ```
 
-Global npm install path:
+### Hermes Agent
+
+```bash
+# 1. Clone AutoResearch
+git clone https://github.com/Maleick/AutoResearch.git
+cd AutoResearch
+npm install
+
+# 2. Install the Hermes skill
+mkdir -p ~/.hermes/skills/autoresearch-hermes
+cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/autoresearch-hermes/SKILL.md
+cp skills/hermes/INTEGRATION.md ~/.hermes/skills/autoresearch-hermes/REFERENCES.md
+
+# 3. Create a cronjob
+hermes cronjob create \
+  --name "autoresearch-loop" \
+  --schedule "every 15m" \
+  --workdir ~/projects/AutoResearch \
+  --skills autoresearch-hermes \
+  --prompt "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+```
+
+See [`skills/hermes/README.md`](skills/hermes/README.md) for full Hermes setup, troubleshooting, and command mapping.
+
+### npm CLI (both runtimes)
+
+Global install path:
 
 ```bash
 npm install -g opencode-autoresearch
-opencode-autoresearch doctor
-opencode-autoresearch --version
+autoresearch doctor
+autoresearch --version
 ```
 
 One-time package runner path:
@@ -134,6 +162,8 @@ npx opencode-autoresearch doctor
 See [`INSTALL.md`](INSTALL.md) for prerequisites, verification, updating, and troubleshooting.
 
 ## Quick Start
+
+### OpenCode
 
 ```bash
 # 1. Add the plugin to opencode.json
@@ -148,25 +178,51 @@ cd ~/Projects/my-project
 /autoresearch
 ```
 
+### Hermes Agent
+
+```bash
+# 1. Ensure the skill is installed (see Installation above)
+
+# 2. Create a config file
+cat > autoresearch-config.json <<'EOF'
+{
+  "goal": "Improve test coverage",
+  "metric": "coverage_pct",
+  "direction": "higher",
+  "verify": "npm run test:coverage",
+  "guard": "npm run typecheck",
+  "max_iterations": 20,
+  "mode": "background"
+}
+EOF
+
+# 3. Start the cronjob
+hermes cronjob resume autoresearch-loop
+
+# 4. Check progress
+cat .autoresearch/state.json | jq .
+```
+
 ## Runtime Surfaces
 
 | Surface | Entry point |
 | --- | --- |
 | OpenCode | `/autoresearch`, `/autoresearch:plan`, `/autoresearch:debug`, `/autoresearch:fix`, `/autoresearch:learn`, `/autoresearch:predict`, `/autoresearch:scenario`, `/autoresearch:security`, `/autoresearch:ship` |
+| Hermes | Cronjob `autoresearch-loop` (see `skills/hermes/README.md`) |
 
 ## Commands
 
-| Command | Purpose |
-| --- | --- |
-| `/autoresearch` | Default improve-verify loop |
-| `/autoresearch:plan` | Planning workflow |
-| `/autoresearch:debug` | Debugging workflow |
-| `/autoresearch:fix` | Fix workflow |
-| `/autoresearch:learn` | Learning workflow |
-| `/autoresearch:predict` | Prediction workflow |
-| `/autoresearch:scenario` | Scenario expansion |
-| `/autoresearch:security` | Security review |
-| `/autoresearch:ship` | Ship-readiness workflow |
+| Command | Purpose | Hermes Equivalent |
+| --- | --- | --- |
+| `/autoresearch` | Default improve-verify loop | Cron runs iteration loop |
+| `/autoresearch:plan` | Planning workflow | Subagent task: plan experiments |
+| `/autoresearch:debug` | Debugging workflow | Subagent task: debug failures |
+| `/autoresearch:fix` | Fix workflow | Subagent task: fix issues |
+| `/autoresearch:learn` | Learning workflow | Memory tool + pattern analysis |
+| `/autoresearch:predict` | Prediction workflow | Subagent task: predict outcomes |
+| `/autoresearch:scenario` | Scenario expansion | Subagent task: expand scenarios |
+| `/autoresearch:security` | Security review | Subagent task: security audit |
+| `/autoresearch:ship` | Ship-readiness workflow | Subagent task: ship checks |
 
 ## CLI Commands
 
@@ -196,15 +252,16 @@ cd ~/Projects/my-project
 ```mermaid
 flowchart LR
     A[OpenCode /autoresearch] --> B[CLI]
+    H[Hermes Cronjob] --> B
     B --> C[Run Manager]
     C --> D[State JSON]
     C --> E[Results TSV]
     C --> F[Subagent Pool]
     F --> G[Orchestrator]
-    F --> H[Scout]
-    F --> I[Analyst]
-    F --> J[Verifier]
-    F --> K[Synthesizer]
+    F --> I[Scout]
+    F --> J[Analyst]
+    F --> K[Verifier]
+    F --> L[Synthesizer]
 ```
 
 ## Runtime Artifacts
@@ -265,6 +322,19 @@ The standing pool provides specialized roles reused across iterations:
 | `release_guard` | Ship-readiness verification |
 | `research_tracker` | Pattern tracking across iterations |
 
+## Runtime Comparison
+
+| Feature | OpenCode | Hermes |
+|---------|----------|--------|
+| Entry | `/autoresearch` slash command | Cronjob or `delegate_task` |
+| Subagents | Standing pool (unlimited) | Batch via `delegate_task` (max 3) |
+| Real-time | Yes | 15-minute cron intervals |
+| Slash commands | 8 variants | Separate cron jobs or tasks |
+| State | `.autoresearch/state.json` | Same file format |
+| Memory | File-based (`autoresearch-memory.md`) | `memory` tool + file |
+| Background | `autoresearch launch` | Native cron |
+| Resume | `autoresearch resume` | Cron continues automatically |
+
 ## Development
 
 ```bash
@@ -280,13 +350,17 @@ npm pack --dry-run  # Preview shipped package contents
 src/                           # TypeScript source (runtime helpers, CLI, subagent pool)
 dist/                          # Compiled JavaScript output
 commands/                      # OpenCode command surfaces
-skills/autoresearch/           # Skill bundle with references
+skills/autoresearch/           # OpenCode skill bundle with references
   references/                  # Workflow and runtime references
     core-principles.md         # Loop discipline
     loop-workflow.md           # Main iteration workflow
     subagent-orchestration.md  # Pool management
     state-management.md        # State semantics
     self-improve-loop.md       # Recursive self-improvement
+skills/hermes/                 # Hermes Agent skill bundle
+  README.md                    # Hermes setup and usage
+  INTEGRATION.md               # Architecture and command mapping
+  autoresearch-prompt.md       # Cron prompt template
 hooks/                         # Shell hooks for session lifecycle
 docs/                          # Install and architecture docs
 wiki/                          # GitHub wiki pages
@@ -296,7 +370,8 @@ wiki/                          # GitHub wiki pages
 
 ## Notes
 
-- This is an **OpenCode-only** package. No Claude or Codex runtime is supported.
+- **OpenCode** users: install via `opencode.json` plugin array or `npm install -g opencode-autoresearch`.
+- **Hermes Agent** users: install via skill files in `skills/hermes/` and create a cronjob.
 - The CLI uses Node.js ESM modules.
 - Self-improvement loops require `--mode background` for long-running unattended operation.
 - Memory files (`autoresearch-memory.md`) are portable across runs and repositories.

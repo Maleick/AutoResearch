@@ -1,19 +1,44 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 460" width="1200" height="460">
   <defs>
     <style>
-      .ui { font-family: 'Segoe UI', system-ui, sans-serif; }
-      .mono { font-family: 'Cascadia Code', 'Fira Code', monospace; }
-      .gradient-bg { fill: url(#bgGradient); }
+      .ui { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif; }
+      .mono { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace; }
     </style>
-    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0d1117;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#161b22;stop-opacity:1" />
+    <!-- Background gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1020"/>
+      <stop offset="50%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#1e293b"/>
     </linearGradient>
-    <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <!-- Subtle radial glow behind center -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Gold accent line gradient -->
+    <linearGradient id="goldLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#fbbf24" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Grid pattern -->
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#1e293b" stroke-width="0.8" opacity="0.6"/>
+    </pattern>
+    <!-- Circuit pattern -->
+    <pattern id="circuit" width="120" height="120" patternUnits="userSpaceOnUse">
+      <circle cx="30" cy="30" r="2" fill="#1e293b" opacity="0.5"/>
+      <circle cx="90" cy="90" r="2" fill="#1e293b" opacity="0.5"/>
+      <path d="M 30 30 L 90 30 L 90 90" fill="none" stroke="#1e293b" stroke-width="0.6" opacity="0.4"/>
+      <path d="M 30 30 L 30 90 L 90 90" fill="none" stroke="#1e293b" stroke-width="0.6" opacity="0.4"/>
+    </pattern>
+    <!-- Arrow marker -->
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
       <polygon points="0 0, 8 3, 0 6" fill="context-stroke"/>
     </marker>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
+    <!-- Glow filter for nodes -->
+    <filter id="nodeGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
@@ -22,115 +47,162 @@
   </defs>
 
   <!-- Background -->
-  <rect width="1200" height="420" fill="url(#bgGradient)"/>
+  <rect width="1200" height="460" fill="url(#bgGrad)"/>
+  <rect width="1200" height="460" fill="url(#grid)"/>
+  <rect width="1200" height="460" fill="url(#circuit)"/>
+  <ellipse cx="600" cy="230" rx="400" ry="180" fill="url(#centerGlow)"/>
 
-  <!-- Decorative grid pattern -->
-  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#21262d" stroke-width="0.5" opacity="0.5"/>
-  </pattern>
-  <rect width="1200" height="420" fill="url(#grid)"/>
+  <!-- Top accent line -->
+  <rect x="0" y="0" width="1200" height="2" fill="url(#goldLine)" opacity="0.8"/>
 
-  <!-- Section dividers -->
-  <line x1="380" y1="30" x2="380" y2="390" stroke="#21262d" stroke-width="1"/>
-  <line x1="820" y1="30" x2="820" y2="390" stroke="#21262d" stroke-width="1"/>
+  <!-- ===== LEFT: Wordmark + Tagline ===== -->
+  <text x="60" y="140" class="ui" font-size="52" font-weight="800" fill="#f8fafc" letter-spacing="-1">AutoResearch</text>
+  <text x="60" y="175" class="ui" font-size="16" fill="#94a3b8" font-weight="400">Autonomous recursive self-improvement.</text>
 
-  <!-- ===== LEFT: Title block ===== -->
-  <text x="56" y="130" class="ui" font-size="48" font-weight="700" fill="#e6edf3">Auto Research</text>
-  <text x="56" y="165" class="ui" font-size="15" fill="#8b949e">Autonomous recursive self-improvement engine</text>
+  <!-- Version pill -->
+  <rect x="60" y="195" width="82" height="26" rx="13" fill="#0f172a" stroke="#fbbf24" stroke-width="1.2"/>
+  <text x="101" y="213" class="ui" font-size="12" font-weight="700" fill="#fbbf24" text-anchor="middle">v3.3.3</text>
 
-  <!-- v3.3.1 pill -->
-  <rect x="56" y="182" width="80" height="24" rx="12" fill="#1a2f1a" stroke="#238636" stroke-width="1"/>
-  <text x="96" y="198" class="ui" font-size="12" font-weight="600" fill="#3fb950" text-anchor="middle">v3.3.1</text>
+  <!-- Runtime badges -->
+  <g transform="translate(60, 245)">
+    <!-- OpenCode badge -->
+    <rect x="0" y="0" width="110" height="32" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2"/>
+    <!-- Geometric icon -->
+    <path d="M 14 8 L 22 16 L 14 24 L 6 16 Z" fill="none" stroke="#38bdf8" stroke-width="1.5"/>
+    <circle cx="14" cy="16" r="2" fill="#38bdf8"/>
+    <text x="58" y="21" class="ui" font-size="11" font-weight="600" fill="#38bdf8" text-anchor="middle">OpenCode</text>
 
-  <!-- Tagline -->
-  <text x="56" y="250" class="ui" font-size="16" fill="#c9d1d9">Fire it before bed.</text>
-  <text x="56" y="272" class="ui" font-size="16" fill="#c9d1d9">Wake up to measurable progress.</text>
+    <!-- Hermes badge -->
+    <rect x="126" y="0" width="100" height="32" rx="8" fill="#0f172a" stroke="#f97316" stroke-width="1.2"/>
+    <!-- Winged helmet / messenger icon -->
+    <path d="M 146 10 Q 150 6 154 10 Q 158 14 154 18 Q 150 22 146 18 Q 142 14 146 10" fill="none" stroke="#f97316" stroke-width="1.2"/>
+    <path d="M 142 12 L 138 8 M 158 12 L 162 8" fill="none" stroke="#f97316" stroke-width="1"/>
+    <text x="188" y="21" class="ui" font-size="11" font-weight="600" fill="#f97316" text-anchor="middle">Hermes</text>
+  </g>
 
-  <!-- Core loop label -->
-  <text x="56" y="340" class="ui" font-size="11" fill="#58a6ff" letter-spacing="2">SELF-IMPROVING LOOP</text>
-  <line x1="56" y1="346" x2="240" y2="346" stroke="#58a6ff" stroke-width="1" opacity="0.4"/>
+  <!-- Stats row -->
+  <g transform="translate(60, 300)">
+    <text x="0" y="0" class="mono" font-size="13" fill="#fbbf24" font-weight="600">∞ iterations</text>
+    <text x="110" y="0" class="mono" font-size="13" fill="#64748b">|</text>
+    <text x="130" y="0" class="mono" font-size="13" fill="#f8fafc">20 max</text>
+    <text x="200" y="0" class="mono" font-size="13" fill="#64748b">|</text>
+    <text x="220" y="0" class="mono" font-size="13" fill="#f8fafc">2 runtimes</text>
+  </g>
 
-  <!-- Recursive icon -->
-  <circle cx="320" cy="100" r="30" fill="none" stroke="#58a6ff" stroke-width="2" opacity="0.3"/>
-  <path d="M 305 100 A 15 15 0 0 1 335 100" fill="none" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- ===== CENTER: Loop Visualization ===== -->
+  <!-- Outer orbit ring -->
+  <circle cx="600" cy="230" r="110" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="6,4" opacity="0.5"/>
 
-  <!-- ===== CENTER: Enhanced diamond loop diagram ===== -->
-  <!-- Arrow: PLAN to MODIFY -->
-  <path d="M 610 78 Q 670 78 670 118" fill="none" stroke="#a371f7" stroke-width="2" marker-end="url(#arr)"/>
-  <!-- Arrow: MODIFY to VERIFY -->
-  <path d="M 670 158 Q 670 188 640 198" fill="none" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
-  <!-- Arrow: VERIFY to KEEP/DISCARD -->
-  <path d="M 580 198 Q 550 188 550 158" fill="none" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
-  <!-- Arrow: KEEP/DISCARD to LEARN -->
-  <path d="M 550 118 Q 550 88 590 78" fill="none" stroke="#30a14e" stroke-width="2" marker-end="url(#arr)"/>
-  <!-- Arrow: LEARN to PLAN (closing the outer loop) -->
-  <path d="M 610 58 Q 520 40 480 100 Q 460 140 520 180" fill="none" stroke="#f0883e" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arr)" opacity="0.7"/>
+  <!-- Loop nodes arranged in a hexagon -->
+  <!-- PLAN -->
+  <g transform="translate(600, 105)">
+    <rect x="-38" y="-14" width="76" height="28" rx="8" fill="#0f172a" stroke="#a78bfa" stroke-width="1.5" filter="url(#nodeGlow)"/>
+    <text x="0" y="4" class="ui" font-size="11" font-weight="700" fill="#a78bfa" text-anchor="middle">PLAN</text>
+  </g>
 
-  <!-- Node: PLAN -->
-  <rect x="570" y="58" width="80" height="28" rx="8" fill="#161b22" stroke="#a371f7" stroke-width="1.5"/>
-  <text x="610" y="76" class="ui" font-size="11" font-weight="700" fill="#a371f7" text-anchor="middle">PLAN</text>
+  <!-- MODIFY -->
+  <g transform="translate(695, 185)">
+    <rect x="-40" y="-14" width="80" height="28" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" filter="url(#nodeGlow)"/>
+    <text x="0" y="4" class="ui" font-size="11" font-weight="700" fill="#38bdf8" text-anchor="middle">MODIFY</text>
+  </g>
 
-  <!-- Node: MODIFY -->
-  <rect x="630" y="118" width="80" height="28" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
-  <text x="670" y="136" class="ui" font-size="11" font-weight="700" fill="#58a6ff" text-anchor="middle">MODIFY</text>
+  <!-- VERIFY -->
+  <g transform="translate(660, 295)">
+    <rect x="-38" y="-14" width="76" height="28" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" filter="url(#nodeGlow)"/>
+    <text x="0" y="4" class="ui" font-size="11" font-weight="700" fill="#38bdf8" text-anchor="middle">VERIFY</text>
+  </g>
 
-  <!-- Node: VERIFY -->
-  <rect x="560" y="178" width="80" height="28" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
-  <text x="600" y="196" class="ui" font-size="11" font-weight="700" fill="#58a6ff" text-anchor="middle">VERIFY</text>
+  <!-- KEEP / DISCARD -->
+  <g transform="translate(540, 295)">
+    <rect x="-46" y="-18" width="92" height="36" rx="8" fill="#0f172a" stroke="#22c55e" stroke-width="1.5" filter="url(#nodeGlow)"/>
+    <text x="0" y="-2" class="ui" font-size="11" font-weight="700" fill="#22c55e" text-anchor="middle">KEEP</text>
+    <text x="0" y="10" class="ui" font-size="8" fill="#64748b" text-anchor="middle">or discard</text>
+  </g>
 
-  <!-- Node: KEEP/DISCARD -->
-  <rect x="490" y="118" width="100" height="28" rx="8" fill="#161b22" stroke="#30a14e" stroke-width="1.5"/>
-  <text x="540" y="132" class="ui" font-size="10" font-weight="700" fill="#30a14e" text-anchor="middle">KEEP</text>
-  <text x="540" y="143" class="ui" font-size="8" fill="#6e7681" text-anchor="middle">or discard</text>
+  <!-- LEARN -->
+  <g transform="translate(505, 185)">
+    <rect x="-38" y="-14" width="76" height="28" rx="8" fill="#0f172a" stroke="#f97316" stroke-width="1.5" filter="url(#nodeGlow)"/>
+    <text x="0" y="4" class="ui" font-size="11" font-weight="700" fill="#f97316" text-anchor="middle">LEARN</text>
+  </g>
 
-  <!-- Node: LEARN -->
-  <rect x="490" y="58" width="80" height="28" rx="8" fill="#161b22" stroke="#f0883e" stroke-width="1.5"/>
-  <text x="530" y="76" class="ui" font-size="11" font-weight="700" fill="#f0883e" text-anchor="middle">LEARN</text>
+  <!-- REPEAT (center node) -->
+  <g transform="translate(600, 230)">
+    <circle cx="0" cy="0" r="28" fill="#0f172a" stroke="#fbbf24" stroke-width="2" filter="url(#nodeGlow)"/>
+    <path d="M -8 0 A 8 8 0 1 1 8 0" fill="none" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="0" y="42" class="ui" font-size="10" fill="#fbbf24" font-weight="600" text-anchor="middle">REPEAT</text>
+  </g>
+
+  <!-- Connecting arrows between outer nodes -->
+  <!-- PLAN → MODIFY -->
+  <path d="M 628 118 Q 660 130 670 165" fill="none" stroke="#a78bfa" stroke-width="1.8" marker-end="url(#arrow)" opacity="0.8"/>
+  <!-- MODIFY → VERIFY -->
+  <path d="M 690 200 Q 685 240 660 275" fill="none" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arrow)" opacity="0.8"/>
+  <!-- VERIFY → KEEP/DISCARD -->
+  <path d="M 620 295 Q 580 295 550 295" fill="none" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arrow)" opacity="0.8"/>
+  <!-- KEEP/DISCARD → LEARN -->
+  <path d="M 520 275 Q 505 240 500 200" fill="none" stroke="#22c55e" stroke-width="1.8" marker-end="url(#arrow)" opacity="0.8"/>
+  <!-- LEARN → PLAN -->
+  <path d="M 520 165 Q 540 130 572 118" fill="none" stroke="#f97316" stroke-width="1.8" marker-end="url(#arrow)" opacity="0.8"/>
 
   <!-- Center label -->
-  <text x="610" y="168" class="ui" font-size="10" fill="#6e7681" text-anchor="middle">recursive</text>
-  <text x="610" y="180" class="ui" font-size="10" fill="#6e7681" text-anchor="middle">self-improvement</text>
+  <text x="600" y="355" class="ui" font-size="11" fill="#64748b" text-anchor="middle" letter-spacing="2">SELF-IMPROVING LOOP</text>
 
-  <!-- Subagent pool indicator -->
-  <text x="610" y="250" class="ui" font-size="10" fill="#8b949e" text-anchor="middle">subagent-first orchestration</text>
-  <rect x="520" y="260" width="180" height="60" rx="6" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
-  <text x="530" y="278" class="mono" font-size="9" fill="#58a6ff">orchestrator</text>
-  <text x="530" y="292" class="mono" font-size="9" fill="#a371f7">scout • analyst</text>
-  <text x="530" y="306" class="mono" font-size="9" fill="#30a14e">verifier • synthesizer</text>
-
-  <!-- ===== RIGHT: Terminal window ===== -->
-  <rect x="848" y="46" width="316" height="328" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <!-- ===== RIGHT: Terminal / Status Panel ===== -->
+  <rect x="860" y="55" width="300" height="350" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1"/>
   <!-- Title bar -->
-  <path d="M 858 46 Q 848 46 848 56 L 848 80 L 1164 80 L 1164 56 Q 1164 46 1154 46 Z" fill="#21262d"/>
+  <path d="M 872 55 Q 860 55 860 67 L 860 95 L 1160 95 L 1160 67 Q 1160 55 1148 55 Z" fill="#1e293b"/>
   <!-- Traffic lights -->
-  <circle cx="872" cy="63" r="5.5" fill="#ff5f57"/>
-  <circle cx="892" cy="63" r="5.5" fill="#ffbd2e"/>
-  <circle cx="912" cy="63" r="5.5" fill="#28c840"/>
+  <circle cx="880" cy="75" r="5" fill="#ef4444" opacity="0.8"/>
+  <circle cx="898" cy="75" r="5" fill="#eab308" opacity="0.8"/>
+  <circle cx="916" cy="75" r="5" fill="#22c55e" opacity="0.8"/>
   <!-- Window title -->
-  <text x="1006" y="67" class="ui" font-size="11" fill="#6e7681" text-anchor="middle">autoresearch --mode background</text>
+  <text x="1010" y="79" class="ui" font-size="11" fill="#64748b" text-anchor="middle">autoresearch --mode background</text>
 
   <!-- Column headers -->
-  <text x="864" y="106" class="mono" font-size="11" fill="#6e7681">iter   metric    result     pool</text>
-  <line x1="864" y1="112" x2="1148" y2="112" stroke="#30363d" stroke-width="1"/>
+  <text x="876" y="120" class="mono" font-size="11" fill="#64748b">iter   metric    result     pool</text>
+  <line x1="876" y1="128" x2="1144" y2="128" stroke="#334155" stroke-width="1"/>
 
   <!-- Iteration rows -->
-  <text x="864" y="132" class="mono" font-size="11" fill="#30a14e">001    94.2      ✓ keep     4/6</text>
-  <text x="864" y="150" class="mono" font-size="11" fill="#f85149">002    93.8      ✗ discard  4/6</text>
-  <text x="864" y="168" class="mono" font-size="11" fill="#30a14e">003    96.1      ✓ keep     5/6</text>
-  <text x="864" y="186" class="mono" font-size="11" fill="#30a14e">004    97.4      ✓ keep     5/6</text>
-  <text x="864" y="204" class="mono" font-size="11" fill="#f85149">005    97.1      ✗ discard  5/6</text>
-  <text x="864" y="222" class="mono" font-size="11" fill="#30a14e">006    99.0      ✓ keep     6/6</text>
-  <text x="864" y="240" class="mono" font-size="11" fill="#30a14e">007    99.3      ✓ keep     6/6</text>
-  <text x="864" y="258" class="mono" font-size="11" fill="#6e7681">008    ...                  ...</text>
+  <text x="876" y="150" class="mono" font-size="11" fill="#22c55e">001    94.2      ✓ keep     4/6</text>
+  <text x="876" y="170" class="mono" font-size="11" fill="#ef4444">002    93.8      ✗ discard  4/6</text>
+  <text x="876" y="190" class="mono" font-size="11" fill="#22c55e">003    96.1      ✓ keep     5/6</text>
+  <text x="876" y="210" class="mono" font-size="11" fill="#22c55e">004    97.4      ✓ keep     5/6</text>
+  <text x="876" y="230" class="mono" font-size="11" fill="#ef4444">005    97.1      ✗ discard  5/6</text>
+  <text x="876" y="250" class="mono" font-size="11" fill="#22c55e">006    99.0      ✓ keep     6/6</text>
+  <text x="876" y="270" class="mono" font-size="11" fill="#22c55e">007    99.3      ✓ keep     6/6</text>
+  <text x="876" y="290" class="mono" font-size="11" fill="#64748b">008    ...                  ...</text>
 
   <!-- Meta-learning indicator -->
-  <text x="864" y="280" class="mono" font-size="9" fill="#f0883e">[loop-002] meta: strategy pivot</text>
-  <text x="864" y="294" class="mono" font-size="9" fill="#f0883e">[loop-002] memory: 7 patterns</text>
+  <text x="876" y="316" class="mono" font-size="9" fill="#f97316">[loop-002] meta: strategy pivot</text>
+  <text x="876" y="332" class="mono" font-size="9" fill="#f97316">[loop-002] memory: 7 patterns</text>
 
   <!-- Best metric footer bar -->
-  <rect x="848" y="312" width="316" height="62" fill="#0d2818"/>
-  <rect x="857" y="320" width="3" height="36" rx="1.5" fill="#30a14e"/>
-  <text x="870" y="334" class="mono" font-size="11" fill="#30a14e">best: 99.3  (+5.1%)  5 kept</text>
-  <text x="870" y="350" class="mono" font-size="11" fill="#6e7681">→ autoresearch-report.md</text>
-  <text x="870" y="366" class="mono" font-size="9" fill="#8b949e">→ autoresearch-memory.md</text>
+  <rect x="860" y="350" width="300" height="55" fill="#0f2818" rx="0 0 12 12"/>
+  <rect x="870" y="360" width="3" height="34" rx="1.5" fill="#22c55e"/>
+  <text x="886" y="376" class="mono" font-size="11" fill="#22c55e">best: 99.3  (+5.1%)  5 kept</text>
+  <text x="886" y="392" class="mono" font-size="9" fill="#64748b">→ autoresearch-report.md</text>
+
+  <!-- ===== BOTTOM: Subtle decorative elements ===== -->
+  <!-- Molecular structure hint -->
+  <g transform="translate(1100, 420)" opacity="0.15">
+    <circle cx="0" cy="0" r="4" fill="#fbbf24"/>
+    <circle cx="20" cy="-10" r="3" fill="#38bdf8"/>
+    <circle cx="35" cy="5" r="3" fill="#f97316"/>
+    <line x1="0" y1="0" x2="20" y2="-10" stroke="#fbbf24" stroke-width="1"/>
+    <line x1="20" y1="-10" x2="35" y2="5" stroke="#38bdf8" stroke-width="1"/>
+  </g>
+
+  <!-- Small loop icon bottom left -->
+  <g transform="translate(80, 420)" opacity="0.2">
+    <path d="M 0 0 A 12 12 0 1 1 20 8" fill="none" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- Data points decoration -->
+  <g opacity="0.12">
+    <circle cx="350" cy="400" r="2" fill="#38bdf8"/>
+    <circle cx="370" cy="395" r="1.5" fill="#38bdf8"/>
+    <circle cx="360" cy="410" r="1.5" fill="#38bdf8"/>
+    <line x1="350" y1="400" x2="370" y2="395" stroke="#38bdf8" stroke-width="0.5"/>
+    <line x1="370" y1="395" x2="360" y2="410" stroke="#38bdf8" stroke-width="0.5"/>
+  </g>
 </svg>

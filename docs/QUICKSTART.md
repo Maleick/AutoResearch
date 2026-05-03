@@ -2,9 +2,31 @@
 
 ## Installation
 
+### OpenCode
+
 ```bash
 npm install -g opencode-autoresearch
 autoresearch doctor
+```
+
+### Hermes Agent
+
+```bash
+# 1. Install the skill
+git clone https://github.com/Maleick/AutoResearch.git
+cd AutoResearch
+npm install
+mkdir -p ~/.hermes/skills/autoresearch-hermes
+cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/autoresearch-hermes/SKILL.md
+cp skills/hermes/INTEGRATION.md ~/.hermes/skills/autoresearch-hermes/REFERENCES.md
+
+# 2. Create a cronjob
+hermes cronjob create \
+  --name "autoresearch-loop" \
+  --schedule "every 15m" \
+  --workdir ~/projects/AutoResearch \
+  --skills autoresearch-hermes \
+  --prompt "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
 ```
 
 ## Basic Usage
@@ -64,6 +86,29 @@ autoresearch init \
 autoresearch launch
 # ... work on other things ...
 autoresearch status
+```
+
+### Hermes Background Runs
+
+```bash
+# Create config
+cat > autoresearch-config.json <<'EOF'
+{
+  "goal": "Improve test coverage",
+  "metric": "coverage_pct",
+  "direction": "higher",
+  "verify": "npm run test:coverage",
+  "guard": "npm run typecheck",
+  "max_iterations": 20,
+  "mode": "background"
+}
+EOF
+
+# Start cron
+hermes cronjob resume autoresearch-loop
+
+# Check progress
+cat .autoresearch/state.json | jq .
 ```
 
 ## Self-Improvement

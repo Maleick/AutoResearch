@@ -1,8 +1,19 @@
 # Install Auto Research
 
-Auto Research is an OpenCode plugin and npm package for structured autonomous improve-verify loops. It keeps runtime state local to the target repository and gates changes with mechanical verification.
+Auto Research is a multi-runtime plugin and npm package for structured autonomous improve-verify loops. It keeps runtime state local to the target repository and gates changes with mechanical verification.
 
-## One-Line OpenCode Install
+## Supported Runtimes
+
+- **OpenCode** — Slash commands (`/autoresearch`) with standing subagent pool
+- **Hermes Agent** — Cron-based iteration loop with `delegate_task` subagents (max 3)
+
+Both runtimes share the same state format (`.autoresearch/state.json`) and CLI (`opencode-autoresearch`).
+
+---
+
+## OpenCode Install
+
+### One-Line OpenCode Install
 
 Paste this one line into OpenCode to install and verify Auto Research. This URL follows the latest `main` instructions:
 
@@ -10,14 +21,14 @@ Paste this one line into OpenCode to install and verify Auto Research. This URL 
 Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md
 ```
 
-## Prerequisites
+### Prerequisites
 
 - OpenCode installed and available in your shell.
 - Node.js with npm available for the optional CLI path.
 - Git installed and available in your shell.
 - A target repository with a verification command such as `npm test`, `pytest`, or `go test ./...`.
 
-## Recommended OpenCode Plugin Install
+### Recommended OpenCode Plugin Install
 
 Add Auto Research to your global or project-level `opencode.json` plugin array:
 
@@ -41,7 +52,7 @@ Restart OpenCode after editing the configuration. The command family should then
 /autoresearch:ship
 ```
 
-## npm Global Install
+### npm Global Install
 
 If you also want the CLI available on your shell `PATH`:
 
@@ -57,7 +68,7 @@ Then restart OpenCode and run:
 /autoresearch
 ```
 
-## One-Time CLI Path
+### One-Time CLI Path
 
 For one-time CLI use without a global install:
 
@@ -66,6 +77,80 @@ npx opencode-autoresearch doctor
 ```
 
 Use the plugin-array install for normal OpenCode usage.
+
+---
+
+## Hermes Agent Install
+
+### Prerequisites
+
+- Hermes Agent installed and configured.
+- Node.js with npm available for the CLI path.
+- Git installed and available in your shell.
+
+### Install the Hermes Skill
+
+```bash
+# 1. Clone AutoResearch (or use an existing checkout)
+git clone https://github.com/Maleick/AutoResearch.git
+cd AutoResearch
+npm install
+
+# 2. Copy skill files to your Hermes skills directory
+mkdir -p ~/.hermes/skills/autoresearch-hermes
+cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/autoresearch-hermes/SKILL.md
+cp skills/hermes/INTEGRATION.md ~/.hermes/skills/autoresearch-hermes/REFERENCES.md
+```
+
+### Create the Cronjob
+
+```bash
+hermes cronjob create \
+  --name "autoresearch-loop" \
+  --schedule "every 15m" \
+  --workdir ~/projects/AutoResearch \
+  --skills autoresearch-hermes \
+  --prompt "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+```
+
+### Initialize a Run
+
+Create a config file in your target project:
+
+```bash
+cat > autoresearch-config.json <<'EOF'
+{
+  "goal": "Improve test coverage",
+  "metric": "coverage_pct",
+  "direction": "higher",
+  "verify": "npm run test:coverage",
+  "guard": "npm run typecheck",
+  "max_iterations": 20,
+  "mode": "background"
+}
+EOF
+```
+
+The first cron run will auto-init from this config.
+
+### Start, Check, and Stop
+
+```bash
+# Start
+hermes cronjob resume autoresearch-loop
+
+# Check status
+cat .autoresearch/state.json | jq .
+
+# Stop
+hermes cronjob pause autoresearch-loop
+# Or set stop flag:
+jq '.flags.stop_requested = true' .autoresearch/state.json > tmp.json && mv tmp.json .autoresearch/state.json
+```
+
+See [`skills/hermes/README.md`](skills/hermes/README.md) for full Hermes setup, troubleshooting, and command mapping.
+
+---
 
 ## Verification
 
@@ -87,13 +172,16 @@ npm run verify:pack
 npm test
 ```
 
-To verify command availability, restart OpenCode in a Git repository and run:
+To verify command availability:
 
-```text
-/autoresearch
-```
+- **OpenCode**: restart OpenCode in a Git repository and run `/autoresearch`.
+- **Hermes**: run `hermes cronjob list` and confirm `autoresearch-loop` is present.
+
+---
 
 ## Updating
+
+### OpenCode
 
 For plugin-array installs, restart OpenCode after a new Auto Research package release is available. To pin a specific version:
 
@@ -110,25 +198,67 @@ npm install -g opencode-autoresearch@latest
 npm list -g opencode-autoresearch --depth=0
 ```
 
+### Hermes
+
+Update the skill files from the latest repo checkout:
+
+```bash
+cd AutoResearch
+git pull origin main
+cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/autoresearch-hermes/SKILL.md
+cp skills/hermes/INTEGRATION.md ~/.hermes/skills/autoresearch-hermes/REFERENCES.md
+```
+
+Restart the cronjob if needed:
+
+```bash
+hermes cronjob resume autoresearch-loop
+```
+
+---
+
 ## Troubleshooting
 
-### Plugin Not Loading
+### Plugin Not Loading (OpenCode)
 
 - Confirm `opencode.json` is valid JSON.
 - Confirm the plugin entry is in the top-level `plugin` array.
 - Restart OpenCode after changing the config.
 - Check OpenCode logs with `opencode run --print-logs "hello"`.
 
-### Commands Not Found
+### Commands Not Found (OpenCode)
 
 - Restart OpenCode so it reloads plugin commands.
 - Confirm the package installed successfully with `npm list -g opencode-autoresearch --depth=0` if using the global path.
 - Run `/autoresearch` from inside a Git repository, not from an empty directory.
 
+### Cron Not Running (Hermes)
+
+```bash
+hermes cronjob list
+hermes cronjob log autoresearch-loop
+```
+
+### State File Corrupted (any runtime)
+
+```bash
+# Reset to baseline
+rm .autoresearch/state.json
+# Next run will re-init from config
+```
+
+### Subagent Failures (Hermes)
+
+Check `.autoresearch/state.json` for:
+- `flags.needs_human` — requires manual intervention
+- Last iteration's `error` field
+
 ### Runtime Artifacts
 
 - Auto Research writes runtime state to `.autoresearch/` in the target repository.
 - Do not commit `.autoresearch/`, `autoresearch-results.tsv`, `autoresearch-report.md`, or `autoresearch-memory.md` unless you intentionally want to share run outputs.
+
+---
 
 ## Safety Notes
 
@@ -137,9 +267,12 @@ npm list -g opencode-autoresearch --depth=0
 - Keep verification mechanical; do not accept improvements based on intuition alone.
 - Do not pipe remote install scripts into a shell.
 
+---
+
 ## Links
 
 - Documentation: https://github.com/Maleick/AutoResearch/tree/main/docs
 - Wiki: https://github.com/Maleick/AutoResearch/wiki
 - Releases: https://github.com/Maleick/AutoResearch/releases
 - Issues: https://github.com/Maleick/AutoResearch/issues
+- Hermes docs: https://hermes-agent.nousresearch.com/docs

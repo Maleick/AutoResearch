@@ -49,6 +49,23 @@ npx opencode-autoresearch doctor
 | `/autoresearch:security` | Security review |
 | `/autoresearch:ship` | Ship-readiness workflow |
 
+## Hermes Agent Commands
+
+Hermes uses cronjobs and `delegate_task` instead of slash commands. See [`../skills/hermes/INTEGRATION.md`](../skills/hermes/INTEGRATION.md) for the full command mapping.
+
+| OpenCode Command | Hermes Equivalent |
+|-----------------|-------------------|
+| `/autoresearch` | Cron runs iteration loop |
+| `/autoresearch:plan` | Subagent task: plan experiments |
+| `/autoresearch:debug` | Subagent task: debug failures |
+| `/autoresearch:fix` | Subagent task: fix issues |
+| `/autoresearch:learn` | Memory tool + pattern analysis |
+| `autoresearch init` | Manual setup (same CLI) |
+| `autoresearch status` | `cat .autoresearch/state.json` |
+| `autoresearch launch` | `cronjob create` |
+| `autoresearch stop` | `cronjob pause` |
+| `autoresearch resume` | `cronjob resume` |
+
 ## Runtime Artifacts
 
 Artifacts are stored under the working directory:

@@ -104,6 +104,8 @@ Stop the recursive loop when:
 
 For long-running unattended improvement:
 
+### OpenCode
+
 ```bash
 autoresearch init \
   --goal "Improve AutoResearch" \
@@ -116,6 +118,29 @@ autoresearch init \
   --duration "8h"
 
 autoresearch launch
+```
+
+### Hermes Agent
+
+```bash
+# Create config with high iteration count
+cat > autoresearch-config.json <<'EOF'
+{
+  "goal": "Improve AutoResearch",
+  "metric": "combined_score",
+  "direction": "higher",
+  "verify": "node scripts/combined-score.js",
+  "guard": "npm run typecheck && npm test",
+  "max_iterations": 50,
+  "mode": "background"
+}
+EOF
+
+# Start cron
+hermes cronjob resume autoresearch-loop
+
+# Check progress anytime
+cat .autoresearch/state.json | jq .
 ```
 
 The background supervisor will spawn child loops, evaluate results, and adapt strategy automatically.
@@ -135,3 +160,4 @@ Self-improvement loops have additional guardrails:
 - [Configuration](Configuration.md) — Core fields and artifacts
 - [Commands](Commands.md) — CLI and OpenCode commands
 - `skills/autoresearch/references/self-improve-loop.md` — Full specification
+- `skills/hermes/README.md` — Hermes self-improvement setup
