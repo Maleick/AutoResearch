@@ -1,4 +1,4 @@
-import { resolve } from "path";
+import { basename, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
@@ -17,7 +17,7 @@ describe("buildSetupSummary", () => {
 
   it("falls back to current working directory basename when repo is undefined", () => {
     const result = mod.buildSetupSummary(undefined, { goal: "improve speed" });
-    expect(result.scope).toBe("AutoResearch");
+    expect(result.scope).toBe(basename(process.cwd()));
   });
 
   it("uses provided scope", () => {

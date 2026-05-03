@@ -32,6 +32,9 @@ jobs:
       - name: Verify package contents
         run: npm run verify:pack
 
+      - name: Test
+        run: npm test
+
       - name: Extract CHANGELOG section
         id: changelog
         run: |

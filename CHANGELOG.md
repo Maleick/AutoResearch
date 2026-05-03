@@ -1,5 +1,20 @@
 # Auto Research Changelog
 
+## [3.3.2] - 2026-05-03
+
+### Added
+- **OpenCode install guide**: Added `.opencode/INSTALL.md` with native `opencode.json` plugin installation, CLI alternative, update notes, and troubleshooting.
+- **Agent guide**: Added tracked `AGENTS.md` with repository-specific development, security, and verification rules.
+
+### Changed
+- **Installation docs**: Updated README, docs, and wiki install instructions to recommend OpenCode's native npm plugin flow first.
+- **Release pipeline**: Added the missing `npm test` gate to the release workflow and aligned release docs with trusted npm publishing.
+- **Package verification**: Required `.opencode/INSTALL.md` and `AGENTS.md` in package dry-run validation.
+
+### Fixed
+- **Hook hardening**: Passed `AUTORESEARCH_STATE` into inline Node scripts through environment variables instead of interpolating it into JavaScript source.
+- **Version references**: Aligned architecture and release docs for v3.3.2.
+
 ## [3.3.1] - 2026-04-29
 
 ### Fixed

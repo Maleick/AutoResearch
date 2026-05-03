@@ -4,7 +4,7 @@ This package uses npm publish for releases. GitHub Actions automates the full re
 
 ## Version Alignment
 
-`VERSION`, `package.json`, `src/constants.ts`, and `.opencode-plugin/plugin.json` must all stay aligned. The `VERSION` file is the canonical source of truth.
+`VERSION`, `package.json`, `package-lock.json`, `src/constants.ts`, and `.opencode-plugin/plugin.json` must all stay aligned. The `VERSION` file is the canonical source of truth.
 
 ## Release Steps
 
@@ -12,10 +12,10 @@ This package uses npm publish for releases. GitHub Actions automates the full re
 
 ```bash
 # Update VERSION file
-echo "3.2.0" > VERSION
+echo "3.3.2" > VERSION
 
 # Sync to package.json
-npm version 3.2.0 --no-git-tag-version
+npm version 3.3.2 --no-git-tag-version
 
 # Sync to src/constants.ts
 # Update the VERSION export manually or use sed
@@ -36,7 +36,7 @@ npm test
 Add a new section for the version in `CHANGELOG.md`:
 
 ```markdown
-## [3.2.0] - YYYY-MM-DD
+## [3.3.2] - YYYY-MM-DD
 
 ### Added
 - Recursive self-improvement loop support
@@ -52,9 +52,9 @@ Add a new section for the version in `CHANGELOG.md`:
 
 ```bash
 git add -A
-git commit -m "Release v3.2.0"
-git tag v3.2.0
-git push origin main v3.2.0
+git commit -m "Release v3.3.2"
+git tag v3.3.2
+git push origin main v3.3.2
 ```
 
 ### 5. Automated release
@@ -64,8 +64,8 @@ GitHub Actions will:
 1. Build and type-check
 2. Verify package contents
 3. Run tests
-4. Create a GitHub Release with CHANGELOG section
-5. Publish to npm
+4. Create a GitHub Release with the CHANGELOG section
+5. Publish to npm with provenance through trusted publishing
 
 ## Manual publish (fallback)
 
@@ -87,6 +87,7 @@ The shipped package includes:
 - `skills/autoresearch/` — Skill bundle with references
 - `hooks/` — Shell hooks for session lifecycle
 - `docs/` — Installation, architecture, and release docs
+- `.opencode/INSTALL.md` — OpenCode native plugin install guide
 - `.opencode-plugin/plugin.json` — OpenCode plugin manifest
 - `AGENTS.md` — Agent guide
 - `VERSION` — Version marker
