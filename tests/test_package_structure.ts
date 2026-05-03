@@ -220,7 +220,8 @@ describe("INSTALL.md", () => {
 
   it("is linked from README installation section", () => {
     const content = readFileSync(resolve(REPO_ROOT, "README.md"), "utf-8");
-    expect(content).toContain("v3.3.3");
+    const version = readJson(resolve(REPO_ROOT, "package.json")).version as string;
+    expect(content).toContain(`v${version}`);
     expect(content).toContain("paste this one-line install prompt");
     expect(content).toContain("Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md");
     expect(content).toContain("See [`INSTALL.md`](INSTALL.md)");
