@@ -1,13 +1,6 @@
 export {
   id,
   repoRoot,
+  server,
   version,
 } from "../dist/index.js";
-
-export async function server() {
-  return {
-    event() {
-      return undefined;
-    },
-  };
-}

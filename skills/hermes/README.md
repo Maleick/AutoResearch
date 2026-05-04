@@ -22,20 +22,20 @@ bash hooks/verify-package.sh
 Copy `skills/hermes/autoresearch-prompt.md` to your Hermes skills directory:
 
 ```bash
-mkdir -p ~/.hermes/skills/autoresearch-hermes
-cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/autoresearch-hermes/SKILL.md
-cp skills/hermes/INTEGRATION.md ~/.hermes/skills/autoresearch-hermes/REFERENCES.md
+mkdir -p ~/.hermes/skills/software-development/autoresearch
+cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/software-development/autoresearch/SKILL.md
+cp skills/hermes/INTEGRATION.md ~/.hermes/skills/software-development/autoresearch/REFERENCES.md
 ```
 
 ### 2. Create Cronjob
 
 ```bash
-hermes cronjob create \
+hermes cron create \
   --name "autoresearch-loop" \
-  --schedule "every 15m" \
   --workdir ~/projects/AutoResearch \
-  --skills autoresearch-hermes \
-  --prompt "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+  --skill autoresearch-hermes \
+  "every 15m" \
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
 ```
 
 ### 3. Initialize Run
@@ -62,7 +62,7 @@ EOF
 ### Start Background Run
 
 ```bash
-hermes cronjob resume autoresearch-loop
+hermes cron resume autoresearch-loop
 ```
 
 ### Check Status
@@ -78,7 +78,7 @@ cat .autoresearch/state.json | jq .
 jq '.flags.stop_requested = true' .autoresearch/state.json > tmp.json && mv tmp.json .autoresearch/state.json
 
 # Or pause cron
-hermes cronjob pause autoresearch-loop
+hermes cron pause autoresearch-loop
 ```
 
 ### View Results
@@ -136,8 +136,8 @@ Content: "AutoResearch strategy for Rust projects:
 ### Cron not running
 
 ```bash
-hermes cronjob list
-hermes cronjob log autoresearch-loop
+hermes cron list
+hermes logs --component cron
 ```
 
 ### State file corrupted

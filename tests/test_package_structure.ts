@@ -201,7 +201,7 @@ describe("hooks/", () => {
 describe(".opencode/", () => {
   it("has OpenCode install guide with plugin and npm paths", () => {
     const content = readFileSync(resolve(REPO_ROOT, ".opencode/INSTALL.md"), "utf-8");
-    expect(content).toContain('"plugin": ["opencode-autoresearch"]');
+    expect(content).toContain('"plugin": ["opencode-autoresearch@latest"]');
     expect(content).toContain("npm install -g opencode-autoresearch");
     expect(content).toContain("opencode-autoresearch doctor");
   });
@@ -213,7 +213,7 @@ describe("INSTALL.md", () => {
     expect(content).toContain("## One-Line OpenCode Install");
     expect(content).toContain("Paste this one line into OpenCode");
     expect(content).toContain("Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md");
-    expect(content).toContain('"plugin": ["opencode-autoresearch"]');
+    expect(content).toContain('"plugin": ["opencode-autoresearch@latest"]');
     expect(content).toContain("npm install -g opencode-autoresearch");
     expect(content).toContain("opencode-autoresearch doctor");
   });

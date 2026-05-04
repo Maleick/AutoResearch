@@ -48,9 +48,9 @@ Hermes uses `cronjob` and `delegate_task` instead of slash commands:
 |-------------|-------------------|
 | `autoresearch init` | Manual setup (same CLI) |
 | `autoresearch status` | `cat .autoresearch/state.json` |
-| `autoresearch launch` | `cronjob create` |
-| `autoresearch stop` | `cronjob pause` |
-| `autoresearch resume` | `cronjob resume` |
+| `autoresearch launch` | `hermes cron create` |
+| `autoresearch stop` | `hermes cron pause` |
+| `autoresearch resume` | `hermes cron resume` |
 
 See [`skills/hermes/INTEGRATION.md`](https://github.com/Maleick/AutoResearch/blob/main/skills/hermes/INTEGRATION.md) for the full mapping.
 

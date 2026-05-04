@@ -1,7 +1,7 @@
 {
   "name": "opencode-autoresearch",
   "version": "3.3.3",
-  "description": "Autonomous recursive self-improvement engine for OpenCode. Subagent-first iteration loop with standing-pool orchestration and mechanical verification.",
+  "description": "Autonomous recursive self-improvement engine for OpenCode and Hermes Agent. Subagent-first iteration loop with mechanical verification.",
   "author": {
     "name": "Maleick",
     "url": "https://github.com/Maleick"
@@ -17,7 +17,9 @@
   "license": "MIT",
   "keywords": [
     "opencode",
+    "hermes",
     "plugin",
+    "agent",
     "autoresearch",
     "automation",
     "workflows",

@@ -12,7 +12,7 @@ Add Auto Research to the `plugin` array in your global or project-level `opencod
 
 ```json
 {
-  "plugin": ["opencode-autoresearch"]
+  "plugin": ["opencode-autoresearch@latest"]
 }
 ```
 
@@ -55,7 +55,7 @@ After installation, these commands are available in OpenCode:
 
 ## Updating
 
-OpenCode refreshes npm plugins when it starts. Restart OpenCode after changing `opencode.json` or after a new Auto Research package release is published.
+OpenCode refreshes npm plugins when it starts. The `opencode-autoresearch@latest` plugin entry follows the current npm `latest` release. Restart OpenCode after changing `opencode.json` or after a new Auto Research package release is published.
 
 To pin a version:
 

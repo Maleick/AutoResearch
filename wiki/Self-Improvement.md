@@ -137,7 +137,7 @@ cat > autoresearch-config.json <<'EOF'
 EOF
 
 # Start cron
-hermes cronjob resume autoresearch-loop
+hermes cron resume autoresearch-loop
 
 # Check progress anytime
 cat .autoresearch/state.json | jq .

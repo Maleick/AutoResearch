@@ -15,22 +15,31 @@ Each cron run executes exactly ONE phase of the AutoResearch loop. Do not combin
 ```bash
 cd {{workdir}}
 if [ -f .autoresearch/state.json ]; then
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "ERROR: jq is required to read .autoresearch/state.json"
+    exit 1
+  fi
   status=$(jq -r '.status' .autoresearch/state.json)
-  phase=$(jq -r '.phase' .autoresearch/state.json)
+  phase=$(jq -r '.memory.hermes_phase // "plan"' .autoresearch/state.json)
+  total_iterations=$(jq -r '.stats.total_iterations // 0' .autoresearch/state.json)
+  iterations_cap=$(jq -r '.iterations_cap // 20' .autoresearch/state.json)
 else
   status="none"
   phase="init"
+  total_iterations=0
+  iterations_cap=20
 fi
 ```
 
 **Decision tree:**
 - `status` = "none" → **Phase INIT** (create run config)
+- `status` = "stopped" or "completed" → **STOP** (report final)
+- `total_iterations >= iterations_cap` → **STOP** (report final)
 - `phase` = "plan" → **Phase PLAN** (design experiment)
 - `phase` = "modify" → **Phase MODIFY** (implement change)
 - `phase` = "verify" → **Phase VERIFY** (run tests/metrics)
 - `phase` = "decide" → **Phase DECIDE** (keep or discard)
 - `phase` = "learn" → **Phase LEARN** (record patterns)
-- `status` = "stopped" or iterations >= max → **STOP** (report final)
 
 ## Phase INIT
 
@@ -48,24 +57,57 @@ fi
 {{verify_command}}
 ```
 
-3. Create `.autoresearch/state.json`:
+3. Prefer the shared AutoResearch CLI for state creation:
+```bash
+autoresearch init \
+  --goal "{{goal}}" \
+  --metric "{{metric}}" \
+  --direction "{{direction}}" \
+  --verify "{{verify_command}}" \
+  --guard "{{guard_command}}" \
+  --iterations {{max}} \
+  --mode background
+```
+
+If the CLI is unavailable, create `.autoresearch/state.json` using the canonical `RunState` shape:
 ```json
 {
+  "schema_version": 1,
   "run_id": "{{date}}-{{n}}",
-  "status": "running",
-  "phase": "plan",
+  "created_at": "{{iso_timestamp}}",
+  "updated_at": "{{iso_timestamp}}",
+  "status": "initialized",
   "mode": "background",
   "goal": "{{goal}}",
-  "metric": "{{metric}}",
-  "direction": "{{direction}}",
+  "scope": "current repository",
+  "metric": {
+    "name": "{{metric}}",
+    "direction": "{{direction}}",
+    "baseline": "{{baseline_value}}",
+    "best": "{{baseline_value}}",
+    "latest": "{{baseline_value}}"
+  },
   "verify": "{{verify_command}}",
   "guard": "{{guard_command}}",
-  "baseline": {{baseline_value}},
-  "current_best": {{baseline_value}},
-  "iterations": [],
-  "stats": {"total": 0, "kept": 0, "discarded": 0},
-  "max_iterations": {{max}},
-  "flags": {"needs_human": false, "stop_requested": false}
+  "iterations_cap": {{max}},
+  "label_requirements": {"keep": [], "stop": []},
+  "artifact_paths": {
+    "results": "autoresearch-results.tsv",
+    "state": ".autoresearch/state.json"
+  },
+  "stats": {
+    "total_iterations": 0,
+    "kept": 0,
+    "discarded": 0,
+    "needs_human": 0,
+    "consecutive_discards": 0
+  },
+  "flags": {
+    "stop_requested": false,
+    "needs_human": false,
+    "background_active": true,
+    "stop_ready": false
+  }
 }
 ```
 
@@ -82,7 +124,7 @@ Toolsets: ["terminal", "file", "web"]
 ```
 
 3. Scout returns: proposed change, expected impact, files to touch
-4. Update state.json: `phase = "modify"`, record plan
+4. Update state.json: set `memory.hermes_phase = "modify"`, record plan in `memory.hermes_plan`, and update `updated_at`
 
 **STOP after plan.** Next run will be Phase MODIFY.
 
@@ -94,7 +136,7 @@ Toolsets: ["terminal", "file", "web"]
 ```bash
 {{guard_command}}
 ```
-4. Update state.json: `phase = "verify"`
+4. Update state.json: set `memory.hermes_phase = "verify"` and update `updated_at`
 
 **STOP after modify.** Next run will be Phase VERIFY.
 
@@ -105,10 +147,10 @@ Toolsets: ["terminal", "file", "web"]
 {{verify_command}}
 ```
 2. Parse result to extract metric value
-3. Compare to `current_best`:
-   - If direction = "higher" and new > current_best → improvement
-   - If direction = "lower" and new < current_best → improvement
-4. Update state.json: `phase = "decide"`, record metric value
+3. Compare to `metric.best`:
+   - If `metric.direction` = "higher" and new > `metric.best` → improvement
+   - If `metric.direction` = "lower" and new < `metric.best` → improvement
+4. Update state.json: set `memory.hermes_phase = "decide"`, record metric value in `memory.hermes_latest_metric`, and update `metric.latest`
 
 **STOP after verify.** Next run will be Phase DECIDE.
 
@@ -116,18 +158,20 @@ Toolsets: ["terminal", "file", "web"]
 
 1. Read state.json for metric comparison
 2. **Keep** if improved:
-   - Update `current_best` to new value
+   - Update `metric.best` and `metric.latest` to new value
    - Increment `kept` count
-   - Commit changes with conventional message
-   - Record iteration as "kept"
+   - Record the recommended conventional commit message
+   - Commit changes only if the user explicitly approved commits for this run
+   - Record iteration as "kept" with `autoresearch record --decision keep --metric-value "{{new_value}}" --verify-status pass --guard-status pass --change-summary "{{change_summary}}"`
 3. **Discard** if not improved or regressed:
-   - Revert changes (git reset or rollback)
+   - Prefer a safe patch rollback for only the experiment changes
+   - Use `git reset`, branch deletion, or other destructive rollback only with explicit user approval
    - Increment `discarded` count
-   - Record iteration as "discarded"
+   - Record iteration as "discarded" with `autoresearch record --decision discard --metric-value "{{new_value}}" --verify-status pass --guard-status pass --change-summary "{{change_summary}}"`
 4. Check stop conditions:
-   - `total_iterations >= max_iterations` → `status = "complete"`
-   - `stop_requested` → `status = "stopped"`
-   - Otherwise → `phase = "learn"`
+   - `stats.total_iterations >= iterations_cap` → run `autoresearch complete`
+   - `flags.stop_requested` → set `status = "stopped"` and `flags.background_active = false`
+   - Otherwise → `memory.hermes_phase = "learn"`
 
 **STOP after decide.** Next run will be Phase LEARN or STOP.
 
@@ -146,7 +190,7 @@ Toolsets: ["file"]
 memory add: "AutoResearch strategy for {{project_type}}: {{pattern}}"
 ```
 
-4. Update state.json: `phase = "plan"`, increment `total`
+4. Update state.json: `memory.hermes_phase = "plan"`. Do not increment `stats.total_iterations` here; `autoresearch record` owns iteration counts.
 
 **STOP after learn.** Next run will be Phase PLAN (next iteration).
 
@@ -157,15 +201,16 @@ memory add: "AutoResearch strategy for {{project_type}}: {{pattern}}"
 cat .autoresearch/state.json | jq -r '
   "Run \(.run_id) complete",
   "Goal: \(.goal)",
-  "Iterations: \(.stats.total) (\(.stats.kept) kept, \(.stats.discarded) discarded)",
-  "Best: \(.current_best) (baseline: \(.baseline))",
-  "Improvement: \((.current_best - .baseline) / .baseline * 100)%"
+  "Iterations: \(.stats.total_iterations) (\(.stats.kept) kept, \(.stats.discarded) discarded)",
+  "Best: \(.metric.best) (baseline: \(.metric.baseline))",
+  "Latest: \(.metric.latest)"
 '
 ```
 
-2. Archive state:
+2. Leave `.autoresearch/state.json` in place as the canonical shared CLI state. If an archive copy is needed, copy it instead of moving it:
 ```bash
-mv .autoresearch/state.json .autoresearch/archive/{{run_id}}.json
+mkdir -p .autoresearch/archive
+cp .autoresearch/state.json .autoresearch/archive/{{run_id}}.json
 ```
 
 3. Report results to user
@@ -178,9 +223,10 @@ mv .autoresearch/state.json .autoresearch/archive/{{run_id}}.json
 - **Mechanical verification only** — no intuition
 - **Keep strict improvements** — discard everything else
 - **Use [SILENT] for no-op phases**
-- **Never exceed max_iterations**
+- **Never exceed iterations_cap**
 - **Respect stop_requested flag**
 - **Record every iteration** before starting next
+- **Never commit or destructively reset without explicit approval**
 
 ## Context Variables
 
@@ -191,14 +237,13 @@ mv .autoresearch/state.json .autoresearch/archive/{{run_id}}.json
 | `{{metric}}` | State file or config |
 | `{{verify_command}}` | State file or config |
 | `{{guard_command}}` | State file or config |
-| `{{current_best}}` | State file |
-| `{{baseline}}` | State file |
-| `{{max}}` | State file (default 20) |
+| `{{current_best}}` | `metric.best` in state file |
+| `{{baseline}}` | `metric.baseline` in state file |
+| `{{max}}` | `iterations_cap` in state file (default 20) |
 
 ## Skills
 
-Load for guidance:
+Load for guidance when available:
 - `autoresearch` — OpenCode AutoResearch skill (concepts apply)
-- `textquest-quality-gate` — validation sequence
 
 **Start by detecting phase from state.json. Execute exactly ONE phase. STOP.**

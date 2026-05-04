@@ -5,24 +5,24 @@
     "status": "complete",
     "acceptance_tests": [
       "Public docs and metadata use the Auto Research brand and point at Maleick/AutoResearch",
-      "Claude /autoresearch command family remains intact",
-      "Codex plugin package installs from the repo marketplace and mirrors the root skill bundle",
+      "OpenCode /autoresearch command family remains intact",
+      "Hermes skill guidance uses the shared CLI state file",
       "Distribution validation and compatibility log tests pass"
     ],
     "notes": "Implementation is complete. Keep current web URLs live for the first rewrite. Maintain legacy autoresearch identifiers where compatibility matters."
   },
   {
     "id": "opencode-only-conversion",
-    "name": "Convert Auto Research to OpenCode-only npm package",
+    "name": "Convert Auto Research to OpenCode npm package",
     "status": "complete",
     "acceptance_tests": [
       "npm run typecheck passes",
       "npm pack --dry-run includes dist/, commands/, skills/, hooks/, docs/, .opencode-plugin/",
       "package.json declares opencode-autoresearch with bin: autoresearch",
       "No Python runtime files in shipped package",
-      "No Claude/Codex plugin bundles in shipped package",
+      "No legacy plugin bundles in shipped package",
       ".autoresearch/ is the runtime state directory"
     ],
-    "notes": "Converting from Python/Codex/Claude hybrid to OpenCode-first npm package. Preserving loop semantics and mode workflows."
+    "notes": "Converted from the Python-era hybrid into an OpenCode-first npm package with Hermes Agent integration. Preserving loop semantics and mode workflows."
   }
 ]

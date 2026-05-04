@@ -2,13 +2,14 @@
 
 ## Project Purpose
 
-Auto Research is an OpenCode workflow bundle and npm package for structured autonomous improve-verify loops.
+Auto Research is an OpenCode and Hermes Agent workflow bundle plus npm package for structured autonomous improve-verify loops.
 
 ## Source of Truth
 
 - Runtime source lives in `src/`.
 - OpenCode commands live in `commands/`.
 - The Auto Research skill bundle lives in `skills/autoresearch/`.
+- The Hermes Agent skill bundle and integration docs live in `skills/hermes/`.
 - Shell hooks live in `hooks/`.
 - OpenCode package metadata lives in `.opencode-plugin/plugin.json`.
 - Installation, architecture, and release docs live in `docs/` and `wiki/`.
@@ -20,6 +21,7 @@ Auto Research is an OpenCode workflow bundle and npm package for structured auto
 - Do not commit, tag, push, create releases, or publish packages unless the user explicitly asks.
 - Do not commit runtime artifacts from `.autoresearch/` or generated result files.
 - Keep `VERSION`, `package.json`, `package-lock.json`, `src/constants.ts`, and `.opencode-plugin/plugin.json` aligned for releases.
+- When Hermes cron, `delegate_task`, model routing, or install behavior changes, keep `README.md`, `INSTALL.md`, `docs/`, `wiki/`, and `skills/hermes/` aligned.
 
 ## Security Rules
 

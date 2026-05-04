@@ -12,6 +12,14 @@ describe("Index Exports", () => {
     expect(index.PRODUCT_BRAND).toBeDefined();
   });
 
+  it("exports an OpenCode plugin server from the package root", async () => {
+    const index = await import(resolve(REPO_ROOT, "dist/index.js"));
+    expect(typeof index.server).toBe("function");
+    const plugin = await index.server({});
+    expect(typeof plugin.event).toBe("function");
+    expect(plugin.event()).toBeUndefined();
+  });
+
   it("exports correct version string", async () => {
     const index = await import(resolve(REPO_ROOT, "dist/index.js"));
     expect(typeof index.VERSION).toBe("string");

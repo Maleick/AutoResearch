@@ -36,11 +36,12 @@ npm install -g opencode-autoresearch
 
 # 2. Create Hermes cron for AutoResearch
 cd ~/projects/AutoResearch
-hermes cronjob create \
-  --name "autoresearch-iteration" \
-  --schedule "every 15m" \
+hermes cron create \
+  --name "autoresearch-loop" \
   --workdir ~/projects/AutoResearch \
-  --prompt-file skills/hermes/autoresearch-prompt.md
+  --skill autoresearch-hermes \
+  "every 15m" \
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
 ```
 
 ## Hermes Prompt Template
@@ -58,9 +59,9 @@ See `skills/hermes/autoresearch-prompt.md` for the full cron prompt.
 | `/autoresearch:learn` | Memory tool + pattern analysis |
 | `autoresearch init` | Manual setup (same CLI) |
 | `autoresearch status` | `cat .autoresearch/state.json` |
-| `autoresearch launch` | `cronjob create` |
-| `autoresearch stop` | `cronjob pause` |
-| `autoresearch resume` | `cronjob resume` |
+| `autoresearch launch` | `hermes cron create` |
+| `autoresearch stop` | `hermes cron pause` |
+| `autoresearch resume` | `hermes cron resume` |
 
 ## State File Format
 
@@ -68,12 +69,18 @@ Hermes uses the same `.autoresearch/state.json` format as OpenCode:
 
 ```json
 {
+  "schema_version": 1,
   "run_id": "2026-05-03-001",
-  "status": "running",
+  "status": "initialized",
   "mode": "background",
   "goal": "Improve test coverage",
-  "metric": "coverage_pct",
-  "direction": "higher",
+  "metric": {
+    "name": "coverage_pct",
+    "direction": "higher",
+    "baseline": "72.4",
+    "best": "72.4",
+    "latest": "72.4"
+  },
   "verify": "npm run test:coverage",
   "guard": "npm run typecheck",
   "stats": {
@@ -83,7 +90,9 @@ Hermes uses the same `.autoresearch/state.json` format as OpenCode:
   },
   "flags": {
     "needs_human": false,
-    "stop_requested": false
+    "stop_requested": false,
+    "background_active": true,
+    "stop_ready": false
   }
 }
 ```
@@ -138,10 +147,10 @@ Next cron run will continue with the next phase.
 - Hermes cron intervals minimum 5 minutes vs OpenCode's real-time
 - No `/autoresearch:` slash command variants (use separate cron jobs)
 - Memory is session-based; use `memory` tool for persistence
+- Commits and destructive rollback require explicit user approval
 
 ## Future Enhancements
 
-- [ ] Native Hermes skill for AutoResearch patterns
 - [ ] Auto-detect optimal cron interval based on iteration duration
 - [ ] Integration with Hermes checkpoint/rollback for safe resets
 - [ ] Cross-session memory for strategy learning

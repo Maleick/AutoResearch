@@ -8,7 +8,7 @@ Add Auto Research to the `plugin` array in your global or project-level `opencod
 
 ```json
 {
-  "plugin": ["opencode-autoresearch"]
+  "plugin": ["opencode-autoresearch@latest"]
 }
 ```
 
@@ -62,9 +62,9 @@ Hermes uses cronjobs and `delegate_task` instead of slash commands. See [`../ski
 | `/autoresearch:learn` | Memory tool + pattern analysis |
 | `autoresearch init` | Manual setup (same CLI) |
 | `autoresearch status` | `cat .autoresearch/state.json` |
-| `autoresearch launch` | `cronjob create` |
-| `autoresearch stop` | `cronjob pause` |
-| `autoresearch resume` | `cronjob resume` |
+| `autoresearch launch` | `hermes cron create` |
+| `autoresearch stop` | `hermes cron pause` |
+| `autoresearch resume` | `hermes cron resume` |
 
 ## Runtime Artifacts
 
@@ -80,7 +80,7 @@ Artifacts are stored under the working directory:
 
 ## Updating
 
-Restart OpenCode after a new Auto Research package release is available. To pin a version:
+The `opencode-autoresearch@latest` plugin entry follows the current npm `latest` release. Restart OpenCode after a new Auto Research package release is available. To pin a fixed version instead:
 
 ```json
 {
@@ -92,7 +92,7 @@ Restart OpenCode after a new Auto Research package release is available. To pin 
 
 ### Plugin not loading
 
-1. Verify `opencode.json` uses `"plugin": ["opencode-autoresearch"]`.
+1. Verify `opencode.json` uses `"plugin": ["opencode-autoresearch@latest"]`.
 2. Restart OpenCode after editing config.
 3. Check logs with `opencode run --print-logs "hello"`.
 

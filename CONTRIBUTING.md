@@ -2,47 +2,52 @@
 
 Auto Research is a cross-platform workflow bundle for coding agents. The repository now has two distribution surfaces:
 
-- a root-centered Codex bundle
-- a Claude compatibility package
+- an OpenCode npm package and plugin payload
+- a Hermes Agent skill and integration surface
 
-The root bundle is the source of truth for the Codex plugin payload.
+The TypeScript runtime, OpenCode bundle, and Hermes skill docs are the source of truth for current behavior.
 
 ## Project structure
 
 ```text
-SKILL.md
-agents/openai.yaml
-references/
-scripts/
-plugins/autoresearch/                 # Claude package
-plugins/codex-autoresearch/           # Codex package
-.agents/plugins/marketplace.json      # Repo marketplace for local Codex installs
+src/                                  # CLI and runtime source
+commands/                             # OpenCode slash command templates
+skills/autoresearch/                  # OpenCode AutoResearch skill
+skills/hermes/                        # Hermes Agent skill and integration docs
+hooks/                                # Shell hooks and package verification
+plugins/autoresearch.ts               # OpenCode plugin entry point
+.opencode-plugin/plugin.json          # OpenCode package metadata
+config/model-routing.json             # Local model routing reference config
+scripts/model-router.sh               # Local model routing helper
+docs/ and wiki/                       # Install, architecture, quickstart, release docs
 tests/
 ```
 
-## Working on the root Codex bundle
+## Working on the OpenCode package
 
-When you change `SKILL.md`, `agents/`, `references/`, or `scripts/`:
+When you change `src/`, `commands/`, `skills/autoresearch/`, `hooks/`, or `.opencode-plugin/`:
 
-1. Re-sync the Codex plugin payload.
-2. Re-run distribution validation.
-3. Re-run the pytest coverage for packaging and compatibility logs.
+1. Keep runtime source, command templates, skill docs, and package metadata aligned.
+2. Re-run focused TypeScript and package verification.
+3. Do not commit generated `.autoresearch/` artifacts or result files.
 
 ```bash
-python3 scripts/sync_plugin_payload.py --repo .
-python3 scripts/check_plugin_distribution.py --repo .
-pytest -q tests/test_plugin_distribution.py tests/test_results_compatibility.py
+npm run typecheck
+npm run build
+npm run verify:pack
+npm test
 ```
 
-## Working on the Claude package
+## Working on Hermes support
 
-The Claude package keeps stable `autoresearch` identifiers for compatibility. Update it when:
+Hermes support lives in `skills/hermes/` and uses the shared CLI state under `.autoresearch/state.json`. Update Hermes docs and prompts when:
 
-- the user-facing command surface changes
+- cronjob setup changes
+- `delegate_task` behavior or concurrency changes
+- state schema, result artifacts, or model routing changes
 - installation instructions change
-- the compatibility layer needs new docs or metadata
 
-Keep the command family stable unless you are intentionally shipping a breaking change.
+Keep Hermes guidance clear that commits and destructive rollback require explicit user approval.
 
 ## Version bumps
 
@@ -51,21 +56,24 @@ When releasing a new version, update these surfaces together:
 1. `VERSION`
 2. `CHANGELOG.md`
 3. `README.md`
-4. `.claude-plugin/marketplace.json`
-5. `plugins/autoresearch/.claude-plugin/plugin.json`
-6. `plugins/codex-autoresearch/.codex-plugin/plugin.json`
+4. `package.json`
+5. `package-lock.json`
+6. `src/constants.ts`
+7. `.opencode-plugin/plugin.json`
 
 ## Validation
 
 Minimum validation for packaging changes:
 
 ```bash
-python3 scripts/check_plugin_distribution.py --repo .
-pytest -q tests/test_plugin_distribution.py tests/test_results_compatibility.py
+npm run typecheck
+npm run build
+npm run verify:pack
+npm test
 ```
 
 For doc-heavy changes, also grep for stale repo or brand references:
 
 ```bash
-rg -n "claude-autoresearch|Autoresearch" README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md wiki docs .claude-plugin plugins
+rg -n "claude-autoresearch|research-results.tsv|autoresearch-state.json|plugins/codex-autoresearch|plugins/autoresearch/|.claude-plugin" README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md wiki docs plugins skills
 ```

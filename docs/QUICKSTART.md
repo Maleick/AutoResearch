@@ -16,17 +16,17 @@ autoresearch doctor
 git clone https://github.com/Maleick/AutoResearch.git
 cd AutoResearch
 npm install
-mkdir -p ~/.hermes/skills/autoresearch-hermes
-cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/autoresearch-hermes/SKILL.md
-cp skills/hermes/INTEGRATION.md ~/.hermes/skills/autoresearch-hermes/REFERENCES.md
+mkdir -p ~/.hermes/skills/software-development/autoresearch
+cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/software-development/autoresearch/SKILL.md
+cp skills/hermes/INTEGRATION.md ~/.hermes/skills/software-development/autoresearch/REFERENCES.md
 
 # 2. Create a cronjob
-hermes cronjob create \
+hermes cron create \
   --name "autoresearch-loop" \
-  --schedule "every 15m" \
   --workdir ~/projects/AutoResearch \
-  --skills autoresearch-hermes \
-  --prompt "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+  --skill autoresearch-hermes \
+  "every 15m" \
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
 ```
 
 ## Basic Usage
@@ -105,7 +105,7 @@ cat > autoresearch-config.json <<'EOF'
 EOF
 
 # Start cron
-hermes cronjob resume autoresearch-loop
+hermes cron resume autoresearch-loop
 
 # Check progress
 cat .autoresearch/state.json | jq .

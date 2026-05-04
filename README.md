@@ -109,7 +109,7 @@ Recommended plugin install in `opencode.json`:
 
 ```json
 {
-  "plugin": ["opencode-autoresearch"]
+  "plugin": ["opencode-autoresearch@latest"]
 }
 ```
 
@@ -128,17 +128,17 @@ cd AutoResearch
 npm install
 
 # 2. Install the Hermes skill
-mkdir -p ~/.hermes/skills/autoresearch-hermes
-cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/autoresearch-hermes/SKILL.md
-cp skills/hermes/INTEGRATION.md ~/.hermes/skills/autoresearch-hermes/REFERENCES.md
+mkdir -p ~/.hermes/skills/software-development/autoresearch
+cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/software-development/autoresearch/SKILL.md
+cp skills/hermes/INTEGRATION.md ~/.hermes/skills/software-development/autoresearch/REFERENCES.md
 
 # 3. Create a cronjob
-hermes cronjob create \
+hermes cron create \
   --name "autoresearch-loop" \
-  --schedule "every 15m" \
   --workdir ~/projects/AutoResearch \
-  --skills autoresearch-hermes \
-  --prompt "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+  --skill autoresearch-hermes \
+  "every 15m" \
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
 ```
 
 See [`skills/hermes/README.md`](skills/hermes/README.md) for full Hermes setup, troubleshooting, and command mapping.
@@ -167,7 +167,7 @@ See [`INSTALL.md`](INSTALL.md) for prerequisites, verification, updating, and tr
 
 ```bash
 # 1. Add the plugin to opencode.json
-# { "plugin": ["opencode-autoresearch"] }
+# { "plugin": ["opencode-autoresearch@latest"] }
 
 # 2. Restart OpenCode
 
@@ -197,7 +197,7 @@ cat > autoresearch-config.json <<'EOF'
 EOF
 
 # 3. Start the cronjob
-hermes cronjob resume autoresearch-loop
+hermes cron resume autoresearch-loop
 
 # 4. Check progress
 cat .autoresearch/state.json | jq .

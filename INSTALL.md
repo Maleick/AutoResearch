@@ -34,7 +34,7 @@ Add Auto Research to your global or project-level `opencode.json` plugin array:
 
 ```json
 {
-  "plugin": ["opencode-autoresearch"]
+  "plugin": ["opencode-autoresearch@latest"]
 }
 ```
 
@@ -97,20 +97,20 @@ cd AutoResearch
 npm install
 
 # 2. Copy skill files to your Hermes skills directory
-mkdir -p ~/.hermes/skills/autoresearch-hermes
-cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/autoresearch-hermes/SKILL.md
-cp skills/hermes/INTEGRATION.md ~/.hermes/skills/autoresearch-hermes/REFERENCES.md
+mkdir -p ~/.hermes/skills/software-development/autoresearch
+cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/software-development/autoresearch/SKILL.md
+cp skills/hermes/INTEGRATION.md ~/.hermes/skills/software-development/autoresearch/REFERENCES.md
 ```
 
 ### Create the Cronjob
 
 ```bash
-hermes cronjob create \
+hermes cron create \
   --name "autoresearch-loop" \
-  --schedule "every 15m" \
   --workdir ~/projects/AutoResearch \
-  --skills autoresearch-hermes \
-  --prompt "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+  --skill autoresearch-hermes \
+  "every 15m" \
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
 ```
 
 ### Initialize a Run
@@ -137,13 +137,13 @@ The first cron run will auto-init from this config.
 
 ```bash
 # Start
-hermes cronjob resume autoresearch-loop
+hermes cron resume autoresearch-loop
 
 # Check status
 cat .autoresearch/state.json | jq .
 
 # Stop
-hermes cronjob pause autoresearch-loop
+hermes cron pause autoresearch-loop
 # Or set stop flag:
 jq '.flags.stop_requested = true' .autoresearch/state.json > tmp.json && mv tmp.json .autoresearch/state.json
 ```
@@ -175,7 +175,7 @@ npm test
 To verify command availability:
 
 - **OpenCode**: restart OpenCode in a Git repository and run `/autoresearch`.
-- **Hermes**: run `hermes cronjob list` and confirm `autoresearch-loop` is present.
+- **Hermes**: run `hermes cron list` and confirm `autoresearch-loop` is present.
 
 ---
 
@@ -183,7 +183,7 @@ To verify command availability:
 
 ### OpenCode
 
-For plugin-array installs, restart OpenCode after a new Auto Research package release is available. To pin a specific version:
+For plugin-array installs, `opencode-autoresearch@latest` follows the current npm `latest` release. Restart OpenCode after a new Auto Research package release is available. To pin a fixed version instead:
 
 ```json
 {
@@ -205,14 +205,14 @@ Update the skill files from the latest repo checkout:
 ```bash
 cd AutoResearch
 git pull origin main
-cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/autoresearch-hermes/SKILL.md
-cp skills/hermes/INTEGRATION.md ~/.hermes/skills/autoresearch-hermes/REFERENCES.md
+cp skills/hermes/autoresearch-prompt.md ~/.hermes/skills/software-development/autoresearch/SKILL.md
+cp skills/hermes/INTEGRATION.md ~/.hermes/skills/software-development/autoresearch/REFERENCES.md
 ```
 
 Restart the cronjob if needed:
 
 ```bash
-hermes cronjob resume autoresearch-loop
+hermes cron resume autoresearch-loop
 ```
 
 ---
@@ -235,8 +235,8 @@ hermes cronjob resume autoresearch-loop
 ### Cron Not Running (Hermes)
 
 ```bash
-hermes cronjob list
-hermes cronjob log autoresearch-loop
+hermes cron list
+hermes logs --component cron
 ```
 
 ### State File Corrupted (any runtime)

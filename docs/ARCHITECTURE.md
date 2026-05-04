@@ -142,9 +142,9 @@ flowchart TD
 | `/autoresearch:learn` | Memory tool + pattern analysis |
 | `autoresearch init` | Manual setup (same CLI) |
 | `autoresearch status` | `cat .autoresearch/state.json` |
-| `autoresearch launch` | `cronjob create` |
-| `autoresearch stop` | `cronjob pause` |
-| `autoresearch resume` | `cronjob resume` |
+| `autoresearch launch` | `hermes cron create` |
+| `autoresearch stop` | `hermes cron pause` |
+| `autoresearch resume` | `hermes cron resume` |
 
 ## CLI Commands
 
@@ -234,6 +234,6 @@ The release workflow is automated via GitHub Actions:
 - State is now in `.autoresearch/state.json` (was `autoresearch-state.json` at root).
 - Runtime helpers are TypeScript (`src/helpers.ts`) not Python.
 - Plugin format is `.opencode-plugin/plugin.json`.
-- The Claude and Codex plugin bundles (`plugins/autoresearch/`, `plugins/codex-autoresearch/`) are no longer shipped.
+- Legacy plugin bundles are no longer shipped.
 - Self-improvement loop added in v3.2.0.
 - Hermes Agent support added in v3.3.3.
