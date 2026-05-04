@@ -1,0 +1,44 @@
+{
+  "version": "1.0.0",
+  "description": "Autoresearch model routing — free models first, paid for complex",
+  "routing": {
+    "research": {
+      "tier_order": ["free", "paid", "fallback"],
+      "tiers": {
+        "free": [
+          "opencode-zen/big-pickle",
+          "opencode-zen/minimax-m2.5-free",
+          "opencode-zen/hy3-preview-free",
+          "opencode-zen/ling-2.6-flash-free",
+          "opencode-zen/nemotron-3-super-free",
+          "opencode-zen/gpt-5-nano-free"
+        ],
+        "paid": [
+          "opencode-go/deepseek-v4-pro",
+          "opencode-go/deepseek-v4-flash"
+        ],
+        "fallback": [
+          "kimi-k2.6",
+          "gpt-5.5"
+        ]
+      },
+      "selection": "round-robin"
+    },
+    "analysis": {
+      "tier_order": ["free", "paid", "fallback"],
+      "tiers": {
+        "free": [
+          "opencode-zen/big-pickle",
+          "opencode-zen/minimax-m2.5-free"
+        ],
+        "paid": [
+          "opencode-go/deepseek-v4-pro"
+        ],
+        "fallback": [
+          "kimi-k2.6"
+        ]
+      }
+    }
+  },
+  "max_concurrent": 10
+}
