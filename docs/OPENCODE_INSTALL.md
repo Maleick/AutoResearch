@@ -84,7 +84,7 @@ The `opencode-autoresearch@latest` plugin entry follows the current npm `latest`
 
 ```json
 {
-  "plugin": ["opencode-autoresearch@3.3.3"]
+  "plugin": ["opencode-autoresearch@3.3.4"]
 }
 ```
 

@@ -8,6 +8,7 @@ const CLI = resolve(REPO_ROOT, "dist/cli.js");
 const STATE_PATH = resolve(REPO_ROOT, ".autoresearch", "state.json");
 const RESULTS_PATH = resolve(REPO_ROOT, "autoresearch-results.tsv");
 const MEMORY_PATH = resolve(REPO_ROOT, "autoresearch-memory.md");
+const packageJson = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf-8")) as { version: string };
 
 const readIfExists = (path: string): string | undefined =>
   existsSync(path) ? readFileSync(path, "utf-8") : undefined;
@@ -111,7 +112,7 @@ describe("CLI Commands", () => {
     it("outputs version info", () => {
       const out = execSync(`node ${CLI} --version`, { encoding: "utf-8" });
       expect(out).toContain("autoresearch");
-      expect(out).toContain("3.3.3");
+      expect(out).toContain(packageJson.version);
     });
 
     it("accepts -v shorthand", () => {
@@ -500,6 +501,38 @@ describe("CLI Commands", () => {
     });
   });
 
+  describe("status command", () => {
+    it("shows human-readable status", () => {
+      const out = execSync(`node ${CLI} status`, { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("Run:");
+      expect(out).toContain("test fixture goal");
+      expect(out).toContain("running");
+    });
+
+    it("outputs JSON with --json flag", () => {
+      const out = execSync(`node ${CLI} status --json`, { encoding: "utf-8", cwd: REPO_ROOT });
+      const json = JSON.parse(out);
+      expect(json.status).toBe("running");
+      expect(json.goal).toBe("test fixture goal");
+      expect(json.metric).toBeDefined();
+      expect(json.stats).toBeDefined();
+      expect(json.stats.total_iterations).toBe(1);
+    });
+
+    it("reports error when no state exists", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-status-none");
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+      expect(() => {
+        execSync(`node ${CLI} status --repo ${tmpDir}`, { encoding: "utf-8" });
+      }).toThrow("Missing file");
+    });
+
+    it("includes iteration count in output", () => {
+      const out = execSync(`node ${CLI} status`, { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toMatch(/1 iteration|1 kept/i);
+    });
+  });
+
   describe("unknown command", () => {
     it("exits with error for unknown command", () => {
       expect(() => {
@@ -518,7 +551,7 @@ describe("CLI Commands", () => {
   describe("version output", () => {
     it("includes version number", () => {
       const out = execSync(`node ${CLI} --version`, { encoding: "utf-8" });
-      expect(out).toContain("3.3.3");
+      expect(out).toContain(packageJson.version);
     });
 
     it("includes runtime info", () => {

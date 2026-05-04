@@ -1,5 +1,11 @@
 # Auto Research Changelog
 
+## [3.3.4] - 2026-05-04
+
+### Fixed
+- **OpenCode plugin export**: Added the v1 default plugin object required by OpenCode's npm/local plugin loader.
+- **OpenCode surface registration**: Registered packaged AutoResearch commands and skill paths from the plugin config hook so `/autoresearch` and the `autoresearch` skill are available after plugin load.
+
 ## [3.3.3] - 2026-05-03
 
 ### Added

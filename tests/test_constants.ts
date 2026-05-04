@@ -1,4 +1,5 @@
 import { resolve } from "path";
+import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
@@ -6,7 +7,8 @@ const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 describe("Constants", () => {
   it("has correct version", async () => {
     const { VERSION } = await import(resolve(REPO_ROOT, "dist/constants.js"));
-    expect(VERSION).toBe("3.3.3");
+    const expected = readFileSync(resolve(REPO_ROOT, "VERSION"), "utf-8").trim();
+    expect(VERSION).toBe(expected);
   });
 
   it("has correct package name", async () => {

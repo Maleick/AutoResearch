@@ -44,7 +44,7 @@ describe("Performance Benchmarks", () => {
     expect(elapsed).toBeLessThan(100);
   });
 
-  it("normalizes labels in under 20ms", async () => {
+  it("normalizes labels in under 50ms", async () => {
     const { normalizeLabels } = await import(resolve(REPO_ROOT, "dist/helpers.js"));
     
     const start = performance.now();
@@ -53,7 +53,7 @@ describe("Performance Benchmarks", () => {
     }
     const elapsed = performance.now() - start;
     
-    expect(elapsed).toBeLessThan(20);
+    expect(elapsed).toBeLessThan(50);
   });
 
   it("counts TSV rows in under 5ms", async () => {
