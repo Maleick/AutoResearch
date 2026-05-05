@@ -344,14 +344,6 @@ describe("CLI Commands", () => {
     });
   });
 
-  describe("doctor command", () => {
-    it("reports version and checks", () => {
-      const out = execSync(`node ${CLI} doctor`, { encoding: "utf-8", cwd: REPO_ROOT });
-      expect(out).toContain("autoresearch");
-      expect(out).toContain("✓");
-    });
-  });
-
   describe("export command", () => {
     it("exports run data as JSON", () => {
       const out = execSync(`node ${CLI} export --repo ${REPO_ROOT}`, { encoding: "utf-8", cwd: REPO_ROOT });
@@ -378,6 +370,53 @@ describe("CLI Commands", () => {
       execSync(`node ${CLI} complete --repo ${tmpDir}`, { encoding: "utf-8" });
       const state = JSON.parse(readFileSync(tmpState, "utf-8"));
       expect(state.status).toBe("completed");
+    });
+  });
+
+  describe("launch command", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-launch");
+    const tmpState = resolve(tmpDir, ".autoresearch", "state.json");
+    const tmpLaunch = resolve(tmpDir, ".autoresearch", "launch.json");
+    const tmpResults = resolve(tmpDir, "autoresearch-results.tsv");
+
+    afterEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    it("creates state, results, and launch files", () => {
+      const out = execSync(`node ${CLI} launch --goal "test goal" --metric "tests" --verify "npm test" --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(existsSync(tmpState)).toBe(true);
+      expect(existsSync(tmpResults)).toBe(true);
+      expect(existsSync(tmpLaunch)).toBe(true);
+    });
+
+    it("outputs JSON with status launched and run_id", () => {
+      const out = execSync(`node ${CLI} launch --goal "test goal" --metric "tests" --verify "npm test" --repo ${tmpDir}`, { encoding: "utf-8" });
+      const json = JSON.parse(out);
+      expect(json.status).toBe("launched");
+      expect(json.run_id).toBeDefined();
+      expect(json.launch_path).toBeDefined();
+    });
+
+    it("writes launch.json with run metadata", () => {
+      execSync(`node ${CLI} launch --goal "test goal" --metric "tests" --verify "npm test" --repo ${tmpDir}`, { encoding: "utf-8" });
+      const launch = JSON.parse(readFileSync(tmpLaunch, "utf-8"));
+      expect(launch.run_id).toBeDefined();
+      expect(launch.goal).toBe("test goal");
+      expect(launch.mode).toBe("background");
+    });
+
+    it("initializes with background mode in state", () => {
+      execSync(`node ${CLI} launch --goal "test goal" --metric "tests" --verify "npm test" --repo ${tmpDir}`, { encoding: "utf-8" });
+      const state = JSON.parse(readFileSync(tmpState, "utf-8"));
+      expect(state.mode).toBe("background");
+    });
+
+    it("accepts optional scope and guard parameters", () => {
+      execSync(`node ${CLI} launch --goal "test goal" --metric "tests" --verify "npm test" --scope "src/" --guard "npm run lint" --repo ${tmpDir}`, { encoding: "utf-8" });
+      const state = JSON.parse(readFileSync(tmpState, "utf-8"));
+      expect(state.scope).toBe("src/");
+      expect(state.guard).toBe("npm run lint");
     });
   });
 

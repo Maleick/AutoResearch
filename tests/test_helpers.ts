@@ -166,6 +166,9 @@ describe("normalizeLabels", () => {
   it("handles nested arrays", () => {
     expect(mod.normalizeLabels([["a", "b"], ["c"]] as any)).toEqual(["a", "b", "c"]);
   });
+  it("flattens inner non-string primitives", () => {
+    expect(mod.normalizeLabels([42 as any, true as any, "a"])).toEqual(["42", "true", "a"]);
+  });
 });
 
 describe("missingRequiredLabels", () => {
