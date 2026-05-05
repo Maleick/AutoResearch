@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1777937560421" clover="3.2.0">
-  <project timestamp="1777937560421" name="All files">
-    <metrics statements="330" coveredstatements="321" conditionals="265" coveredconditionals="245" methods="48" coveredmethods="48" elements="643" coveredelements="614" complexity="0" loc="330" ncloc="330" packages="1" files="7" classes="7"/>
+<coverage generated="1777947159005" clover="3.2.0">
+  <project timestamp="1777947159005" name="All files">
+    <metrics statements="330" coveredstatements="323" conditionals="265" coveredconditionals="247" methods="48" coveredmethods="48" elements="643" coveredelements="618" complexity="0" loc="330" ncloc="330" packages="1" files="7" classes="7"/>
     <file name="constants.js" path="/Users/maleick/Projects/AutoResearch/dist/constants.js">
       <metrics statements="8" coveredstatements="8" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
       <line num="1" count="4" type="stmt"/>
@@ -14,7 +14,7 @@
       <line num="8" count="4" type="stmt"/>
     </file>
     <file name="helpers.js" path="/Users/maleick/Projects/AutoResearch/dist/helpers.js">
-      <metrics statements="141" coveredstatements="132" conditionals="122" coveredconditionals="113" methods="27" coveredmethods="27"/>
+      <metrics statements="141" coveredstatements="134" conditionals="122" coveredconditionals="115" methods="27" coveredmethods="27"/>
       <line num="5" count="34" type="stmt"/>
       <line num="6" count="34" type="stmt"/>
       <line num="10" count="3" type="stmt"/>
@@ -102,24 +102,24 @@
       <line num="137" count="9" type="cond" truecount="4" falsecount="0"/>
       <line num="138" count="2" type="stmt"/>
       <line num="139" count="7" type="stmt"/>
-      <line num="142" count="1432" type="cond" truecount="2" falsecount="0"/>
+      <line num="142" count="1433" type="cond" truecount="2" falsecount="0"/>
       <line num="143" count="2" type="stmt"/>
-      <line num="144" count="1430" type="cond" truecount="2" falsecount="0"/>
+      <line num="144" count="1431" type="cond" truecount="2" falsecount="0"/>
       <line num="145" count="16" type="stmt"/>
-      <line num="147" count="1423" type="cond" truecount="2" falsecount="0"/>
+      <line num="147" count="1424" type="cond" truecount="2" falsecount="0"/>
       <line num="148" count="2" type="stmt"/>
       <line num="149" count="2" type="cond" truecount="1" falsecount="1"/>
-      <line num="151" count="1425" type="stmt"/>
-      <line num="152" count="6030" type="cond" truecount="2" falsecount="0"/>
+      <line num="151" count="1426" type="stmt"/>
+      <line num="152" count="6033" type="cond" truecount="2" falsecount="0"/>
       <line num="153" count="2" type="stmt"/>
-      <line num="154" count="6028" type="cond" truecount="2" falsecount="0"/>
-      <line num="155" count="6024" type="stmt"/>
-      <line num="156" count="6024" type="cond" truecount="1" falsecount="1"/>
-      <line num="158" count="4" type="cond" truecount="1" falsecount="1"/>
+      <line num="154" count="6031" type="cond" truecount="2" falsecount="0"/>
+      <line num="155" count="6025" type="stmt"/>
+      <line num="156" count="6025" type="cond" truecount="1" falsecount="1"/>
+      <line num="158" count="6" type="cond" truecount="2" falsecount="0"/>
       <line num="159" count="4" type="stmt"/>
-      <line num="160" count="0" type="stmt"/>
-      <line num="161" count="0" type="cond" truecount="0" falsecount="2"/>
-      <line num="163" count="1421" type="stmt"/>
+      <line num="160" count="2" type="stmt"/>
+      <line num="161" count="2" type="cond" truecount="1" falsecount="1"/>
+      <line num="163" count="1422" type="stmt"/>
       <line num="166" count="56" type="stmt"/>
       <line num="167" count="56" type="stmt"/>
       <line num="170" count="11" type="stmt"/>
