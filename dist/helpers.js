@@ -9,6 +9,16 @@ export class AutoresearchError extends Error {
 export function printJson(payload) {
     console.log(JSON.stringify(payload, null, 2));
 }
+export function sanitizeForTerminal(value) {
+    return String(value).replace(/[\x00-\x1f\x7f-\x9f]/g, (char) => {
+        switch (char) {
+            case "\n": return "\\n";
+            case "\r": return "\\r";
+            case "\t": return "\\t";
+            default: return `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`;
+        }
+    });
+}
 export function utcNow() {
     return new Date().toISOString().replace("Z", "+00:00").split("+")[0] + "Z";
 }
