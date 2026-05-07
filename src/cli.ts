@@ -112,7 +112,7 @@ const markdownHtmlEscapes: Record<string, string> = {
 };
 
 const escapeMarkdownInline = (value: unknown): string => {
-  return String(value ?? "")
+  return sanitizeForTerminal(value ?? "")
     .replace(/[&<>"]/g, (char) => markdownHtmlEscapes[char]!)
     .replace(/[\r\n\t]+/g, " ")
     .replace(/\s{2,}/g, " ")
@@ -125,7 +125,7 @@ const escapeMarkdownTableCell = (value: unknown): string => {
   return escaped.length > 0 ? escaped : "—";
 };
 
-const formatMetricValue = (val: unknown): string => {
+const formatDisplayValue = (val: unknown): string => {
   if (val === undefined || val === null) return "—";
   return sanitizeForTerminal(val);
 };
