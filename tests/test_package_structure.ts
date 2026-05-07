@@ -210,9 +210,11 @@ describe(".opencode/", () => {
 describe("INSTALL.md", () => {
   it("has root OpenCode handoff instructions", () => {
     const content = readFileSync(resolve(REPO_ROOT, "INSTALL.md"), "utf-8");
+    const version = readJson(resolve(REPO_ROOT, "package.json")).version as string;
     expect(content).toContain("## One-Line OpenCode Install");
     expect(content).toContain("Paste this one line into OpenCode");
-    expect(content).toContain("Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md");
+    expect(content).toContain("pinned to the immutable");
+    expect(content).toContain(`Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v${version}/INSTALL.md`);
     expect(content).toContain('"plugin": ["opencode-autoresearch@latest"]');
     expect(content).toContain("npm install -g opencode-autoresearch");
     expect(content).toContain("opencode-autoresearch doctor");
@@ -223,7 +225,8 @@ describe("INSTALL.md", () => {
     const version = readJson(resolve(REPO_ROOT, "package.json")).version as string;
     expect(content).toContain(`v${version}`);
     expect(content).toContain("paste this one-line install prompt");
-    expect(content).toContain("Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md");
+    expect(content).toContain("pinned to the immutable");
+    expect(content).toContain(`Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v${version}/INSTALL.md`);
     expect(content).toContain("See [`INSTALL.md`](INSTALL.md)");
   });
 });

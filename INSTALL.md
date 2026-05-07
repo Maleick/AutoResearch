@@ -15,10 +15,10 @@ Both runtimes share the same state format (`.autoresearch/state.json`) and CLI (
 
 ### One-Line OpenCode Install
 
-Paste this one line into OpenCode to install and verify Auto Research. This URL follows the latest `main` instructions:
+Paste this one line into OpenCode to install and verify Auto Research. This URL is pinned to the immutable `v3.3.4` release instructions:
 
 ```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.3.4/INSTALL.md
 ```
 
 ### Prerequisites
