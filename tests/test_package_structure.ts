@@ -247,10 +247,11 @@ describe("AGENTS.md", () => {
 });
 
 describe("release workflow", () => {
-  it("runs tests before publishing", () => {
+  it("runs tests before semantic-release publishing", () => {
     const content = readFileSync(resolve(REPO_ROOT, ".github/workflows/release.yml"), "utf-8");
     expect(content).toContain("npm test");
-    expect(content).toContain("npm publish --access public --provenance");
+    expect(content).toContain("node-version: '22.14.0'");
+    expect(content).toContain("npx semantic-release");
   });
 });
 
