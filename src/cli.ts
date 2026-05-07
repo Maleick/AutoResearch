@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt } from "./helpers.js";
+import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal } from "./helpers.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
@@ -84,10 +84,12 @@ const parseArgs = (args: string[]): Record<string, string> => {
   return result;
 };
 
-const formatMetricValue = (val: unknown): string => {
+const formatDisplayValue = (val: unknown): string => {
   if (val === undefined || val === null) return "—";
-  return String(val);
+  return sanitizeForTerminal(val);
 };
+
+const formatMetricValue = formatDisplayValue;
 
 const formatTimestamp = (ts: string): string => {
   try {
@@ -158,7 +160,7 @@ const main = async (): Promise<number> => {
         break;
       }
       case "init": {
-        if (verbose) console.error(`[verbose] Initializing run with goal: ${grouped.goal}`);
+        if (verbose) console.error(`[verbose] Initializing run with goal: ${formatDisplayValue(grouped.goal)}`);
         if (dryRun) {
           console.log("[dry-run] Would initialize run with config:");
           console.log(JSON.stringify({
@@ -209,13 +211,13 @@ const main = async (): Promise<number> => {
         } else {
           const s = snapshot;
           const stats = s.stats;
-          console.log(`Run:     ${s.run_id}`);
-          console.log(`Status:  ${s.status}`);
-          console.log(`Mode:    ${s.mode}`);
-          console.log(`Goal:    ${s.goal}`);
+          console.log(`Run:     ${formatDisplayValue(s.run_id)}`);
+          console.log(`Status:  ${formatDisplayValue(s.status)}`);
+          console.log(`Mode:    ${formatDisplayValue(s.mode)}`);
+          console.log(`Goal:    ${formatDisplayValue(s.goal)}`);
           if (s.metric) {
             const m = s.metric;
-            console.log(`Metric:  ${m.name} (${m.direction})`);
+            console.log(`Metric:  ${formatDisplayValue(m.name)} (${formatDisplayValue(m.direction)})`);
             console.log(`  best:  ${formatMetricValue(m.best)}`);
             console.log(`  latest: ${formatMetricValue(m.latest)}`);
           }
@@ -225,7 +227,7 @@ const main = async (): Promise<number> => {
           console.log(`Results: ${s.results_rows} rows`);
           const lastIter = s.last_iteration;
           if (lastIter && lastIter.iteration) {
-            console.log(`Last:    iter ${lastIter.iteration} — ${lastIter.decision} (${lastIter.metric_value})`);
+            console.log(`Last:    iter ${formatDisplayValue(lastIter.iteration)} — ${formatDisplayValue(lastIter.decision)} (${formatMetricValue(lastIter.metric_value)})`);
           }
           const flags = s.flags;
           if (flags?.needs_human) console.log("⚠  Needs human input");
@@ -253,20 +255,20 @@ const main = async (): Promise<number> => {
         const statusEmoji: Record<string, string> = {
           running: "🔄", completed: "✅", initialized: "📋", stopping: "⏹", stopped: "⏸",
         };
-        console.log(`${statusEmoji[s.status as string] ?? "⚪"} Auto Research Run: ${s.run_id}`);
-        console.log(`   Goal:      ${s.goal ?? "—"}`);
-        console.log(`   Status:    ${s.status}`);
-        console.log(`   Mode:      ${s.mode}`);
+        console.log(`${statusEmoji[s.status as string] ?? "⚪"} Auto Research Run: ${formatDisplayValue(s.run_id)}`);
+        console.log(`   Goal:      ${formatDisplayValue(s.goal)}`);
+        console.log(`   Status:    ${formatDisplayValue(s.status)}`);
+        console.log(`   Mode:      ${formatDisplayValue(s.mode)}`);
         if (s.metric) {
           const m = s.metric;
-          console.log(`   Metric:    ${m.name} → ${formatMetricValue(m.latest)} (best: ${formatMetricValue(m.best)}, dir: ${m.direction})`);
+          console.log(`   Metric:    ${formatDisplayValue(m.name)} → ${formatMetricValue(m.latest)} (best: ${formatMetricValue(m.best)}, dir: ${formatDisplayValue(m.direction)})`);
         }
         if (stats) {
           console.log(`   Progress:  ${stats.total_iterations} iterations | ${stats.kept} kept | ${stats.discarded} discarded`);
         }
         if (lastIter && lastIter.iteration) {
-          console.log(`   Last iter: #${lastIter.iteration} — ${lastIter.decision}`);
-          if (lastIter.change_summary) console.log(`   Change:    ${lastIter.change_summary}`);
+          console.log(`   Last iter: #${formatDisplayValue(lastIter.iteration)} — ${formatDisplayValue(lastIter.decision)}`);
+          if (lastIter.change_summary) console.log(`   Change:    ${formatDisplayValue(lastIter.change_summary)}`);
         }
         if (flags?.needs_human) console.log("   ⚠  Needs human review");
         if (flags?.stop_requested) console.log("   ⏹  Stop was requested");
@@ -306,7 +308,7 @@ const main = async (): Promise<number> => {
           const cols = r.split("\t");
           if (cols.length >= 8) {
             const emoji = cols[2] === "keep" ? "✓" : cols[2] === "discard" ? "✗" : "⚠";
-            console.log(`${emoji}  #${cols[1]}  ${cols[2]}  (${formatMetricValue(cols[3])})  ${cols[7].substring(0, 60)}`);
+            console.log(`${emoji}  #${formatDisplayValue(cols[1])}  ${formatDisplayValue(cols[2])}  (${formatMetricValue(cols[3])})  ${formatDisplayValue(cols[7].substring(0, 60))}`);
           }
         }
         console.log(`\nShowing ${Math.min(limit, records.length)} of ${lines.length - 1} records.`);
@@ -337,17 +339,17 @@ const main = async (): Promise<number> => {
           break;
         }
         console.log("Run Configuration:");
-        console.log(`  Goal:     ${state.goal ?? "—"}`);
-        console.log(`  Mode:     ${state.mode ?? "—"}`);
+        console.log(`  Goal:     ${formatDisplayValue(state.goal)}`);
+        console.log(`  Mode:     ${formatDisplayValue(state.mode)}`);
         if (state.metric) {
           const m = state.metric;
-          console.log(`  Metric:   ${m.name} (${m.direction})`);
+          console.log(`  Metric:   ${formatDisplayValue(m.name)} (${formatDisplayValue(m.direction)})`);
         }
-        console.log(`  Scope:    ${state.scope ?? "—"}`);
-        console.log(`  Iter cap: ${state.iterations_cap ?? "—"}`);
-        console.log(`  Deadline: ${state.deadline_at ? formatTimestamp(state.deadline_at as string) : "—"}`);
-        console.log(`  Verify:   ${state.verify ?? "—"}`);
-        console.log(`  Guard:    ${state.guard ?? "—"}`);
+        console.log(`  Scope:    ${formatDisplayValue(state.scope)}`);
+        console.log(`  Iter cap: ${formatDisplayValue(state.iterations_cap)}`);
+        console.log(`  Deadline: ${formatDisplayValue(state.deadline_at ? formatTimestamp(state.deadline_at as string) : "—")}`);
+        console.log(`  Verify:   ${formatDisplayValue(state.verify)}`);
+        console.log(`  Guard:    ${formatDisplayValue(state.guard)}`);
         console.log(`  Pool:     ${state.subagent_pool ? "configured" : "none"}`);
         break;
       }
@@ -426,14 +428,14 @@ const main = async (): Promise<number> => {
         
         if (errors.length === 0) {
           console.log("✓ Configuration is valid");
-          console.log(`  Goal: ${grouped.goal}`);
-          console.log(`  Metric: ${grouped.metric} (${grouped.direction || "lower"})`);
-          console.log(`  Verify: ${verify}`);
-          console.log(`  Mode: ${grouped.mode || "foreground"}`);
+          console.log(`  Goal: ${formatDisplayValue(grouped.goal)}`);
+          console.log(`  Metric: ${formatDisplayValue(grouped.metric)} (${formatDisplayValue(grouped.direction || "lower")})`);
+          console.log(`  Verify: ${formatDisplayValue(verify)}`);
+          console.log(`  Mode: ${formatDisplayValue(grouped.mode || "foreground")}`);
         } else {
           console.error("✗ Configuration errors:");
           for (const err of errors) {
-            console.error(`  - ${err}`);
+            console.error(`  - ${formatDisplayValue(err)}`);
           }
           return 1;
         }
@@ -463,14 +465,14 @@ const main = async (): Promise<number> => {
         }
         
         console.log(`# Auto Research Report`);
-        console.log(`\n**Run:** ${state.run_id}`);
-        console.log(`**Goal:** ${state.goal}`);
-        console.log(`**Status:** ${state.status}`);
-        console.log(`**Mode:** ${state.mode}`);
+        console.log(`\n**Run:** ${formatDisplayValue(state.run_id)}`);
+        console.log(`**Goal:** ${formatDisplayValue(state.goal)}`);
+        console.log(`**Status:** ${formatDisplayValue(state.status)}`);
+        console.log(`**Mode:** ${formatDisplayValue(state.mode)}`);
         if (state.metric) {
           const m = state.metric;
-          console.log(`**Metric:** ${m.name} (${m.direction})`);
-          console.log(`**Best:** ${m.best} | **Latest:** ${m.latest}`);
+          console.log(`**Metric:** ${formatDisplayValue(m.name)} (${formatDisplayValue(m.direction)})`);
+          console.log(`**Best:** ${formatMetricValue(m.best)} | **Latest:** ${formatMetricValue(m.latest)}`);
         }
         if (state.stats) {
           const s = state.stats;
@@ -485,7 +487,7 @@ const main = async (): Promise<number> => {
           for (const r of results) {
             const cols = r.split("\t");
             if (cols.length >= 8) {
-              console.log(`- ${cols[1]}: ${cols[2]} (${cols[3]}) — ${cols[7].substring(0, 60)}`);
+              console.log(`- ${formatDisplayValue(cols[1])}: ${formatDisplayValue(cols[2])} (${formatMetricValue(cols[3])}) — ${formatDisplayValue(cols[7].substring(0, 60))}`);
             }
           }
         }
@@ -507,7 +509,7 @@ const main = async (): Promise<number> => {
         }
         console.log("Memory Patterns — candidate next goals:");
         for (const p of patterns) {
-          console.log(`  → ${p.replace("### Pattern: ", "")}`);
+          console.log(`  → ${formatDisplayValue(p.replace("### Pattern: ", ""))}`);
         }
         console.log(`\n${patterns.length} patterns available. Use 'autoresearch init --goal "..."' to start a new run.`);
         break;
@@ -552,8 +554,8 @@ const main = async (): Promise<number> => {
           console.log(JSON.stringify(exportData, null, 2));
         } else if (format === "md" || format === "markdown") {
           console.log(`# Auto Research Export`);
-          console.log(`\n**Run:** ${exportData.state.run_id}`);
-          console.log(`**Goal:** ${exportData.state.goal}`);
+          console.log(`\n**Run:** ${formatDisplayValue(exportData.state.run_id)}`);
+          console.log(`**Goal:** ${formatDisplayValue(exportData.state.goal)}`);
           console.log(`**Exported:** ${exportData.exported_at}`);
           console.log(`\n## Summary`);
           console.log(`- Total iterations: ${exportData.summary.total}`);
@@ -563,7 +565,7 @@ const main = async (): Promise<number> => {
           console.log(`| # | Decision | Metric | Summary |`);
           console.log(`|---|----------|--------|---------|`);
           for (const r of records) {
-            console.log(`| ${r.iteration} | ${r.decision} | ${r.metric_value || "—"} | ${r.change_summary?.substring(0, 50) || "—"} |`);
+            console.log(`| ${formatDisplayValue(r.iteration)} | ${formatDisplayValue(r.decision)} | ${formatMetricValue(r.metric_value || "—")} | ${formatDisplayValue(r.change_summary?.substring(0, 50) || "—")} |`);
           }
         } else {
           console.error(`Unknown format: ${format}. Supported: json, md`);

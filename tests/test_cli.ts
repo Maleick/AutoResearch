@@ -572,6 +572,95 @@ describe("CLI Commands", () => {
     });
   });
 
+  describe("terminal-safe human-readable output", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-terminal-safe");
+    const statePath = resolve(tmpDir, ".autoresearch", "state.json");
+    const resultsPath = resolve(tmpDir, "autoresearch-results.tsv");
+    const memoryPath = resolve(tmpDir, "autoresearch-memory.md");
+    const controlText = "clear\u001b[2J\u001b[Hbell\u0007\nFORGED: completed";
+    const inlineControlText = "clear\u001b[2J\u001b[Hbell\u0007";
+
+    beforeAll(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+      mkdirSync(resolve(tmpDir, ".autoresearch"), { recursive: true });
+      writeFileSync(statePath, JSON.stringify({
+        schema_version: 1,
+        run_id: `run-${controlText}`,
+        created_at: "2026-05-03T00:00:00Z",
+        updated_at: "2026-05-03T00:01:00Z",
+        status: "running",
+        mode: "foreground",
+        goal: `goal ${controlText}`,
+        scope: `scope ${controlText}`,
+        metric: {
+          name: `metric ${controlText}`,
+          direction: "lower",
+          baseline: "1",
+          best: `best ${controlText}`,
+          latest: "0",
+        },
+        verify: `npm test ${controlText}`,
+        guard: `guard ${controlText}`,
+        label_requirements: { keep: [], stop: [] },
+        artifact_paths: {
+          results: resultsPath,
+          state: statePath,
+        },
+        stats: {
+          total_iterations: 1,
+          kept: 1,
+          discarded: 0,
+          needs_human: 0,
+          consecutive_discards: 0,
+        },
+        flags: {
+          stop_requested: false,
+          needs_human: false,
+          background_active: false,
+          stop_ready: false,
+        },
+        last_iteration: {
+          iteration: 1,
+          decision: `keep${controlText}`,
+          metric_value: `0${controlText}`,
+          change_summary: `change ${controlText}`,
+          labels: [],
+          timestamp: "2026-05-03T00:01:00Z",
+          keep_labels_satisfied: true,
+          stop_labels_satisfied: true,
+          missing_keep_labels: [],
+          missing_stop_labels: [],
+        },
+      }, null, 2) + "\n", "utf-8");
+      writeFileSync(resultsPath, [
+        "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote",
+        `2026-05-03T00:01:00Z\t1\tkeep\t0${inlineControlText}\tpass\tpass\tfixture\tchange ${inlineControlText}\tfixture\tbaseline`,
+      ].join("\n") + "\n", "utf-8");
+      writeFileSync(memoryPath, `### Pattern: pattern ${controlText}\n\nDetails.\n`, "utf-8");
+    });
+
+    afterAll(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    it("escapes controls from attacker-controlled artifacts in text commands", () => {
+      const commands = ["status", "explain", "history", "config", "suggest", "report", "export --format md"];
+      for (const command of commands) {
+        const out = execSync(`node ${CLI} ${command} --repo ${tmpDir}`, { encoding: "utf-8" });
+        expect(out).not.toContain("\u001b");
+        expect(out).not.toContain("\u0007");
+        expect(out).toContain("\\u001b");
+      }
+    });
+
+    it("keeps JSON output raw so JSON.stringify escapes controls", () => {
+      const out = execSync(`node ${CLI} status --json --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(out).not.toContain("\u001b");
+      expect(out).toContain("\\u001b");
+      expect(JSON.parse(out).goal).toContain("\u001b");
+    });
+  });
+
   describe("unknown command", () => {
     it("exits with error for unknown command", () => {
       expect(() => {
