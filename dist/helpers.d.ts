@@ -4,6 +4,7 @@ export declare class AutoresearchError extends Error {
     constructor(message: string);
 }
 export declare function printJson(payload: unknown): void;
+export declare function sanitizeForTerminal(value: unknown): string;
 export declare function utcNow(): string;
 export declare function resolveRepo(repo?: string): string;
 export declare function ensureParent(filePath: string): void;
