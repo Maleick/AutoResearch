@@ -1,3 +1,29 @@
+## [3.4.1](https://github.com/Maleick/AutoResearch/compare/v3.4.0...v3.4.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* **install:** avoid cron prompt command substitution ([#110](https://github.com/Maleick/AutoResearch/issues/110)) ([72c3816](https://github.com/Maleick/AutoResearch/commit/72c3816105eaf1e069ed0347d8d320ce96707d06))
+
+# [3.4.0](https://github.com/Maleick/AutoResearch/compare/v3.3.3...v3.4.0) (2026-05-07)
+
+
+### Bug Fixes
+
+* anchor OpenCode command skill references ([#27](https://github.com/Maleick/AutoResearch/issues/27)) ([05552ac](https://github.com/Maleick/AutoResearch/commit/05552ac615e69e0cc246e929fdd8de5384dbdba0))
+* avoid Hermes init shell interpolation ([#28](https://github.com/Maleick/AutoResearch/issues/28)) ([5c3511d](https://github.com/Maleick/AutoResearch/commit/5c3511da03032a895791eac5322779f6428d4441))
+* expose OpenCode plugin entry ([3fbf3a6](https://github.com/Maleick/AutoResearch/commit/3fbf3a6a664d446f37a2b3c4efa2483a5762fbb9))
+* **hermes:** require trusted cron commands ([#29](https://github.com/Maleick/AutoResearch/issues/29)) ([75df509](https://github.com/Maleick/AutoResearch/commit/75df509fbb36f1fca7b8e2d95cb166aa5efcfe07))
+* pass model router args safely ([#31](https://github.com/Maleick/AutoResearch/issues/31)) ([de0e9e8](https://github.com/Maleick/AutoResearch/commit/de0e9e852f958e453f3e81bc0e6618bba2e4282e))
+* register OpenCode plugin surfaces ([3faadf1](https://github.com/Maleick/AutoResearch/commit/3faadf128793758b00671341bd7e1636c5bcf66c))
+* run releases on Node 22 ([#33](https://github.com/Maleick/AutoResearch/issues/33)) ([029678d](https://github.com/Maleick/AutoResearch/commit/029678d362488b0b74a86713ab590d372a5e6c5b))
+
+
+### Features
+
+* **hermes:** add full Hermes Agent runtime support ([190f133](https://github.com/Maleick/AutoResearch/commit/190f13355ab85b09391d959125e532cae16042e2)), closes [#hermes-support](https://github.com/Maleick/AutoResearch/issues/hermes-support) [#multi-runtime](https://github.com/Maleick/AutoResearch/issues/multi-runtime)
+* **routing:** add intelligent model routing for free-tier priority ([3f7ecba](https://github.com/Maleick/AutoResearch/commit/3f7ecba7a52e3059bc9fba071eaa65db0f4c5bd4))
+
 # Auto Research Changelog
 
 ## [3.3.4] - 2026-05-04

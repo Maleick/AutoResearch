@@ -25,6 +25,9 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Security audit
+        run: npm run audit
+
       - name: Check version consistency
         run: |
           node -e "

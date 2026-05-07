@@ -62,6 +62,21 @@ describe("package.json", () => {
     expect(scripts.build).toBeDefined();
     expect(scripts.typecheck).toBeDefined();
   });
+
+  it("has an audit script for moderate-or-higher advisories", () => {
+    const scripts = readJson(resolve(REPO_ROOT, "package.json")).scripts as Record<string, string>;
+    expect(scripts.audit).toBe("npm audit --audit-level=moderate");
+  });
+
+  it("runs version synchronization before packing", () => {
+    const scripts = readJson(resolve(REPO_ROOT, "package.json")).scripts as Record<string, string>;
+    expect(scripts.prepack).toContain("node scripts/sync-version.mjs");
+  });
+
+  it("includes semantic-release exec for version synchronization", () => {
+    const devDependencies = readJson(resolve(REPO_ROOT, "package.json")).devDependencies as Record<string, string>;
+    expect(devDependencies["@semantic-release/exec"]).toBeDefined();
+  });
 });
 
 describe(".opencode-plugin/plugin.json", () => {
@@ -210,9 +225,11 @@ describe(".opencode/", () => {
 describe("INSTALL.md", () => {
   it("has root OpenCode handoff instructions", () => {
     const content = readFileSync(resolve(REPO_ROOT, "INSTALL.md"), "utf-8");
+    const version = readJson(resolve(REPO_ROOT, "package.json")).version as string;
     expect(content).toContain("## One-Line OpenCode Install");
     expect(content).toContain("Paste this one line into OpenCode");
-    expect(content).toContain("Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md");
+    expect(content).toContain("pinned to the immutable");
+    expect(content).toContain(`Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v${version}/INSTALL.md`);
     expect(content).toContain('"plugin": ["opencode-autoresearch@latest"]');
     expect(content).toContain("npm install -g opencode-autoresearch");
     expect(content).toContain("opencode-autoresearch doctor");
@@ -223,7 +240,8 @@ describe("INSTALL.md", () => {
     const version = readJson(resolve(REPO_ROOT, "package.json")).version as string;
     expect(content).toContain(`v${version}`);
     expect(content).toContain("paste this one-line install prompt");
-    expect(content).toContain("Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md");
+    expect(content).toContain("pinned to the immutable");
+    expect(content).toContain(`Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v${version}/INSTALL.md`);
     expect(content).toContain("See [`INSTALL.md`](INSTALL.md)");
   });
 });
@@ -250,7 +268,58 @@ describe("release workflow", () => {
   it("runs tests before publishing", () => {
     const content = readFileSync(resolve(REPO_ROOT, ".github/workflows/release.yml"), "utf-8");
     expect(content).toContain("npm test");
-    expect(content).toContain("npm publish --access public --provenance");
+    expect(content).toContain("NPM_CONFIG_PROVENANCE");
+    expect(content).toContain("npx semantic-release");
+    expect(content).not.toContain("NODE_AUTH_TOKEN");
+  });
+
+  it("runs the audit gate before release", () => {
+    const content = readFileSync(resolve(REPO_ROOT, ".github/workflows/release.yml"), "utf-8");
+    expect(content).toContain("npm run audit");
+  });
+
+  it("uses a Node version supported by semantic-release", () => {
+    const content = readFileSync(resolve(REPO_ROOT, ".github/workflows/release.yml"), "utf-8");
+    expect(content).toContain("node-version: '22'");
+  });
+});
+
+describe("semantic-release config", () => {
+  it("syncs all version surfaces during release prepare", () => {
+    const content = readFileSync(resolve(REPO_ROOT, ".releaserc.json"), "utf-8");
+    expect(content).toContain("@semantic-release/exec");
+    expect(content).toContain("node scripts/sync-version.mjs");
+    expect(content).toContain("VERSION");
+    expect(content).toContain("src/constants.ts");
+    expect(content).toContain(".opencode-plugin/plugin.json");
+    expect(content).toContain("README.md");
+  });
+});
+
+describe("version sync script", () => {
+  it("updates every release version surface", () => {
+    const content = readFileSync(resolve(REPO_ROOT, "scripts/sync-version.mjs"), "utf-8");
+    expect(content).toContain("../VERSION");
+    expect(content).toContain("../src/constants.ts");
+    expect(content).toContain("../.opencode-plugin/plugin.json");
+    expect(content).toContain("../README.md");
+  });
+});
+
+describe("validate workflow", () => {
+  it("runs the audit gate before package verification", () => {
+    const content = readFileSync(resolve(REPO_ROOT, ".github/workflows/validate.yml"), "utf-8");
+    expect(content).toContain("npm run audit");
+    expect(content.indexOf("npm run audit")).toBeLessThan(content.indexOf("npm run verify:pack"));
+  });
+});
+
+describe("package verifier", () => {
+  it("requires compiled entrypoints declared by package metadata", () => {
+    const verifier = readFileSync(resolve(REPO_ROOT, "hooks/verify-package.sh"), "utf-8");
+    expect(verifier).toContain('"dist/cli.js"');
+    expect(verifier).toContain('"dist/index.js"');
+    expect(verifier).toContain('"dist/index.d.ts"');
   });
 });
 
