@@ -319,7 +319,9 @@ describe("buildSupervisorSnapshot", () => {
     try { rmSync(stateDir, { recursive: true, force: true }); } catch {}
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(resolve(stateDir, "state.json"), JSON.stringify(createMinimalState()), "utf-8");
-    symlinkSync("/dev/zero", resolve(stateDir, "autoresearch-results.tsv"));
+    const resultsTarget = resolve(stateDir, "results-target.tsv");
+    writeFileSync(resultsTarget, "placeholder\n", "utf-8");
+    symlinkSync(resultsTarget, resolve(stateDir, "autoresearch-results.tsv"));
     await expect(mod.buildSupervisorSnapshot(stateDir, "autoresearch-results.tsv", "state.json"))
       .rejects.toThrow("Refusing to read symlinked results file");
   });
