@@ -24,6 +24,15 @@ function commandNameForPath(filePath: string) {
   return relativePath.replace(/\.md$/, "").split(sep).join(":");
 }
 
+function pathForTemplate(filePath: string) {
+  return filePath.split(sep).join("/");
+}
+
+function anchorTrustedSkillReferences(template: string) {
+  const trustedSkillBundlePath = pathForTemplate(join(repoRoot, "skills", SKILL_NAME));
+  return template.replaceAll(`skills/${SKILL_NAME}/`, `${trustedSkillBundlePath}/`);
+}
+
 const commandFiles = [
   "commands/autoresearch.md",
   "commands/autoresearch/plan.md",
@@ -50,7 +59,7 @@ export async function server() {
       for (const commandFile of commandFiles) {
         const filePath = join(repoRoot, commandFile);
         config.command[commandNameForPath(filePath)] ??= {
-          template: readFileSync(filePath, "utf8").trim(),
+          template: anchorTrustedSkillReferences(readFileSync(filePath, "utf8").trim()),
         };
       }
     },

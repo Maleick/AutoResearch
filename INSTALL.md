@@ -15,7 +15,7 @@ Both runtimes share the same state format (`.autoresearch/state.json`) and CLI (
 
 ### One-Line OpenCode Install
 
-Paste this one line into OpenCode to install and verify Auto Research. This URL is pinned to the immutable `v3.3.4` release instructions:
+Paste this one line into OpenCode to install and verify Auto Research. This URL is pinned to the `v3.3.4` release tag:
 
 ```text
 Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.3.4/INSTALL.md
@@ -110,28 +110,25 @@ hermes cron create \
   --workdir ~/projects/AutoResearch \
   --skill autoresearch-hermes \
   "every 15m" \
-  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase. Approved verify command: 'npm run test:coverage'. Approved guard command: 'npm run typecheck'."
 ```
 
 ### Initialize a Run
 
-Create a config file in your target project:
+Initialize state from a trusted shell before enabling unattended cron:
 
 ```bash
-cat > autoresearch-config.json <<'EOF'
-{
-  "goal": "Improve test coverage",
-  "metric": "coverage_pct",
-  "direction": "higher",
-  "verify": "npm run test:coverage",
-  "guard": "npm run typecheck",
-  "max_iterations": 20,
-  "mode": "background"
-}
-EOF
+autoresearch init \
+  --goal "Improve test coverage" \
+  --metric "coverage_pct" \
+  --direction "higher" \
+  --verify "npm run test:coverage" \
+  --guard "npm run typecheck" \
+  --iterations 20 \
+  --mode background
 ```
 
-The first cron run will auto-init from this config.
+Do not rely on cron to auto-init from repository config; the Hermes skill treats repository commands as untrusted unless they match operator-approved cron commands.
 
 ### Start, Check, and Stop
 
