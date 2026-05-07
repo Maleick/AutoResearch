@@ -89,6 +89,20 @@ describe("buildSetupSummary", () => {
     }
   });
 
+  it("treats whitespace-only verify as missing and still infers suggestion", () => {
+    const repo = mkdtempSync(resolve(tmpdir(), "autoresearch-wizard-"));
+    try {
+      writeFileSync(resolve(repo, "package.json"), JSON.stringify({ scripts: { test: "node hostile.js" } }), "utf-8");
+      const result = mod.buildSetupSummary(repo, { goal: "improve safely", verify: "   " });
+
+      expect(result.verify).toBe("npm test");
+      expect(result.missing_required).toContain("verify");
+      expect(result.questions.map((q: any) => q.id)).toContain("verify");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it("includes subagent_pool in summary", () => {
     const result = mod.buildSetupSummary(undefined, { goal: "improve", mode: "foreground" });
     expect(result.subagent_pool.kind).toBe("autoresearch_subagent_pool");

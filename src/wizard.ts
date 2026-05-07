@@ -14,7 +14,8 @@ export function buildSetupSummary(
   repo: string | undefined,
   config: WizardConfig,
 ): Record<string, unknown> {
-  const verify = config.verify ?? inferVerifyCommand(repo);
+  const explicitVerify = config.verify?.trim();
+  const verify = explicitVerify || inferVerifyCommand(repo);
   const direction = normalizeDirection(config.direction);
   const mode = normalizeMode(config.mode);
   const durationSeconds = parseDurationSeconds(config.duration);
@@ -28,7 +29,7 @@ export function buildSetupSummary(
 
   const missingRequired: string[] = [];
   if (!config.goal) missingRequired.push("goal");
-  if (!config.verify) missingRequired.push("verify");
+  if (!explicitVerify) missingRequired.push("verify");
 
   const stopReasons: string[] = [];
   if (verify !== "<set verify command>") {
@@ -39,7 +40,7 @@ export function buildSetupSummary(
 
   const questions: { id: string; prompt: string; reason: string }[] = [];
   if (!config.goal) questions.push({ id: "goal", prompt: "What outcome should this run optimize for?", reason: "The loop needs one concrete result to chase." });
-  if (!config.verify) questions.push({ id: "verify", prompt: "What command should mechanically verify the metric?", reason: "The loop should not keep changes on intuition alone." });
+  if (!explicitVerify) questions.push({ id: "verify", prompt: "What command should mechanically verify the metric?", reason: "The loop should not keep changes on intuition alone." });
   if (!config.mode) questions.push({ id: "mode", prompt: "Should the run stay in `foreground` or move to `background`?", reason: "The skill requires an explicit run-mode choice." });
 
   return {
