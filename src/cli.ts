@@ -101,14 +101,17 @@ const markdownEscapePattern = /([\\`*_{}[\]()#+\-.!|>])/g;
 const terminalControlPattern = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g;
 const controlCharacterPattern = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
 
-const formatMarkdownField = (value: unknown): string => {
+const sanitizeMarkdownText = (value: unknown): string => {
   if (value === undefined || value === null) return "—";
   return String(value)
     .replace(terminalControlPattern, "")
     .replace(controlCharacterPattern, "")
     .replace(/\r?\n|\r/g, " ")
-    .replace(/\t/g, " ")
-    .replace(markdownEscapePattern, "\\$1");
+    .replace(/\t/g, " ");
+};
+
+const formatMarkdownField = (value: unknown): string => {
+  return sanitizeMarkdownText(value).replace(markdownEscapePattern, "\\$1");
 };
 
 
