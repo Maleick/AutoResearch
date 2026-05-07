@@ -87,7 +87,7 @@ Toolsets: ["terminal", "file", "web"]
 
 1. Read state.json for the planned change
 2. Implement the focused change (one change per iteration)
-3. Run the operator-approved guard command only after the Command Trust Gate passes. If no guard is configured in state, record guard status as `skip`.
+3. Run the operator-approved guard command only after the Command Trust Gate passes. Record the actual guard status for later DECIDE-phase recording: `pass` if the configured guard runs successfully, `fail` if it runs and fails, or `skip` if no guard is configured in state. Do not hard-code `pass` when the guard was skipped or failed.
 4. Update state.json: set `memory.hermes_phase = "verify"` and update `updated_at`
 
 **STOP after modify.** Next run will be Phase VERIFY.
