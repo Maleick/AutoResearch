@@ -84,6 +84,47 @@ const parseArgs = (args: string[]): Record<string, string> => {
   return result;
 };
 
+
+const markdownInlineEscapes: Record<string, string> = {
+  "\\": "\\\\",
+  "`": "\\`",
+  "*": "\\*",
+  "_": "\\_",
+  "{": "\\{",
+  "}": "\\}",
+  "[": "\\[",
+  "]": "\\]",
+  "(": "\\(",
+  ")": "\\)",
+  "#": "\\#",
+  "+": "\\+",
+  "-": "\\-",
+  ".": "\\.",
+  "!": "\\!",
+  "|": "\\|",
+};
+
+const markdownHtmlEscapes: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+};
+
+const escapeMarkdownInline = (value: unknown): string => {
+  return String(value ?? "")
+    .replace(/[&<>"]/g, (char) => markdownHtmlEscapes[char]!)
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .replace(/[\\`*_{}\[\]()#+\-.!|]/g, (char) => markdownInlineEscapes[char]!);
+};
+
+const escapeMarkdownTableCell = (value: unknown): string => {
+  const escaped = escapeMarkdownInline(value);
+  return escaped.length > 0 ? escaped : "—";
+};
+
 const formatMetricValue = (val: unknown): string => {
   if (val === undefined || val === null) return "—";
   return String(val);
@@ -569,9 +610,9 @@ const main = async (): Promise<number> => {
           console.log(JSON.stringify(exportData, null, 2));
         } else if (format === "md" || format === "markdown") {
           console.log(`# Auto Research Export`);
-          console.log(`\n**Run:** ${exportData.state.run_id}`);
-          console.log(`**Goal:** ${exportData.state.goal}`);
-          console.log(`**Exported:** ${exportData.exported_at}`);
+          console.log(`\n**Run:** ${escapeMarkdownInline(exportData.state.run_id) || "—"}`);
+          console.log(`**Goal:** ${escapeMarkdownInline(exportData.state.goal) || "—"}`);
+          console.log(`**Exported:** ${escapeMarkdownInline(exportData.exported_at)}`);
           console.log(`\n## Summary`);
           console.log(`- Total iterations: ${exportData.summary.total}`);
           console.log(`- Kept: ${exportData.summary.kept}`);
@@ -580,7 +621,7 @@ const main = async (): Promise<number> => {
           console.log(`| # | Decision | Metric | Summary |`);
           console.log(`|---|----------|--------|---------|`);
           for (const r of records) {
-            console.log(`| ${r.iteration} | ${r.decision} | ${r.metric_value || "—"} | ${r.change_summary?.substring(0, 50) || "—"} |`);
+            console.log(`| ${escapeMarkdownTableCell(r.iteration)} | ${escapeMarkdownTableCell(r.decision)} | ${escapeMarkdownTableCell(r.metric_value)} | ${escapeMarkdownTableCell(r.change_summary?.substring(0, 50))} |`);
           }
         } else {
           console.error(`Unknown format: ${format}. Supported: json, md`);
