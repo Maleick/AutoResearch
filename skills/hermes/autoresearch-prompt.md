@@ -82,7 +82,7 @@ const args = [
   "--direction", String(config.direction || "lower"),
   "--verify", String(config.verify),
   "--iterations", String(config.max_iterations || config.iterations || 20),
-  "--mode", "background",
+  "--mode", String(config.mode || "background"),
 ];
 if (config.guard) {
   args.push("--guard", String(config.guard));
