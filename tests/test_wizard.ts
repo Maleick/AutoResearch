@@ -1,3 +1,5 @@
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
 import { basename, resolve } from "path";
 import { fileURLToPath } from "url";
 
@@ -33,6 +35,8 @@ describe("buildSetupSummary", () => {
   it("uses provided verify when set", () => {
     const result = mod.buildSetupSummary(undefined, { goal: "improve", verify: "make test" });
     expect(result.verify).toBe("make test");
+    expect(result.missing_required).not.toContain("verify");
+    expect(result.questions.map((q: any) => q.id)).not.toContain("verify");
   });
 
   it("defaults direction to lower", () => {
@@ -71,6 +75,34 @@ describe("buildSetupSummary", () => {
   it("reports missing verify when inference fails", () => {
     const result = mod.buildSetupSummary("/nonexistent", {});
     expect(result.missing_required).toContain("verify");
+  });
+
+  it("requires explicit verify confirmation even when npm test is inferred", () => {
+    const repo = mkdtempSync(resolve(tmpdir(), "autoresearch-wizard-"));
+    try {
+      writeFileSync(resolve(repo, "package.json"), JSON.stringify({ scripts: { test: "node hostile.js" } }), "utf-8");
+      const result = mod.buildSetupSummary(repo, { goal: "improve safely" });
+
+      expect(result.verify).toBe("npm test");
+      expect(result.missing_required).toContain("verify");
+      expect(result.questions.map((q: any) => q.id)).toContain("verify");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("treats whitespace-only verify as missing, includes verify in required fields, and still infers suggestion", () => {
+    const repo = mkdtempSync(resolve(tmpdir(), "autoresearch-wizard-"));
+    try {
+      writeFileSync(resolve(repo, "package.json"), JSON.stringify({ scripts: { test: "node hostile.js" } }), "utf-8");
+      const result = mod.buildSetupSummary(repo, { goal: "improve safely", verify: "   " });
+
+      expect(result.verify).toBe("npm test");
+      expect(result.missing_required).toContain("verify");
+      expect(result.questions.map((q: any) => q.id)).toContain("verify");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it("includes subagent_pool in summary", () => {
