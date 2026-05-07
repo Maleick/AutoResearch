@@ -57,17 +57,43 @@ fi
 {{verify_command}}
 ```
 
-3. Prefer the shared AutoResearch CLI for state creation:
+3. Prefer the shared AutoResearch CLI for state creation. Treat values read from `autoresearch-config.json` or prompts as untrusted data: **do not** render raw values into a shell command. Use a native argv invocation (no shell) so quotes and shell metacharacters remain argument data:
 ```bash
-autoresearch init \
-  --goal "{{goal}}" \
-  --metric "{{metric}}" \
-  --direction "{{direction}}" \
-  --verify "{{verify_command}}" \
-  --guard "{{guard_command}}" \
-  --iterations {{max}} \
-  --mode background
+node <<'NODE'
+const { existsSync, readFileSync } = require("fs");
+const { spawnSync } = require("child_process");
+
+const configPath = "autoresearch-config.json";
+const config = existsSync(configPath)
+  ? JSON.parse(readFileSync(configPath, "utf8"))
+  : {};
+
+const required = ["goal", "metric", "verify"];
+const missing = required.filter((key) => !config[key]);
+if (missing.length) {
+  console.error(`Missing required AutoResearch config fields: ${missing.join(", ")}`);
+  process.exit(1);
+}
+
+const args = [
+  "init",
+  "--goal", String(config.goal),
+  "--metric", String(config.metric),
+  "--direction", String(config.direction || "lower"),
+  "--verify", String(config.verify),
+  "--iterations", String(config.max_iterations || config.iterations || 20),
+  "--mode", "background",
+];
+if (config.guard) {
+  args.push("--guard", String(config.guard));
+}
+
+const result = spawnSync("autoresearch", args, { stdio: "inherit", shell: false });
+process.exit(result.status ?? 1);
+NODE
 ```
+
+If collecting missing values interactively instead of using `autoresearch-config.json`, pass them to the CLI through the same kind of native argv array. Never concatenate or template those values into bash.
 
 If the CLI is unavailable, create `.autoresearch/state.json` using the canonical `RunState` shape:
 ```json
