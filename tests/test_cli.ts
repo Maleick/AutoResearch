@@ -101,10 +101,58 @@ describe("CLI Commands", () => {
   });
 
   describe("--dry-run flag", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-dry-run");
+    const tmpState = resolve(tmpDir, ".autoresearch", "state.json");
+    const tmpResults = resolve(tmpDir, "autoresearch-results.tsv");
+    const tmpLaunch = resolve(tmpDir, ".autoresearch", "launch.json");
+
+    afterEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
     it("prevents file creation in init", () => {
-      const out = execSync(`node ${CLI} init --goal "test" --metric "test" --verify "echo" --dry-run 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT });
+      const out = execSync(`node ${CLI} init --goal "test" --metric "test" --verify "echo" --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("Would initialize");
       expect(out).toContain("test");
+      expect(existsSync(tmpState)).toBe(false);
+      expect(existsSync(tmpResults)).toBe(false);
+    });
+
+    it("prevents file creation in launch", () => {
+      const out = execSync(`node ${CLI} launch --goal "test" --metric "test" --verify "echo" --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("Would launch");
+      expect(existsSync(tmpState)).toBe(false);
+      expect(existsSync(tmpResults)).toBe(false);
+      expect(existsSync(tmpLaunch)).toBe(false);
+    });
+
+    it("prevents state and result mutations in record", () => {
+      execSync(`node ${CLI} init --goal "test" --metric "test" --verify "echo" --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
+      const stateBefore = readFileSync(tmpState, "utf-8");
+      const resultsBefore = readFileSync(tmpResults, "utf-8");
+
+      const out = execSync(`node ${CLI} record --decision keep --metric-value 1 --verify-status pass --guard-status pass --change-summary "dry" --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT });
+
+      expect(out).toContain("Would record");
+      expect(readFileSync(tmpState, "utf-8")).toBe(stateBefore);
+      expect(readFileSync(tmpResults, "utf-8")).toBe(resultsBefore);
+    });
+
+    it("prevents state mutations in stop, resume, and complete", () => {
+      execSync(`node ${CLI} init --goal "test" --metric "test" --verify "echo" --mode background --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
+
+      const beforeStop = readFileSync(tmpState, "utf-8");
+      expect(execSync(`node ${CLI} stop --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT })).toContain("Would request");
+      expect(readFileSync(tmpState, "utf-8")).toBe(beforeStop);
+
+      execSync(`node ${CLI} stop --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
+      const beforeResume = readFileSync(tmpState, "utf-8");
+      expect(execSync(`node ${CLI} resume --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT })).toContain("Would resume");
+      expect(readFileSync(tmpState, "utf-8")).toBe(beforeResume);
+
+      const beforeComplete = readFileSync(tmpState, "utf-8");
+      expect(execSync(`node ${CLI} complete --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT })).toContain("Would mark");
+      expect(readFileSync(tmpState, "utf-8")).toBe(beforeComplete);
     });
   });
 

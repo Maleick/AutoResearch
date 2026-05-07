@@ -605,8 +605,6 @@ const main = async (): Promise<number> => {
       }
       case "launch": {
         const { resolvePath } = await import("./helpers.js");
-        const { initializeRun } = await import("./run-manager.js");
-        const { writeFileSync } = await import("fs");
         const { LAUNCH_DEFAULT } = await import("./constants.js");
         const config = {
           goal: grouped.goal as string,
@@ -625,6 +623,14 @@ const main = async (): Promise<number> => {
           stop_condition: grouped["stop-condition"] as string | undefined,
           baseline: grouped.baseline as string | undefined,
         };
+        const launchPath = resolvePath(grouped.repo as string | undefined, grouped["launch-path"] as string | undefined, LAUNCH_DEFAULT);
+        if (dryRun) {
+          console.log("[dry-run] Would launch background run with config:");
+          console.log(JSON.stringify({ ...config, launch_path: launchPath }, null, 2));
+          return 0;
+        }
+        const { initializeRun } = await import("./run-manager.js");
+        const { writeFileSync } = await import("fs");
         const state = await initializeRun(
           grouped.repo as string | undefined,
           grouped["results-path"] as string | undefined,
@@ -632,34 +638,61 @@ const main = async (): Promise<number> => {
           config,
           grouped["fresh-start"] === "true",
         );
-        const launchPath = resolvePath(grouped.repo as string | undefined, grouped["launch-path"] as string | undefined, LAUNCH_DEFAULT);
         writeFileSync(launchPath, JSON.stringify({ run_id: state.run_id, goal: state.goal, mode: "background" }, null, 2) + "\n", "utf-8");
         printJson({ status: "launched", run_id: state.run_id, launch_path: launchPath });
         break;
       }
       case "complete": {
+        if (dryRun) {
+          console.log("[dry-run] Would mark run complete");
+          return 0;
+        }
         const { completeRun } = await import("./run-manager.js");
         const state = await completeRun(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
         printJson({ status: "completed", run_id: state.run_id });
         break;
       }
       case "stop": {
+        if (dryRun) {
+          console.log("[dry-run] Would request background run stop");
+          return 0;
+        }
         const { setStopRequested } = await import("./run-manager.js");
         const state = await setStopRequested(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
         printJson({ status: "stop_requested", run_id: state.run_id });
         break;
       }
       case "resume": {
+        if (dryRun) {
+          console.log("[dry-run] Would resume background run");
+          return 0;
+        }
         const { resumeBackgroundRun } = await import("./run-manager.js");
         const state = await resumeBackgroundRun(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
         printJson({ status: "resumed", run_id: state.run_id });
         break;
       }
       case "record": {
-        const { appendIteration } = await import("./run-manager.js");
         const { normalizeResultStatus } = await import("./helpers.js");
         const vs = (grouped["verify-status"] as string) || "pass";
         const gs = (grouped["guard-status"] as string) || "skip";
+        const iteration = parsePositiveInt(grouped.iteration as string | undefined, "iteration");
+        if (dryRun) {
+          console.log("[dry-run] Would record experiment result:");
+          console.log(JSON.stringify({
+            decision: grouped.decision,
+            metric_value: grouped["metric-value"],
+            verify_status: normalizeResultStatus(vs, "verify_status"),
+            guard_status: normalizeResultStatus(gs, "guard_status"),
+            hypothesis: grouped.hypothesis,
+            change_summary: grouped["change-summary"],
+            labels: grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined,
+            note: grouped.note,
+            iteration,
+          }, null, 2));
+          return 0;
+        }
+        const { appendIteration } = await import("./run-manager.js");
         const state = await appendIteration(
           grouped.repo as string | undefined,
           grouped["results-path"] as string | undefined,
@@ -672,7 +705,7 @@ const main = async (): Promise<number> => {
           grouped["change-summary"] as string,
           grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined,
           grouped.note as string | undefined,
-          parsePositiveInt(grouped.iteration as string | undefined, "iteration"),
+          iteration,
         );
         printJson(state);
         break;
