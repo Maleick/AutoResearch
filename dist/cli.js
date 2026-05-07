@@ -433,7 +433,7 @@ const main = async () => {
                 break;
             }
             case "validate": {
-                const { normalizeDirection, normalizeMode, inferVerifyCommand } = await import("./helpers.js");
+                const { normalizeDirection, normalizeMode } = await import("./helpers.js");
                 const errors = [];
                 if (!grouped.goal)
                     errors.push("Missing required: --goal");
@@ -453,10 +453,8 @@ const main = async () => {
                 catch (e) {
                     errors.push(`Invalid mode: ${e.message}`);
                 }
-                const verify = grouped.verify || inferVerifyCommand(grouped.repo);
-                if (verify === "<set verify command>") {
-                    errors.push("Cannot infer verify command. Provide --verify explicitly.");
-                }
+                if (!grouped.verify)
+                    errors.push("Missing required: --verify");
                 if (useJson) {
                     printJson({ valid: errors.length === 0, errors });
                     return errors.length > 0 ? 1 : 0;
@@ -465,7 +463,7 @@ const main = async () => {
                     console.log("✓ Configuration is valid");
                     console.log(`  Goal: ${grouped.goal}`);
                     console.log(`  Metric: ${grouped.metric} (${grouped.direction || "lower"})`);
-                    console.log(`  Verify: ${verify}`);
+                    console.log(`  Verify: ${grouped.verify}`);
                     console.log(`  Mode: ${grouped.mode || "foreground"}`);
                 }
                 else {

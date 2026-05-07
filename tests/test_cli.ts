@@ -223,6 +223,27 @@ describe("CLI Commands", () => {
         execSync(`node ${CLI} validate`, { encoding: "utf-8", cwd: REPO_ROOT });
       }).toThrow("Missing required");
     });
+
+    it("requires explicit verify even when a command could be inferred", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-validate-infer");
+      rmSync(tmpDir, { recursive: true, force: true });
+      mkdirSync(tmpDir, { recursive: true });
+      writeFileSync(resolve(tmpDir, "package.json"), JSON.stringify({ scripts: { test: "echo ok" } }), "utf-8");
+
+      try {
+        try {
+          execSync(`node ${CLI} validate --repo ${tmpDir} --goal "test" --metric "test" --json`, { encoding: "utf-8", cwd: REPO_ROOT });
+          throw new Error("validate unexpectedly succeeded");
+        } catch (error) {
+          const stdout = (error as { stdout?: string }).stdout ?? "";
+          const json = JSON.parse(stdout) as { valid: boolean; errors: string[] };
+          expect(json.valid).toBe(false);
+          expect(json.errors).toContain("Missing required: --verify");
+        }
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("summary command", () => {
