@@ -649,7 +649,9 @@ describe("CLI Commands", () => {
         const out = execSync(`node ${CLI} ${command} --repo ${tmpDir}`, { encoding: "utf-8" });
         expect(out).not.toContain("\u001b");
         expect(out).not.toContain("\u0007");
+        expect(out).not.toContain("\nFORGED: completed");
         expect(out).toContain("\\u001b");
+        expect(out).toContain("\\nFORGED: completed");
       }
     });
 
