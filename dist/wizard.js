@@ -2,7 +2,8 @@ import { basename } from "path";
 import { resolveRepo, normalizeDirection, normalizeMode, parseDurationSeconds, normalizeLabels, inferVerifyCommand, } from "./helpers.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy } from "./subagent-pool.js";
 export function buildSetupSummary(repo, config) {
-    const verify = config.verify ?? inferVerifyCommand(repo);
+    const explicitVerify = config.verify?.trim();
+    const verify = explicitVerify || inferVerifyCommand(repo);
     const direction = normalizeDirection(config.direction);
     const mode = normalizeMode(config.mode);
     const durationSeconds = parseDurationSeconds(config.duration);
@@ -16,7 +17,7 @@ export function buildSetupSummary(repo, config) {
     const missingRequired = [];
     if (!config.goal)
         missingRequired.push("goal");
-    if (verify === "<set verify command>")
+    if (!explicitVerify)
         missingRequired.push("verify");
     const stopReasons = [];
     if (verify !== "<set verify command>") {
@@ -29,7 +30,7 @@ export function buildSetupSummary(repo, config) {
     const questions = [];
     if (!config.goal)
         questions.push({ id: "goal", prompt: "What outcome should this run optimize for?", reason: "The loop needs one concrete result to chase." });
-    if (!config.verify)
+    if (!explicitVerify)
         questions.push({ id: "verify", prompt: "What command should mechanically verify the metric?", reason: "The loop should not keep changes on intuition alone." });
     if (!config.mode)
         questions.push({ id: "mode", prompt: "Should the run stay in `foreground` or move to `background`?", reason: "The skill requires an explicit run-mode choice." });

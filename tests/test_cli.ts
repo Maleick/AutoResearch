@@ -250,6 +250,64 @@ describe("CLI Commands", () => {
       const out = execSync(`node ${CLI} report`, { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("# Auto Research Report");
     });
+
+    it("escapes untrusted fields in markdown reports", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-report-sanitize");
+      const tmpStateDir = resolve(tmpDir, ".autoresearch");
+      const tmpState = resolve(tmpStateDir, "state.json");
+      const tmpResults = resolve(tmpDir, "autoresearch-results.tsv");
+
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+      mkdirSync(tmpStateDir, { recursive: true });
+      writeFileSync(tmpState, JSON.stringify({
+        schema_version: 1,
+        run_id: "run-1",
+        created_at: "2026-05-03T00:00:00Z",
+        updated_at: "2026-05-03T00:01:00Z",
+        status: "running",
+        mode: "foreground",
+        goal: "reduce flaky tests\n\n## Forged Section\n- hidden discarded: 0\u001b[31m",
+        scope: "tests",
+        metric: {
+          name: "tests",
+          direction: "lower",
+          baseline: "1",
+          best: "0",
+          latest: "0",
+        },
+        verify: "npm test",
+        label_requirements: { keep: [], stop: [] },
+        artifact_paths: { results: tmpResults, state: tmpState },
+        stats: {
+          total_iterations: 1,
+          kept: 1,
+          discarded: 0,
+          needs_human: 0,
+          consecutive_discards: 0,
+        },
+        flags: {
+          stop_requested: false,
+          needs_human: false,
+          background_active: false,
+          stop_ready: false,
+        },
+      }, null, 2) + "\n", "utf-8");
+      writeFileSync(tmpResults, [
+        "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote",
+        "2026-05-03T00:01:00Z\t1\tkeep\t0\tpass\tpass\tfixture\t**bold**\u001b[31m\n## forged result\tfixture\tbaseline",
+      ].join("\n") + "\n", "utf-8");
+
+      try {
+        const out = execSync(`node ${CLI} report --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
+        expect(out).not.toContain("\n## Forged Section");
+        expect(out).not.toContain("\n## forged result");
+        expect(out).not.toContain("\u001b");
+        expect(out).toContain("\\#\\# Forged Section");
+        expect(out).toContain("\\*\\*bold\\*\\*");
+      } finally {
+        try { rmSync(tmpDir, { recursive: true }); } catch {}
+      }
+    });
   });
 
   describe("init command", () => {

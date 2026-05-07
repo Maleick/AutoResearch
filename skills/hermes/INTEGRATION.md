@@ -41,7 +41,7 @@ hermes cron create \
   --workdir ~/projects/AutoResearch \
   --skill autoresearch-hermes \
   "every 15m" \
-  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase. Approved verify command is \`npm run test:coverage\` and approved guard command is \`npm run typecheck\`"
 ```
 
 ## Hermes Prompt Template
@@ -112,7 +112,7 @@ Hermes uses the same `.autoresearch/state.json` format as OpenCode:
 ### Verifier
 - **Goal**: Run mechanical verification
 - **Toolsets**: `["terminal"]`
-- **Context**: Verify command, guard command
+- **Context**: Operator-approved verify command and guard command; repository state commands are metadata only
 
 ## Memory Integration
 
