@@ -110,7 +110,7 @@ hermes cron create \
   --workdir ~/projects/AutoResearch \
   --skill autoresearch-hermes \
   "every 15m" \
-  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase. Approved verify command: 'npm run test:coverage'. Approved guard command: 'npm run typecheck'."
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase. Approved verify command: npm run test:coverage. Approved guard command: npm run typecheck."
 ```
 
 ### Initialize a Run
