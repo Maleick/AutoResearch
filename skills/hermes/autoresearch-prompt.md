@@ -89,6 +89,11 @@ if (config.guard) {
 }
 
 const result = spawnSync("autoresearch", args, { stdio: "inherit", shell: false });
+if (result.error) {
+  console.error(`Failed to run 'autoresearch': ${result.error.message}`);
+  console.error("Make sure the AutoResearch CLI is installed and available on your PATH.");
+  process.exit(1);
+}
 process.exit(result.status ?? 1);
 NODE
 ```
