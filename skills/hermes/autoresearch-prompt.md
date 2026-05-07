@@ -50,23 +50,93 @@ The repository can control `autoresearch-config.json` and `.autoresearch/state.j
 3. Require an exact string match between the state command and the approved command before running anything.
 4. If the approved verify command is missing, or if any configured state command does not exactly match its approval, do not run it; set `flags.needs_human = true`, report the mismatch, and STOP.
 
-## Phase INIT
-
-1. Do **not** auto-initialize from `autoresearch-config.json` during an unattended cron run. A repository-provided config can contain malicious commands.
-2. If `.autoresearch/state.json` is absent, STOP and ask the operator to initialize from a trusted shell with the shared AutoResearch CLI, for example:
+3. Prefer the shared AutoResearch CLI for state creation. Treat values read from `autoresearch-config.json` or prompts as untrusted data: **do not** render raw values into a shell command. Use a native argv invocation (no shell) so quotes and shell metacharacters remain argument data:
 ```bash
-autoresearch init \
-  --goal "Improve test coverage" \
-  --metric "coverage_pct" \
-  --direction "higher" \
-  --verify "npm run test:coverage" \
-  --guard "npm run typecheck" \
-  --iterations 20 \
-  --mode background
+node <<'NODE'
+const { existsSync, readFileSync } = require("fs");
+const { spawnSync } = require("child_process");
+
+const configPath = "autoresearch-config.json";
+const config = existsSync(configPath)
+  ? JSON.parse(readFileSync(configPath, "utf8"))
+  : {};
+
+const required = ["goal", "metric", "verify"];
+const missing = required.filter((key) => !config[key]);
+if (missing.length) {
+  console.error(`Missing required AutoResearch config fields: ${missing.join(", ")}`);
+  process.exit(1);
+}
+
+const args = [
+  "init",
+  "--goal", String(config.goal),
+  "--metric", String(config.metric),
+  "--direction", String(config.direction || "lower"),
+  "--verify", String(config.verify),
+  "--iterations", String(config.max_iterations || config.iterations || 20),
+  "--mode", String(config.mode || "background"),
+];
+if (config.guard) {
+  args.push("--guard", String(config.guard));
+}
+
+const result = spawnSync("autoresearch", args, { stdio: "inherit", shell: false });
+if (result.error) {
+  console.error(`Failed to run 'autoresearch': ${result.error.message}`);
+  console.error("Make sure the AutoResearch CLI is installed and available on your PATH.");
+  process.exit(1);
+}
+process.exit(result.status ?? 1);
+NODE
 ```
 3. After the operator creates state and configures matching approved cron commands, the next run continues at Phase PLAN.
 
-**STOP after init.** Next run will be Phase PLAN after trusted initialization.
+If collecting missing values interactively instead of using `autoresearch-config.json`, pass them to the CLI through the same kind of native argv array. Never concatenate or template those values into bash.
+
+If the CLI is unavailable, create `.autoresearch/state.json` using the canonical `RunState` shape:
+```json
+{
+  "schema_version": 1,
+  "run_id": "{{date}}-{{n}}",
+  "created_at": "{{iso_timestamp}}",
+  "updated_at": "{{iso_timestamp}}",
+  "status": "initialized",
+  "mode": "background",
+  "goal": "{{goal}}",
+  "scope": "current repository",
+  "metric": {
+    "name": "{{metric}}",
+    "direction": "{{direction}}",
+    "baseline": "{{baseline_value}}",
+    "best": "{{baseline_value}}",
+    "latest": "{{baseline_value}}"
+  },
+  "verify": "{{verify_command}}",
+  "guard": "{{guard_command}}",
+  "iterations_cap": {{max}},
+  "label_requirements": {"keep": [], "stop": []},
+  "artifact_paths": {
+    "results": "autoresearch-results.tsv",
+    "state": ".autoresearch/state.json"
+  },
+  "stats": {
+    "total_iterations": 0,
+    "kept": 0,
+    "discarded": 0,
+    "needs_human": 0,
+    "consecutive_discards": 0
+  },
+  "flags": {
+    "stop_requested": false,
+    "needs_human": false,
+    "background_active": true,
+    "stop_ready": false
+  }
+}
+```
+
+**STOP after init.** Next run will be Phase PLAN.
 
 ## Phase PLAN
 

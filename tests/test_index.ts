@@ -56,6 +56,14 @@ describe("Index Exports", () => {
         paths: expect.arrayContaining([REPO_ROOT]),
       },
     });
+
+    const autoresearchTemplate = config.command.autoresearch.template;
+    expect(autoresearchTemplate).toContain(
+      `${REPO_ROOT}/skills/autoresearch/references/loop-workflow.md`,
+    );
+    for (const command of Object.values(config.command)) {
+      expect(command.template).not.toContain("`skills/autoresearch/");
+    }
   });
 
   it("exports correct version string", async () => {
