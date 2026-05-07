@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v3.3.4-58a6ff?style=flat" alt="v3.3.4">
+  <img src="https://img.shields.io/badge/version-v3.4.1-58a6ff?style=flat" alt="v3.4.1">
   <a href="https://github.com/Maleick/AutoResearch/stargazers"><img src="https://img.shields.io/github/stars/Maleick/AutoResearch?style=flat&color=58a6ff" alt="Stars"></a>
   <a href="https://github.com/Maleick/AutoResearch/commits/main"><img src="https://img.shields.io/github/last-commit/Maleick/AutoResearch?style=flat" alt="Last Commit"></a>
   <a href="https://github.com/Maleick/AutoResearch/releases"><img src="https://img.shields.io/github/v/release/Maleick/AutoResearch?style=flat" alt="Version"></a>
@@ -99,10 +99,10 @@ See [`skills/autoresearch/references/self-improve-loop.md`](skills/autoresearch/
 
 ### OpenCode
 
-For OpenCode, paste this one-line install prompt into your agent. This URL follows the latest `main` instructions:
+For OpenCode, paste this one-line install prompt into your agent. This URL is pinned to the `v3.3.4` release instructions:
 
 ```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.3.4/INSTALL.md
 ```
 
 Recommended plugin install in `opencode.json`:
@@ -138,7 +138,7 @@ hermes cron create \
   --workdir ~/projects/AutoResearch \
   --skill autoresearch-hermes \
   "every 15m" \
-  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase. Approved verify command: \"npm run test:coverage\". Approved guard command: \"npm run typecheck\"."
 ```
 
 See [`skills/hermes/README.md`](skills/hermes/README.md) for full Hermes setup, troubleshooting, and command mapping.
@@ -183,18 +183,15 @@ cd ~/Projects/my-project
 ```bash
 # 1. Ensure the skill is installed (see Installation above)
 
-# 2. Create a config file
-cat > autoresearch-config.json <<'EOF'
-{
-  "goal": "Improve test coverage",
-  "metric": "coverage_pct",
-  "direction": "higher",
-  "verify": "npm run test:coverage",
-  "guard": "npm run typecheck",
-  "max_iterations": 20,
-  "mode": "background"
-}
-EOF
+# 2. Initialize state from a trusted shell before enabling unattended cron
+autoresearch init \
+  --goal "Improve test coverage" \
+  --metric "coverage_pct" \
+  --direction "higher" \
+  --verify "npm run test:coverage" \
+  --guard "npm run typecheck" \
+  --iterations 20 \
+  --mode background
 
 # 3. Start the cronjob
 hermes cron resume autoresearch-loop

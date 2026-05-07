@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { writeFileSync, unlinkSync, existsSync, mkdirSync, rmSync, readFileSync } from "fs";
+import { writeFileSync, unlinkSync, existsSync, mkdirSync, rmSync, readFileSync, readdirSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
@@ -150,6 +150,9 @@ describe("normalizeLabels", () => {
   });
   it("normalizes arrays", () => {
     expect(mod.normalizeLabels([" a ", " b "])).toEqual(["a", "b"]);
+  });
+  it("filters whitespace-only strings in arrays", () => {
+    expect(mod.normalizeLabels(["a", " ", "b"])).toEqual(["a", "b"]);
   });
   it("preserves order of first occurrence", () => {
     expect(mod.normalizeLabels(["b", "a", "b"])).toEqual(["b", "a"]);
@@ -366,6 +369,30 @@ describe("atomicWriteJson", () => {
     const content = JSON.parse(readFileSync(tmpFile, "utf-8"));
     expect(content).toEqual({ new: true });
   });
+
+  it("cleans temporary file and rethrows when rename fails", () => {
+    const dirPath = resolve(REPO_ROOT, ".autoresearch-test-atomic-dir");
+    const tmpPrefix = ".autoresearch-test-atomic-dir.tmp.";
+    try {
+      rmSync(dirPath, { recursive: true, force: true });
+      for (const entry of readdirSync(REPO_ROOT)) {
+        if (entry.startsWith(tmpPrefix)) {
+          rmSync(resolve(REPO_ROOT, entry), { force: true });
+        }
+      }
+      mkdirSync(dirPath);
+
+      expect(() => mod.atomicWriteJson(dirPath, { key: "value" })).toThrow(mod.AutoresearchError);
+      expect(readdirSync(REPO_ROOT).filter((entry) => entry.startsWith(tmpPrefix))).toEqual([]);
+    } finally {
+      rmSync(dirPath, { recursive: true, force: true });
+      for (const entry of readdirSync(REPO_ROOT)) {
+        if (entry.startsWith(tmpPrefix)) {
+          rmSync(resolve(REPO_ROOT, entry), { force: true });
+        }
+      }
+    }
+  });
 });
 
 describe("printJson", () => {
@@ -503,23 +530,25 @@ describe("parseRunState", () => {
   let mod: any;
   beforeAll(async () => { mod = await importHelpers(); });
 
+  const validState = () => ({
+    schema_version: 1,
+    run_id: "test-run",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
+    status: "running",
+    mode: "foreground",
+    goal: "test",
+    scope: "test",
+    metric: { name: "test", direction: "lower" },
+    verify: "npm test",
+    label_requirements: { keep: [], stop: [] },
+    artifact_paths: { results: "results.tsv", state: "state.json" },
+    stats: { total_iterations: 0, kept: 0, discarded: 0, needs_human: 0, consecutive_discards: 0 },
+    flags: { stop_requested: false, needs_human: false, background_active: false, stop_ready: false },
+  });
+
   it("returns valid state", () => {
-    const state = {
-      schema_version: 1,
-      run_id: "test-run",
-      created_at: "2024-01-01T00:00:00Z",
-      updated_at: "2024-01-01T00:00:00Z",
-      status: "running",
-      mode: "foreground",
-      goal: "test",
-      scope: "test",
-      metric: { name: "test", direction: "lower" },
-      verify: "npm test",
-      label_requirements: { keep: [], stop: [] },
-      artifact_paths: { results: "results.tsv", state: "state.json" },
-      stats: { total_iterations: 0, kept: 0, discarded: 0, needs_human: 0, consecutive_discards: 0 },
-      flags: { stop_requested: false, needs_human: false, background_active: false, stop_ready: false },
-    };
+    const state = validState();
     expect(mod.parseRunState(state)).toEqual(state);
   });
 
@@ -536,42 +565,32 @@ describe("parseRunState", () => {
   });
 
   it("throws on invalid metric", () => {
-    const state = {
-      schema_version: 1,
-      run_id: "test-run",
-      created_at: "2024-01-01T00:00:00Z",
-      updated_at: "2024-01-01T00:00:00Z",
-      status: "running",
-      mode: "foreground",
-      goal: "test",
-      scope: "test",
-      metric: "invalid",
-      verify: "npm test",
-      label_requirements: { keep: [], stop: [] },
-      artifact_paths: { results: "results.tsv", state: "state.json" },
-      stats: { total_iterations: 0, kept: 0, discarded: 0, needs_human: 0, consecutive_discards: 0 },
-      flags: { stop_requested: false, needs_human: false, background_active: false, stop_ready: false },
-    };
+    const state = { ...validState(), metric: "invalid" };
     expect(() => mod.parseRunState(state)).toThrow("Invalid state: metric must be an object");
   });
 
+  it("throws on metric with non-string name or direction", () => {
+    const state = { ...validState(), metric: { name: 42, direction: null } };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: metric must have name and direction");
+  });
+
   it("throws on invalid stats", () => {
-    const state = {
-      schema_version: 1,
-      run_id: "test-run",
-      created_at: "2024-01-01T00:00:00Z",
-      updated_at: "2024-01-01T00:00:00Z",
-      status: "running",
-      mode: "foreground",
-      goal: "test",
-      scope: "test",
-      metric: { name: "test", direction: "lower" },
-      verify: "npm test",
-      label_requirements: { keep: [], stop: [] },
-      artifact_paths: { results: "results.tsv", state: "state.json" },
-      stats: "invalid",
-      flags: { stop_requested: false, needs_human: false, background_active: false, stop_ready: false },
-    };
+    const state = { ...validState(), stats: "invalid" };
     expect(() => mod.parseRunState(state)).toThrow("Invalid state: stats must be an object");
+  });
+
+  it("throws on stats with non-number fields", () => {
+    const state = { ...validState(), stats: { total_iterations: "0", kept: 0, discarded: 0, needs_human: 0 } };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: stats must have total_iterations, kept, discarded, needs_human");
+  });
+
+  it("throws on invalid flags", () => {
+    const state = { ...validState(), flags: "invalid" };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: flags must be an object");
+  });
+
+  it("throws on flags with non-boolean fields", () => {
+    const state = { ...validState(), flags: { stop_requested: "false", needs_human: false, background_active: false, stop_ready: false } };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
   });
 });
