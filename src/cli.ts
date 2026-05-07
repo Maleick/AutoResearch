@@ -255,7 +255,12 @@ const main = async (): Promise<number> => {
         const statusEmoji: Record<string, string> = {
           running: "🔄", completed: "✅", initialized: "📋", stopping: "⏹", stopped: "⏸",
         };
-        console.log(`${statusEmoji[s.status as string] ?? "⚪"} Auto Research Run: ${formatDisplayValue(s.run_id)}`);
+        const statusKey = typeof s.status === "string" ? s.status : "";
+        const candidateEmoji = Object.prototype.hasOwnProperty.call(statusEmoji, statusKey)
+          ? statusEmoji[statusKey]
+          : undefined;
+        const emoji = typeof candidateEmoji === "string" ? candidateEmoji : "⚪";
+        console.log(`${emoji} Auto Research Run: ${formatDisplayValue(s.run_id)}`);
         console.log(`   Goal:      ${formatDisplayValue(s.goal)}`);
         console.log(`   Status:    ${formatDisplayValue(s.status)}`);
         console.log(`   Mode:      ${formatDisplayValue(s.mode)}`);
