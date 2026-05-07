@@ -1,3 +1,5 @@
+import { PACKAGE_NAME } from "./constants.js";
+export { PACKAGE_NAME };
 export declare class AutoresearchError extends Error {
     constructor(message: string);
 }
@@ -20,4 +22,19 @@ export declare function parseTsvFile(content: string): Record<string, string>[];
 export declare function countTsvDataRows(content: string): number;
 import type { RunState } from "./types.js";
 export declare function parseRunState(value: unknown): RunState;
+export interface UpdateCacheData {
+    last_check: string;
+    current_version: string;
+    latest_version: string;
+    update_available: boolean;
+}
+export declare function getUpdateCachePath(): string;
+export declare function readUpdateCache(): UpdateCacheData | null;
+export declare function getGlobalNpmPrefix(): string | null;
+export declare function getInstalledPackagePath(packageName: string): string | null;
+export declare function getInstalledPackageInfo(packageName: string): {
+    version?: string;
+    description?: string;
+    repository?: string;
+} | null;
 //# sourceMappingURL=helpers.d.ts.map
