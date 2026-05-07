@@ -499,7 +499,7 @@ describe("CLI Commands", () => {
         expect(out).not.toContain("## forged heading");
         expect(out).not.toContain("<script>");
         expect(out).not.toContain("bad | cell");
-        expect(out).toContain("run\\-1 \\#\\# forged heading");
+        expect(out).toContain("run\\-1\\\\n\\#\\# forged heading");
         expect(out).toContain("&lt;script&gt;alert\\(1\\)&lt;/script&gt; \\| approve");
         expect(out).toContain("bad \\| cell");
       } finally {
@@ -805,9 +805,11 @@ describe("CLI Commands", () => {
         expect(out).not.toContain("\u001b");
         expect(out).not.toContain("\u0007");
         expect(out).not.toContain("\nFORGED: completed");
-        expect(out).toContain("\\u001b");
-        expect(out).toContain("\\nFORGED: completed");
       }
+
+      const statusOut = execSync(`node ${CLI} status --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(statusOut).toContain("\\u001b");
+      expect(statusOut).toContain("\\nFORGED: completed");
     });
 
     it("keeps JSON output raw so JSON.stringify escapes controls", () => {

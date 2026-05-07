@@ -107,7 +107,7 @@ const markdownHtmlEscapes = {
     '"': "&quot;",
 };
 const escapeMarkdownInline = (value) => {
-    return String(value ?? "")
+    return sanitizeForTerminal(value ?? "")
         .replace(/[&<>"]/g, (char) => markdownHtmlEscapes[char])
         .replace(/[\r\n\t]+/g, " ")
         .replace(/\s{2,}/g, " ")
@@ -118,7 +118,7 @@ const escapeMarkdownTableCell = (value) => {
     const escaped = escapeMarkdownInline(value);
     return escaped.length > 0 ? escaped : "—";
 };
-const formatMetricValue = (val) => {
+const formatDisplayValue = (val) => {
     if (val === undefined || val === null)
         return "—";
     return sanitizeForTerminal(val);
@@ -136,15 +136,17 @@ const formatTimestamp = (ts) => {
 const markdownEscapePattern = /([\\`*_{}[\]()#+\-.!|>])/g;
 const terminalControlPattern = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g;
 const controlCharacterPattern = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
-const formatMarkdownField = (value) => {
+const sanitizeMarkdownText = (value) => {
     if (value === undefined || value === null)
         return "—";
     return String(value)
         .replace(terminalControlPattern, "")
         .replace(controlCharacterPattern, "")
         .replace(/\r?\n|\r/g, " ")
-        .replace(/\t/g, " ")
-        .replace(markdownEscapePattern, "\\$1");
+        .replace(/\t/g, " ");
+};
+const formatMarkdownField = (value) => {
+    return sanitizeMarkdownText(value).replace(markdownEscapePattern, "\\$1");
 };
 const main = async () => {
     const args = process.argv.slice(2);
@@ -285,7 +287,12 @@ const main = async () => {
                 const statusEmoji = {
                     running: "🔄", completed: "✅", initialized: "📋", stopping: "⏹", stopped: "⏸",
                 };
-                console.log(`${statusEmoji[s.status] ?? "⚪"} Auto Research Run: ${formatDisplayValue(s.run_id)}`);
+                const statusKey = typeof s.status === "string" ? s.status : "";
+                const candidateEmoji = Object.prototype.hasOwnProperty.call(statusEmoji, statusKey)
+                    ? statusEmoji[statusKey]
+                    : undefined;
+                const emoji = typeof candidateEmoji === "string" ? candidateEmoji : "⚪";
+                console.log(`${emoji} Auto Research Run: ${formatDisplayValue(s.run_id)}`);
                 console.log(`   Goal:      ${formatDisplayValue(s.goal)}`);
                 console.log(`   Status:    ${formatDisplayValue(s.status)}`);
                 console.log(`   Mode:      ${formatDisplayValue(s.mode)}`);
