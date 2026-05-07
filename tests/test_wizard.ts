@@ -35,6 +35,8 @@ describe("buildSetupSummary", () => {
   it("uses provided verify when set", () => {
     const result = mod.buildSetupSummary(undefined, { goal: "improve", verify: "make test" });
     expect(result.verify).toBe("make test");
+    expect(result.missing_required).not.toContain("verify");
+    expect(result.questions.map((q: any) => q.id)).not.toContain("verify");
   });
 
   it("defaults direction to lower", () => {
@@ -89,7 +91,7 @@ describe("buildSetupSummary", () => {
     }
   });
 
-  it("treats whitespace-only verify as missing and still infers suggestion", () => {
+  it("treats whitespace-only verify as missing, includes verify in required fields, and still infers suggestion", () => {
     const repo = mkdtempSync(resolve(tmpdir(), "autoresearch-wizard-"));
     try {
       writeFileSync(resolve(repo, "package.json"), JSON.stringify({ scripts: { test: "node hostile.js" } }), "utf-8");
