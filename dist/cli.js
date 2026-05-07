@@ -82,6 +82,42 @@ const parseArgs = (args) => {
     }
     return result;
 };
+const markdownInlineEscapes = {
+    "\\": "\\\\",
+    "`": "\\`",
+    "*": "\\*",
+    "_": "\\_",
+    "{": "\\{",
+    "}": "\\}",
+    "[": "\\[",
+    "]": "\\]",
+    "(": "\\(",
+    ")": "\\)",
+    "#": "\\#",
+    "+": "\\+",
+    "-": "\\-",
+    ".": "\\.",
+    "!": "\\!",
+    "|": "\\|",
+};
+const markdownHtmlEscapes = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+};
+const escapeMarkdownInline = (value) => {
+    return String(value ?? "")
+        .replace(/[&<>"]/g, (char) => markdownHtmlEscapes[char])
+        .replace(/[\r\n\t]+/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim()
+        .replace(/[\\`*_{}\[\]()#+\-.!|]/g, (char) => markdownInlineEscapes[char]);
+};
+const escapeMarkdownTableCell = (value) => {
+    const escaped = escapeMarkdownInline(value);
+    return escaped.length > 0 ? escaped : "—";
+};
 const formatMetricValue = (val) => {
     if (val === undefined || val === null)
         return "—";
@@ -95,6 +131,19 @@ const formatTimestamp = (ts) => {
     catch {
         return ts;
     }
+};
+const markdownEscapePattern = /([\\`*_{}[\]()#+\-.!|>])/g;
+const terminalControlPattern = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g;
+const controlCharacterPattern = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+const formatMarkdownField = (value) => {
+    if (value === undefined || value === null)
+        return "—";
+    return String(value)
+        .replace(terminalControlPattern, "")
+        .replace(controlCharacterPattern, "")
+        .replace(/\r?\n|\r/g, " ")
+        .replace(/\t/g, " ")
+        .replace(markdownEscapePattern, "\\$1");
 };
 const main = async () => {
     const args = process.argv.slice(2);
@@ -384,7 +433,7 @@ const main = async () => {
                 break;
             }
             case "validate": {
-                const { normalizeDirection, normalizeMode, inferVerifyCommand } = await import("./helpers.js");
+                const { normalizeDirection, normalizeMode } = await import("./helpers.js");
                 const errors = [];
                 if (!grouped.goal)
                     errors.push("Missing required: --goal");
@@ -404,10 +453,8 @@ const main = async () => {
                 catch (e) {
                     errors.push(`Invalid mode: ${e.message}`);
                 }
-                const verify = grouped.verify || inferVerifyCommand(grouped.repo);
-                if (verify === "<set verify command>") {
-                    errors.push("Cannot infer verify command. Provide --verify explicitly.");
-                }
+                if (!grouped.verify)
+                    errors.push("Missing required: --verify");
                 if (useJson) {
                     printJson({ valid: errors.length === 0, errors });
                     return errors.length > 0 ? 1 : 0;
@@ -416,7 +463,7 @@ const main = async () => {
                     console.log("✓ Configuration is valid");
                     console.log(`  Goal: ${grouped.goal}`);
                     console.log(`  Metric: ${grouped.metric} (${grouped.direction || "lower"})`);
-                    console.log(`  Verify: ${verify}`);
+                    console.log(`  Verify: ${grouped.verify}`);
                     console.log(`  Mode: ${grouped.mode || "foreground"}`);
                 }
                 else {
@@ -448,29 +495,29 @@ const main = async () => {
                     break;
                 }
                 console.log(`# Auto Research Report`);
-                console.log(`\n**Run:** ${state.run_id}`);
-                console.log(`**Goal:** ${state.goal}`);
-                console.log(`**Status:** ${state.status}`);
-                console.log(`**Mode:** ${state.mode}`);
+                console.log(`\n**Run:** ${formatMarkdownField(state.run_id)}`);
+                console.log(`**Goal:** ${formatMarkdownField(state.goal)}`);
+                console.log(`**Status:** ${formatMarkdownField(state.status)}`);
+                console.log(`**Mode:** ${formatMarkdownField(state.mode)}`);
                 if (state.metric) {
                     const m = state.metric;
-                    console.log(`**Metric:** ${m.name} (${m.direction})`);
-                    console.log(`**Best:** ${m.best} | **Latest:** ${m.latest}`);
+                    console.log(`**Metric:** ${formatMarkdownField(m.name)} (${formatMarkdownField(m.direction)})`);
+                    console.log(`**Best:** ${formatMarkdownField(m.best)} | **Latest:** ${formatMarkdownField(m.latest)}`);
                 }
                 if (state.stats) {
                     const s = state.stats;
                     console.log(`\n## Stats`);
-                    console.log(`- Iterations: ${s.total_iterations}`);
-                    console.log(`- Kept: ${s.kept}`);
-                    console.log(`- Discarded: ${s.discarded}`);
-                    console.log(`- Needs human: ${s.needs_human}`);
+                    console.log(`- Iterations: ${formatMarkdownField(s.total_iterations)}`);
+                    console.log(`- Kept: ${formatMarkdownField(s.kept)}`);
+                    console.log(`- Discarded: ${formatMarkdownField(s.discarded)}`);
+                    console.log(`- Needs human: ${formatMarkdownField(s.needs_human)}`);
                 }
                 if (results.length > 0) {
                     console.log(`\n## Iterations`);
                     for (const r of results) {
                         const cols = r.split("\t");
                         if (cols.length >= 8) {
-                            console.log(`- ${cols[1]}: ${cols[2]} (${cols[3]}) — ${cols[7].substring(0, 60)}`);
+                            console.log(`- ${formatMarkdownField(cols[1])}: ${formatMarkdownField(cols[2])} (${formatMarkdownField(cols[3])}) — ${formatMarkdownField(cols[7]).substring(0, 60)}`);
                         }
                     }
                 }
@@ -534,9 +581,9 @@ const main = async () => {
                 }
                 else if (format === "md" || format === "markdown") {
                     console.log(`# Auto Research Export`);
-                    console.log(`\n**Run:** ${exportData.state.run_id}`);
-                    console.log(`**Goal:** ${exportData.state.goal}`);
-                    console.log(`**Exported:** ${exportData.exported_at}`);
+                    console.log(`\n**Run:** ${escapeMarkdownInline(exportData.state.run_id) || "—"}`);
+                    console.log(`**Goal:** ${escapeMarkdownInline(exportData.state.goal) || "—"}`);
+                    console.log(`**Exported:** ${escapeMarkdownInline(exportData.exported_at)}`);
                     console.log(`\n## Summary`);
                     console.log(`- Total iterations: ${exportData.summary.total}`);
                     console.log(`- Kept: ${exportData.summary.kept}`);
@@ -545,7 +592,7 @@ const main = async () => {
                     console.log(`| # | Decision | Metric | Summary |`);
                     console.log(`|---|----------|--------|---------|`);
                     for (const r of records) {
-                        console.log(`| ${r.iteration} | ${r.decision} | ${r.metric_value || "—"} | ${r.change_summary?.substring(0, 50) || "—"} |`);
+                        console.log(`| ${escapeMarkdownTableCell(r.iteration)} | ${escapeMarkdownTableCell(r.decision)} | ${escapeMarkdownTableCell(r.metric_value)} | ${escapeMarkdownTableCell(r.change_summary?.substring(0, 50))} |`);
                     }
                 }
                 else {

@@ -1,6 +1,6 @@
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } from "fs";
+import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync, symlinkSync } from "fs";
 import type { RunState, RunStats, RunFlags, Metric, LabelRequirements, ArtifactPaths } from "../src/types.js";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
@@ -312,6 +312,28 @@ describe("buildSupervisorSnapshot", () => {
     writeFileSync(resolve(stateDir, "autoresearch-results.tsv"), header, "utf-8");
     const snapshot = await mod.buildSupervisorSnapshot(stateDir, "autoresearch-results.tsv", "state.json");
     expect(snapshot.results_rows).toBe(0);
+  });
+
+  it("rejects symlinked results files", async () => {
+    const stateDir = resolve(TMP_DIR, "buildSupervisorSnapshot-symlink");
+    try { rmSync(stateDir, { recursive: true, force: true }); } catch {}
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(resolve(stateDir, "state.json"), JSON.stringify(createMinimalState()), "utf-8");
+    const resultsTarget = resolve(stateDir, "results-target.tsv");
+    writeFileSync(resultsTarget, "placeholder\n", "utf-8");
+    symlinkSync(resultsTarget, resolve(stateDir, "autoresearch-results.tsv"));
+    await expect(mod.buildSupervisorSnapshot(stateDir, "autoresearch-results.tsv", "state.json"))
+      .rejects.toThrow("Refusing to read symlinked results file");
+  });
+
+  it("rejects oversized results files before reading them", async () => {
+    const stateDir = resolve(TMP_DIR, "buildSupervisorSnapshot-oversized");
+    try { rmSync(stateDir, { recursive: true, force: true }); } catch {}
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(resolve(stateDir, "state.json"), JSON.stringify(createMinimalState()), "utf-8");
+    writeFileSync(resolve(stateDir, "autoresearch-results.tsv"), Buffer.alloc((10 * 1024 * 1024) + 1));
+    await expect(mod.buildSupervisorSnapshot(stateDir, "autoresearch-results.tsv", "state.json"))
+      .rejects.toThrow("Refusing to read results file larger than");
   });
 });
 
