@@ -1,3 +1,21 @@
+# [3.5.0](https://github.com/Maleick/AutoResearch/compare/v3.4.1...v3.5.0) (2026-05-07)
+
+
+### Bug Fixes
+
+* bound status results file reads ([#116](https://github.com/Maleick/AutoResearch/issues/116)) ([628b203](https://github.com/Maleick/AutoResearch/commit/628b203e736d564a4858d992a212e4a63fdb0980))
+* escape Markdown export fields to prevent injection ([#115](https://github.com/Maleick/AutoResearch/issues/115)) ([76cb6de](https://github.com/Maleick/AutoResearch/commit/76cb6de5fa27c30cd7131a02532bb36609f10f79))
+* honor dry-run for mutating cli commands ([#118](https://github.com/Maleick/AutoResearch/issues/118)) ([4b879f6](https://github.com/Maleick/AutoResearch/commit/4b879f6683c57a27cfb9b6ff229c587f82d18d19))
+* **install:** avoid cron prompt command substitution ([#111](https://github.com/Maleick/AutoResearch/issues/111)) ([927edac](https://github.com/Maleick/AutoResearch/commit/927edacf0bb0ccb7f6b3f10a539d223837ecb954))
+* require explicit verify in validate ([#117](https://github.com/Maleick/AutoResearch/issues/117)) ([fd71f54](https://github.com/Maleick/AutoResearch/commit/fd71f54b812b6bb98442c892a9f1e7c52007d0f4))
+* run semantic-release on supported node ([#120](https://github.com/Maleick/AutoResearch/issues/120)) ([f457d9b](https://github.com/Maleick/AutoResearch/commit/f457d9be213351c414165e009dee3df916def407))
+* sanitize report markdown fields ([#114](https://github.com/Maleick/AutoResearch/issues/114)) ([6d67814](https://github.com/Maleick/AutoResearch/commit/6d67814666ab27a7f7066313d293d7fccecd9e72))
+
+
+### Features
+
+* add workflow issue templates ([#84](https://github.com/Maleick/AutoResearch/issues/84)) ([#121](https://github.com/Maleick/AutoResearch/issues/121)) ([aca0468](https://github.com/Maleick/AutoResearch/commit/aca04684648b1107d83a424948abe6ae1b128153))
+
 ## [3.4.1](https://github.com/Maleick/AutoResearch/compare/v3.4.0...v3.4.1) (2026-05-07)
 
 
