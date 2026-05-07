@@ -26,7 +26,7 @@ hermes cron create \
   --workdir ~/projects/AutoResearch \
   --skill autoresearch-hermes \
   "every 15m" \
-  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase. Approved verify command: npm run test:coverage. Approved guard command: npm run typecheck."
 ```
 
 ## Basic Usage
@@ -91,18 +91,15 @@ autoresearch status
 ### Hermes Background Runs
 
 ```bash
-# Create config
-cat > autoresearch-config.json <<'EOF'
-{
-  "goal": "Improve test coverage",
-  "metric": "coverage_pct",
-  "direction": "higher",
-  "verify": "npm run test:coverage",
-  "guard": "npm run typecheck",
-  "max_iterations": 20,
-  "mode": "background"
-}
-EOF
+# Initialize state from a trusted shell before enabling unattended cron
+autoresearch init \
+  --goal "Improve test coverage" \
+  --metric "coverage_pct" \
+  --direction "higher" \
+  --verify "npm run test:coverage" \
+  --guard "npm run typecheck" \
+  --iterations 20 \
+  --mode background
 
 # Start cron
 hermes cron resume autoresearch-loop

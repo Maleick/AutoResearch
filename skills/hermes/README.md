@@ -35,27 +35,25 @@ hermes cron create \
   --workdir ~/projects/AutoResearch \
   --skill autoresearch-hermes \
   "every 15m" \
-  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase."
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase. Approved verify command: npm run test:coverage. Approved guard command: npm run typecheck."
 ```
 
 ### 3. Initialize Run
 
-```bash
-# Create config
-cat > autoresearch-config.json <<'EOF'
-{
-  "goal": "Improve test coverage",
-  "metric": "coverage_pct",
-  "direction": "higher",
-  "verify": "npm run test:coverage",
-  "guard": "npm run typecheck",
-  "max_iterations": 20,
-  "mode": "background"
-}
-EOF
+Initialize state from a trusted shell before enabling unattended cron. Do not rely on cron to auto-init from `autoresearch-config.json`; repository files are untrusted command sources.
 
-# First run will auto-init from this config
+```bash
+autoresearch init \
+  --goal "Improve test coverage" \
+  --metric "coverage_pct" \
+  --direction "higher" \
+  --verify "npm run test:coverage" \
+  --guard "npm run typecheck" \
+  --iterations 20 \
+  --mode background
 ```
+
+Configure the cron prompt/environment with matching operator-approved commands, and the Hermes skill will refuse to execute state commands that do not exactly match those approvals.
 
 ## Usage
 
@@ -145,7 +143,7 @@ hermes logs --component cron
 ```bash
 # Reset to baseline
 rm .autoresearch/state.json
-# Next run will re-init from config
+# Re-run autoresearch init manually from a trusted shell before resuming cron
 ```
 
 ### Subagent failures
