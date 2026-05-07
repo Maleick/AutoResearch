@@ -15,10 +15,10 @@ Both runtimes share the same state format (`.autoresearch/state.json`) and CLI (
 
 ### One-Line OpenCode Install
 
-Paste this one line into OpenCode to install and verify Auto Research. This URL follows the latest `main` instructions:
+Paste this one line into OpenCode to install and verify Auto Research. This URL is pinned to the `v3.3.4` release tag:
 
 ```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.3.4/INSTALL.md
 ```
 
 ### Prerequisites
@@ -110,7 +110,7 @@ hermes cron create \
   --workdir ~/projects/AutoResearch \
   --skill autoresearch-hermes \
   "every 15m" \
-  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase. Approved verify command: `npm run test:coverage`. Approved guard command: `npm run typecheck`."
+  "Run AutoResearch iteration loop. Detect phase from .autoresearch/state.json and execute one phase. Approved verify command: 'npm run test:coverage'. Approved guard command: 'npm run typecheck'."
 ```
 
 ### Initialize a Run
