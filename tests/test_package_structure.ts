@@ -274,6 +274,11 @@ describe("release workflow", () => {
     const content = readFileSync(resolve(REPO_ROOT, ".github/workflows/release.yml"), "utf-8");
     expect(content).toContain("npm run audit");
   });
+
+  it("uses a Node version supported by semantic-release", () => {
+    const content = readFileSync(resolve(REPO_ROOT, ".github/workflows/release.yml"), "utf-8");
+    expect(content).toContain("node-version: '22'");
+  });
 });
 
 describe("semantic-release config", () => {
