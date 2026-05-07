@@ -1,3 +1,10 @@
+# [3.6.0](https://github.com/Maleick/AutoResearch/compare/v3.5.0...v3.6.0) (2026-05-07)
+
+
+### Features
+
+* add doctor source diagnostics ([#73](https://github.com/Maleick/AutoResearch/issues/73)) ([#122](https://github.com/Maleick/AutoResearch/issues/122)) ([add511a](https://github.com/Maleick/AutoResearch/commit/add511a2c741894a5ca66089235bbaa815331680))
+
 # [3.5.0](https://github.com/Maleick/AutoResearch/compare/v3.4.1...v3.5.0) (2026-05-07)
 
 
