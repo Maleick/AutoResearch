@@ -66,6 +66,16 @@ describe("Index Exports", () => {
     }
   });
 
+  it("does not duplicate repoRoot in skills.paths when already present", async () => {
+    const index = await import(resolve(REPO_ROOT, "dist/index.js"));
+    const plugin = await index.server({});
+    const config = { skills: { paths: [REPO_ROOT] } };
+
+    plugin.config(config);
+
+    expect(config.skills.paths).toStrictEqual([REPO_ROOT]);
+  });
+
   it("exports correct version string", async () => {
     const index = await import(resolve(REPO_ROOT, "dist/index.js"));
     expect(typeof index.VERSION).toBe("string");
