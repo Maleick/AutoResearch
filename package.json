@@ -63,13 +63,15 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "audit": "npm audit --audit-level=moderate",
     "test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.json",
     "verify:pack": "bash hooks/verify-package.sh",
-    "prepack": "tsc"
+    "prepack": "node scripts/sync-version.mjs && tsc"
   },
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^12.0.6",
     "@semantic-release/npm": "^13.1.5",
