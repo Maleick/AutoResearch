@@ -636,8 +636,6 @@ const main = async () => {
             }
             case "launch": {
                 const { resolvePath } = await import("./helpers.js");
-                const { initializeRun } = await import("./run-manager.js");
-                const { writeFileSync } = await import("fs");
                 const { LAUNCH_DEFAULT } = await import("./constants.js");
                 const config = {
                     goal: grouped.goal,
@@ -656,36 +654,71 @@ const main = async () => {
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
                 };
-                const state = await initializeRun(grouped.repo, grouped["results-path"], grouped["state-path"], config, grouped["fresh-start"] === "true");
                 const launchPath = resolvePath(grouped.repo, grouped["launch-path"], LAUNCH_DEFAULT);
+                if (dryRun) {
+                    console.log("[dry-run] Would launch background run with config:");
+                    console.log(JSON.stringify({ ...config, launch_path: launchPath }, null, 2));
+                    return 0;
+                }
+                const { initializeRun } = await import("./run-manager.js");
+                const { writeFileSync } = await import("fs");
+                const state = await initializeRun(grouped.repo, grouped["results-path"], grouped["state-path"], config, grouped["fresh-start"] === "true");
                 writeFileSync(launchPath, JSON.stringify({ run_id: state.run_id, goal: state.goal, mode: "background" }, null, 2) + "\n", "utf-8");
                 printJson({ status: "launched", run_id: state.run_id, launch_path: launchPath });
                 break;
             }
             case "complete": {
+                if (dryRun) {
+                    console.log("[dry-run] Would mark run complete");
+                    return 0;
+                }
                 const { completeRun } = await import("./run-manager.js");
                 const state = await completeRun(grouped.repo, grouped["state-path"]);
                 printJson({ status: "completed", run_id: state.run_id });
                 break;
             }
             case "stop": {
+                if (dryRun) {
+                    console.log("[dry-run] Would request background run stop");
+                    return 0;
+                }
                 const { setStopRequested } = await import("./run-manager.js");
                 const state = await setStopRequested(grouped.repo, grouped["state-path"]);
                 printJson({ status: "stop_requested", run_id: state.run_id });
                 break;
             }
             case "resume": {
+                if (dryRun) {
+                    console.log("[dry-run] Would resume background run");
+                    return 0;
+                }
                 const { resumeBackgroundRun } = await import("./run-manager.js");
                 const state = await resumeBackgroundRun(grouped.repo, grouped["state-path"]);
                 printJson({ status: "resumed", run_id: state.run_id });
                 break;
             }
             case "record": {
-                const { appendIteration } = await import("./run-manager.js");
                 const { normalizeResultStatus } = await import("./helpers.js");
                 const vs = grouped["verify-status"] || "pass";
                 const gs = grouped["guard-status"] || "skip";
-                const state = await appendIteration(grouped.repo, grouped["results-path"], grouped["state-path"], grouped.decision, grouped["metric-value"], normalizeResultStatus(vs, "verify_status"), normalizeResultStatus(gs, "guard_status"), grouped.hypothesis, grouped["change-summary"], grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined, grouped.note, parsePositiveInt(grouped.iteration, "iteration"));
+                const iteration = parsePositiveInt(grouped.iteration, "iteration");
+                if (dryRun) {
+                    console.log("[dry-run] Would record experiment result:");
+                    console.log(JSON.stringify({
+                        decision: grouped.decision,
+                        metric_value: grouped["metric-value"],
+                        verify_status: normalizeResultStatus(vs, "verify_status"),
+                        guard_status: normalizeResultStatus(gs, "guard_status"),
+                        hypothesis: grouped.hypothesis,
+                        change_summary: grouped["change-summary"],
+                        labels: grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined,
+                        note: grouped.note,
+                        iteration,
+                    }, null, 2));
+                    return 0;
+                }
+                const { appendIteration } = await import("./run-manager.js");
+                const state = await appendIteration(grouped.repo, grouped["results-path"], grouped["state-path"], grouped.decision, grouped["metric-value"], normalizeResultStatus(vs, "verify_status"), normalizeResultStatus(gs, "guard_status"), grouped.hypothesis, grouped["change-summary"], grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined, grouped.note, iteration);
                 printJson(state);
                 break;
             }
