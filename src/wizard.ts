@@ -28,7 +28,7 @@ export function buildSetupSummary(
 
   const missingRequired: string[] = [];
   if (!config.goal) missingRequired.push("goal");
-  if (verify === "<set verify command>") missingRequired.push("verify");
+  if (!config.verify) missingRequired.push("verify");
 
   const stopReasons: string[] = [];
   if (verify !== "<set verify command>") {
