@@ -1,4 +1,4 @@
-export const VERSION = "3.4.1";
+export const VERSION = "3.5.0";
 export const PACKAGE_NAME = "opencode-autoresearch";
 export const SKILL_NAME = "autoresearch";
 export const PRODUCT_BRAND = "Auto Research";

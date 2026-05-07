@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal } from "./helpers.js";
+import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
@@ -774,8 +774,6 @@ const main = async (): Promise<number> => {
       }
       case "doctor": {
         const { VERSION, PACKAGE_NAME, SKILL_NAME } = await import("./constants.js");
-        console.log(`${SKILL_NAME} ${VERSION} (${PACKAGE_NAME})`);
-        console.log("Runtime: Node.js " + process.version);
 
         const base = resolveRepo(grouped.repo as string | undefined);
         const checks: Array<{ name: string; ok: boolean; detail?: string }> = [];
@@ -794,6 +792,68 @@ const main = async (): Promise<number> => {
         checks.push({ name: "plugin", ok: existsSync(resolve(base, ".opencode-plugin/plugin.json")), detail: "plugin manifest" });
         checks.push({ name: "VERSION", ok: existsSync(resolve(base, "VERSION")), detail: "version marker" });
 
+        const globalPrefix = getGlobalNpmPrefix();
+        const installedPath = getInstalledPackagePath(PACKAGE_NAME);
+        const installedInfo = installedPath ? getInstalledPackageInfo(PACKAGE_NAME) : null;
+        const updateCache = readUpdateCache();
+
+        const updateStatus = {
+          cache_exists: updateCache !== null,
+          last_check: updateCache?.last_check || null,
+          current_version: updateCache?.current_version || null,
+          latest_version: updateCache?.latest_version || null,
+          update_available: updateCache?.update_available || false,
+          update_disabled: process.env.AUTORESEARCH_NO_UPDATE === "1",
+        };
+
+        if (useJson) {
+          printJson({
+            version: VERSION,
+            skill_name: SKILL_NAME,
+            runtime: `Node.js ${process.version}`,
+            source: {
+              package_name: PACKAGE_NAME,
+              global_path: installedPath || null,
+              global_prefix: globalPrefix || null,
+              installed_version: installedInfo?.version || null,
+              installed_description: installedInfo?.description || null,
+              installed_repository: installedInfo?.repository || null,
+            },
+            update: updateStatus,
+            checks: checks,
+            checks_passed: checks.filter((c) => !c.ok).length === 0,
+          });
+          break;
+        }
+
+        console.log(`${SKILL_NAME} ${VERSION} (${PACKAGE_NAME})`);
+        console.log(`Runtime: Node.js ${process.version}`);
+        console.log("");
+
+        console.log("Source:");
+        console.log(`  Package:    ${PACKAGE_NAME}`);
+        if (installedPath) {
+          console.log(`  Global:     ${installedPath}`);
+          if (globalPrefix) console.log(`  Prefix:     ${globalPrefix}`);
+          if (installedInfo?.repository) console.log(`  Repo:       ${installedInfo.repository}`);
+        } else {
+          console.log("  Global:     not found via npm -g");
+        }
+        console.log("");
+
+        console.log("Update:");
+        if (updateCache) {
+          console.log(`  Last check: ${updateCache.last_check}`);
+          console.log(`  Current:    ${updateCache.current_version}`);
+          console.log(`  Latest:     ${updateCache.latest_version}`);
+          console.log(`  Available:  ${updateCache.update_available ? "yes" : "no"}`);
+        } else {
+          console.log("  Cache:      no update check recorded");
+        }
+        console.log(`  Disabled:   ${process.env.AUTORESEARCH_NO_UPDATE === "1" ? "yes (AUTORESEARCH_NO_UPDATE=1)" : "no"}`);
+        console.log("");
+
+        console.log("Installation Checks:");
         let maxNameLen = 0;
         for (const c of checks) maxNameLen = Math.max(maxNameLen, c.name.length);
 
@@ -801,6 +861,7 @@ const main = async (): Promise<number> => {
           const padded = c.name.padEnd(maxNameLen + 2);
           console.log(`  ${c.ok ? "✓" : "✗"} ${padded}${c.detail ?? (c.ok ? "present" : "missing")}`);
         }
+
         const failed = checks.filter((c) => !c.ok).length;
         if (failed > 0) {
           console.error(`\n${failed} check(s) failed. Reinstall with 'npm install -g opencode-autoresearch'.`);

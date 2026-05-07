@@ -1,7 +1,7 @@
 import { VERSION, PACKAGE_NAME, PRODUCT_BRAND, SKILL_NAME } from "./constants.js";
 export declare const id = "autoresearch";
 export declare const repoRoot: string;
-export declare const version = "3.4.1";
+export declare const version = "3.5.0";
 type OpenCodeConfig = {
     command?: Record<string, {
         template: string;
