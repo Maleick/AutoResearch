@@ -96,6 +96,19 @@ const formatTimestamp = (ts) => {
         return ts;
     }
 };
+const markdownEscapePattern = /([\\`*_{}[\]()#+\-.!|>])/g;
+const terminalControlPattern = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g;
+const controlCharacterPattern = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+const formatMarkdownField = (value) => {
+    if (value === undefined || value === null)
+        return "—";
+    return String(value)
+        .replace(terminalControlPattern, "")
+        .replace(controlCharacterPattern, "")
+        .replace(/\r?\n|\r/g, " ")
+        .replace(/\t/g, " ")
+        .replace(markdownEscapePattern, "\\$1");
+};
 const main = async () => {
     const args = process.argv.slice(2);
     // Handle standalone flags
@@ -448,29 +461,29 @@ const main = async () => {
                     break;
                 }
                 console.log(`# Auto Research Report`);
-                console.log(`\n**Run:** ${state.run_id}`);
-                console.log(`**Goal:** ${state.goal}`);
-                console.log(`**Status:** ${state.status}`);
-                console.log(`**Mode:** ${state.mode}`);
+                console.log(`\n**Run:** ${formatMarkdownField(state.run_id)}`);
+                console.log(`**Goal:** ${formatMarkdownField(state.goal)}`);
+                console.log(`**Status:** ${formatMarkdownField(state.status)}`);
+                console.log(`**Mode:** ${formatMarkdownField(state.mode)}`);
                 if (state.metric) {
                     const m = state.metric;
-                    console.log(`**Metric:** ${m.name} (${m.direction})`);
-                    console.log(`**Best:** ${m.best} | **Latest:** ${m.latest}`);
+                    console.log(`**Metric:** ${formatMarkdownField(m.name)} (${formatMarkdownField(m.direction)})`);
+                    console.log(`**Best:** ${formatMarkdownField(m.best)} | **Latest:** ${formatMarkdownField(m.latest)}`);
                 }
                 if (state.stats) {
                     const s = state.stats;
                     console.log(`\n## Stats`);
-                    console.log(`- Iterations: ${s.total_iterations}`);
-                    console.log(`- Kept: ${s.kept}`);
-                    console.log(`- Discarded: ${s.discarded}`);
-                    console.log(`- Needs human: ${s.needs_human}`);
+                    console.log(`- Iterations: ${formatMarkdownField(s.total_iterations)}`);
+                    console.log(`- Kept: ${formatMarkdownField(s.kept)}`);
+                    console.log(`- Discarded: ${formatMarkdownField(s.discarded)}`);
+                    console.log(`- Needs human: ${formatMarkdownField(s.needs_human)}`);
                 }
                 if (results.length > 0) {
                     console.log(`\n## Iterations`);
                     for (const r of results) {
                         const cols = r.split("\t");
                         if (cols.length >= 8) {
-                            console.log(`- ${cols[1]}: ${cols[2]} (${cols[3]}) — ${cols[7].substring(0, 60)}`);
+                            console.log(`- ${formatMarkdownField(cols[1])}: ${formatMarkdownField(cols[2])} (${formatMarkdownField(cols[3])}) — ${formatMarkdownField(cols[7]).substring(0, 60)}`);
                         }
                     }
                 }
