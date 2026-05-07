@@ -356,25 +356,28 @@ describe("CLI Commands", () => {
       const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-export-md");
       const stateDir = resolve(tmpDir, ".autoresearch");
       try { rmSync(tmpDir, { recursive: true }); } catch {}
-      mkdirSync(stateDir, { recursive: true });
-      writeFileSync(resolve(stateDir, "state.json"), JSON.stringify({
-        run_id: "run-1\n## forged heading",
-        goal: "<script>alert(1)</script> | approve",
-      }), "utf-8");
-      writeFileSync(resolve(tmpDir, "autoresearch-results.tsv"), [
-        "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote",
-        "2026-05-03T00:01:00Z\t1|2\tkeep\t<0.1>\tpass\tpass\tfixture\tbad | cell\n## hidden\tfixture\tbaseline",
-      ].join("\n") + "\n", "utf-8");
+      try {
+        mkdirSync(stateDir, { recursive: true });
+        writeFileSync(resolve(stateDir, "state.json"), JSON.stringify({
+          run_id: "run-1\n## forged heading",
+          goal: "<script>alert(1)</script> | approve",
+        }), "utf-8");
+        writeFileSync(resolve(tmpDir, "autoresearch-results.tsv"), [
+          "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote",
+          "2026-05-03T00:01:00Z\t1|2\tkeep\t<0.1>\tpass\tpass\tfixture\tbad | cell\n## hidden\tfixture\tbaseline",
+        ].join("\n") + "\n", "utf-8");
 
-      const out = execSync(`node ${CLI} export --repo ${tmpDir} --format md`, { encoding: "utf-8", cwd: REPO_ROOT });
+        const out = execSync(`node ${CLI} export --repo ${tmpDir} --format md`, { encoding: "utf-8", cwd: REPO_ROOT });
 
-      expect(out).not.toContain("## forged heading");
-      expect(out).not.toContain("<script>");
-      expect(out).not.toContain("bad | cell");
-      expect(out).toContain("run\\-1 \\#\\# forged heading");
-      expect(out).toContain("&lt;script&gt;alert\\(1\\)&lt;/script&gt; \\| approve");
-      expect(out).toContain("bad \\| cell");
-      try { rmSync(tmpDir, { recursive: true }); } catch {}
+        expect(out).not.toContain("## forged heading");
+        expect(out).not.toContain("<script>");
+        expect(out).not.toContain("bad | cell");
+        expect(out).toContain("run\\-1 \\#\\# forged heading");
+        expect(out).toContain("&lt;script&gt;alert\\(1\\)&lt;/script&gt; \\| approve");
+        expect(out).toContain("bad \\| cell");
+      } finally {
+        try { rmSync(tmpDir, { recursive: true }); } catch {}
+      }
     });
   });
 
