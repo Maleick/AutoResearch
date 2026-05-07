@@ -29,8 +29,8 @@ function pathForTemplate(filePath: string) {
 }
 
 function anchorTrustedSkillReferences(template: string) {
-  const trustedSkillBundlePath = pathForTemplate(join(repoRoot, "skills", "autoresearch"));
-  return template.replaceAll("skills/autoresearch/", `${trustedSkillBundlePath}/`);
+  const trustedSkillBundlePath = pathForTemplate(join(repoRoot, "skills", SKILL_NAME));
+  return template.replaceAll(`skills/${SKILL_NAME}/`, `${trustedSkillBundlePath}/`);
 }
 
 const commandFiles = [
