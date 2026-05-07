@@ -17,6 +17,7 @@ export interface RunConfig {
   scope?: string;
   guard?: string;
   iterations?: number;
+  max_no_progress?: number;
   duration?: string;
   memory_path?: string;
   required_keep_labels?: string[];
@@ -79,6 +80,7 @@ export interface RunState {
   metric: Metric;
   verify: string;
   guard?: string;
+  max_no_progress?: number;
   iterations_cap?: number;
   duration?: string;
   duration_seconds?: number;

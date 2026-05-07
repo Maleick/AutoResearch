@@ -37,6 +37,7 @@ const usage = (): void => {
   console.error("  --mode          foreground or background");
   console.error("  --scope         In-scope files or subsystem");
   console.error("  --iterations    Iteration cap");
+  console.error("  --max-no-progress  Max consecutive discards before stop");
   console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
   console.error("  --json          Output raw JSON (default: human-readable)");
   console.error("  --results-path  Custom results TSV path");
@@ -71,7 +72,7 @@ const parseArgs = (args: string[]): Record<string, string> => {
       const shortToLong: Record<string, string> = {
         r: "repo", g: "goal", m: "metric", d: "direction",
         v: "verify", n: "guard", o: "mode", s: "scope",
-        i: "iterations", t: "duration",
+        i: "iterations", t: "duration", p: "max-no-progress",
       };
       const key = shortToLong[args[i][1]] ?? args[i].slice(1);
       if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
@@ -147,6 +148,7 @@ const main = async (): Promise<number> => {
           guard: grouped.guard as string | undefined,
           mode: grouped.mode as string | undefined,
           iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
+          max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
           duration: grouped.duration as string | undefined,
           memory_path: grouped["memory-path"] as string | undefined,
           required_keep_labels: grouped["required-keep-labels"] as string[] | undefined,
@@ -179,6 +181,7 @@ const main = async (): Promise<number> => {
           scope: grouped.scope as string | undefined,
           guard: grouped.guard as string | undefined,
           iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
+          max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
           duration: grouped.duration as string | undefined,
           memory_path: grouped["memory-path"] as string | undefined,
           required_keep_labels: grouped["required-keep-labels"] as string[] | undefined,
@@ -617,6 +620,7 @@ const main = async (): Promise<number> => {
           scope: grouped.scope as string | undefined,
           guard: grouped.guard as string | undefined,
           iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
+          max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
           duration: grouped.duration as string | undefined,
           memory_path: grouped["memory-path"] as string | undefined,
           required_keep_labels: grouped["required-keep-labels"] as string[] | undefined,
