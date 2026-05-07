@@ -1,3 +1,10 @@
+## [3.4.1](https://github.com/Maleick/AutoResearch/compare/v3.4.0...v3.4.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* **install:** avoid cron prompt command substitution ([#110](https://github.com/Maleick/AutoResearch/issues/110)) ([72c3816](https://github.com/Maleick/AutoResearch/commit/72c3816105eaf1e069ed0347d8d320ce96707d06))
+
 # [3.4.0](https://github.com/Maleick/AutoResearch/compare/v3.3.3...v3.4.0) (2026-05-07)
 
 
