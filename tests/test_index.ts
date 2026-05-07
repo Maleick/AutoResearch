@@ -56,6 +56,24 @@ describe("Index Exports", () => {
         paths: expect.arrayContaining([REPO_ROOT]),
       },
     });
+
+    const autoresearchTemplate = config.command.autoresearch.template;
+    expect(autoresearchTemplate).toContain(
+      `${REPO_ROOT}/skills/autoresearch/references/loop-workflow.md`,
+    );
+    for (const command of Object.values(config.command)) {
+      expect(command.template).not.toContain("`skills/autoresearch/");
+    }
+  });
+
+  it("does not duplicate repoRoot in skills.paths when already present", async () => {
+    const index = await import(resolve(REPO_ROOT, "dist/index.js"));
+    const plugin = await index.server({});
+    const config = { skills: { paths: [REPO_ROOT] } };
+
+    plugin.config(config);
+
+    expect(config.skills.paths).toStrictEqual([REPO_ROOT]);
   });
 
   it("exports correct version string", async () => {
