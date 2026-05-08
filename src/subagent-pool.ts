@@ -1,5 +1,6 @@
 const ROLE_LIMIT = 6;
 let poolKeyCounter = 0;
+let branchIdCounter = 0;
 const RESOURCE_TIERS: Record<string, string[]> = {
   lite: ["orchestrator", "scout", "verifier"],
   balanced: ["orchestrator", "scout", "analyst", "verifier"],
@@ -126,4 +127,66 @@ export function buildContinuationPolicy(mode: string): Record<string, unknown> {
       "needs_human",
     ],
   };
+}
+
+export interface DraftPoolConfigInput {
+  num_drafts: number;
+  branch_selection_policy: "best" | "roulette" | "diverse";
+  baseline_iteration?: number;
+}
+
+export function buildDraftPoolPlan(input: DraftPoolConfigInput): Record<string, unknown> {
+  const { num_drafts, branch_selection_policy, baseline_iteration } = input;
+  const activeDrafts: Array<{ branch_id: string; iteration: number; parent_iteration: number; status: string }> = [];
+
+  for (let i = 0; i < num_drafts; i++) {
+    activeDrafts.push({
+      branch_id: `draft-${branchIdCounter++}`,
+      iteration: i + 1,
+      parent_iteration: baseline_iteration ?? 0,
+      status: "pending",
+    });
+  }
+
+  return {
+    kind: "autoresearch_draft_pool",
+    version: 1,
+    num_drafts,
+    branch_selection_policy,
+    active_drafts: activeDrafts,
+    best_branch_id: activeDrafts[0]?.branch_id,
+  };
+}
+
+export function selectNextBranch(
+  activeDrafts: Array<{ branch_id: string; iteration: number; metric_value?: string; status: string }>,
+  policy: "best" | "roulette" | "diverse",
+  direction: string,
+): string | undefined {
+  const completedDrafts = activeDrafts.filter(d => d.status === "completed" && d.metric_value != null);
+  if (completedDrafts.length === 0) {
+    return activeDrafts.find(d => d.status === "pending")?.branch_id;
+  }
+
+  switch (policy) {
+    case "best": {
+      const sorted = [...completedDrafts].sort((a, b) => {
+        const aVal = parseFloat(a.metric_value ?? "0");
+        const bVal = parseFloat(b.metric_value ?? "0");
+        return direction === "lower" ? aVal - bVal : bVal - aVal;
+      });
+      return sorted[0]?.branch_id;
+    }
+    case "roulette": {
+      const idx = Math.floor(Math.random() * completedDrafts.length);
+      return completedDrafts[idx]?.branch_id;
+    }
+    case "diverse": {
+      const maxIter = Math.max(...completedDrafts.map(d => d.iteration));
+      const mostRecent = completedDrafts.find(d => d.iteration === maxIter);
+      return mostRecent?.branch_id ?? completedDrafts[0]?.branch_id;
+    }
+    default:
+      return activeDrafts[0]?.branch_id;
+  }
 }

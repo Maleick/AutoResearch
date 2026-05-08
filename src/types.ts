@@ -24,6 +24,8 @@ export interface RunConfig {
   run_tag?: string;
   stop_condition?: string;
   baseline?: string;
+  num_drafts?: number;
+  branch_selection_policy?: "best" | "roulette" | "diverse";
 }
 
 export type WizardConfig = Partial<Omit<RunConfig, 'baseline'>> & {
@@ -92,6 +94,7 @@ export interface RunState {
   stats: RunStats;
   flags: RunFlags;
   last_iteration?: LastIteration;
+  draft_pool?: Record<string, unknown>;
 }
 
 export interface SupervisorSnapshot {
@@ -111,4 +114,20 @@ export interface SupervisorSnapshot {
   subagent_pool?: Record<string, unknown>;
   continuation_policy?: Record<string, unknown>;
   subagent_guidance?: Record<string, unknown>;
+  draft_pool?: Record<string, unknown>;
+}
+
+export interface DraftPoolConfig {
+  num_drafts: number;
+  branch_selection_policy: "best" | "roulette" | "diverse";
+  active_drafts: Record<string, unknown>[];
+  best_branch_id?: string;
+}
+
+export interface DraftBranch {
+  branch_id: string;
+  iteration: number;
+  parent_iteration: number;
+  metric_value?: string;
+  status: "pending" | "running" | "completed" | "discarded";
 }

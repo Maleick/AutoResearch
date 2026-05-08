@@ -1,0 +1,57 @@
+
+> opencode-autoresearch@3.4.0 test
+> node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.json
+
+No run data found. Run 'autoresearch init' first.
+Unknown shell: powershell. Supported: bash, zsh, fish
+✗ Configuration errors:
+  - Missing required: --goal
+  - Missing required: --metric
+Missing file: /Users/maleick/Projects/AutoResearch/.autoship/workspaces/issue-52/.autoresearch-test-status-none/.autoresearch/state.json
+Unknown command: unknowncmd
+Run 'autoresearch --help' for usage.
+
+Test Suites: 14 passed, 14 total
+Tests:       465 passed, 465 total
+Snapshots:   0 total
+Time:        4.714 s
+Ran all test suites.
+PASS
+
+> opencode-autoresearch@3.4.0 test
+> node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.json
+
+No run data found. Run 'autoresearch init' first.
+Unknown shell: powershell. Supported: bash, zsh, fish
+✗ Configuration errors:
+  - Missing required: --goal
+  - Missing required: --metric
+Missing file: /Users/maleick/Projects/AutoResearch/.autoship/workspaces/issue-52/.autoresearch-test-status-none/.autoresearch/state.json
+Unknown command: unknowncmd
+Run 'autoresearch --help' for usage.
+
+Test Suites: 14 passed, 14 total
+Tests:       465 passed, 465 total
+Snapshots:   0 total
+Time:        4.718 s
+Ran all test suites.
+PASS
+
+> opencode-autoresearch@3.4.0 test
+> node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.json
+
+No run data found. Run 'autoresearch init' first.
+Unknown shell: powershell. Supported: bash, zsh, fish
+✗ Configuration errors:
+  - Missing required: --goal
+  - Missing required: --metric
+Missing file: /Users/maleick/Projects/AutoResearch/.autoship/workspaces/issue-52/.autoresearch-test-status-none/.autoresearch/state.json
+Unknown command: unknowncmd
+Run 'autoresearch --help' for usage.
+
+Test Suites: 14 passed, 14 total
+Tests:       465 passed, 465 total
+Snapshots:   0 total
+Time:        4.789 s
+Ran all test suites.
+PASS

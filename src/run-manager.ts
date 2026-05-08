@@ -13,7 +13,7 @@ import {
   AutoresearchError,
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT } from "./constants.js";
-import { buildSubagentPoolPlan, buildContinuationPolicy } from "./subagent-pool.js";
+import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
 import { writeFileSync, readFileSync, appendFileSync, existsSync } from "fs";
 
 export async function initializeRun(
@@ -147,6 +147,13 @@ export function makeStatePayload(
     mode: config.mode,
   });
   const continuationPolicy = buildContinuationPolicy(config.mode);
+  const draftPool = (config.num_drafts ?? 1) > 1
+    ? buildDraftPoolPlan({
+        num_drafts: config.num_drafts ?? 1,
+        branch_selection_policy: config.branch_selection_policy ?? "best",
+        baseline_iteration: 0,
+      })
+    : undefined;
 
   return {
     schema_version: 1,
@@ -195,6 +202,7 @@ export function makeStatePayload(
     },
     subagent_pool: subagentPool,
     continuation_policy: continuationPolicy,
+    draft_pool: draftPool,
   };
 }
 
@@ -302,5 +310,8 @@ export async function buildSupervisorSnapshot(
     artifact_paths: state.artifact_paths,
     flags: state.flags,
     label_requirements: state.label_requirements,
+    subagent_pool: state.subagent_pool,
+    continuation_policy: state.continuation_policy,
+    draft_pool: state.draft_pool,
   };
 }
