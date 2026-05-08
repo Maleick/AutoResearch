@@ -160,7 +160,7 @@ const readTailLines = (filePath: string, limit: number): string[] => {
       const bytesToRead = Math.min(chunkSize, position);
       position -= bytesToRead;
 
-      const chunk = Buffer.allocUnsafe(bytesToRead);
+      const chunk = Buffer.alloc(bytesToRead);
       const bytesRead = readSync(fd, chunk, 0, bytesToRead, position);
       const data = Buffer.concat([chunk.subarray(0, bytesRead), remainder]);
 
