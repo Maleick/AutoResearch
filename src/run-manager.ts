@@ -169,10 +169,19 @@ async function appendTextFileNoFollow(filePath: string, content: string, descrip
     if (code !== "ENOENT") throw err;
   }
 
+  if (typeof constants.O_NOFOLLOW !== "number") {
+    throw new AutoresearchError(
+      `Refusing to append to ${description} because this platform does not support O_NOFOLLOW: ${filePath}`,
+    );
+  }
+
   let handle;
   try {
-    const noFollow = typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
-    handle = await open(filePath, constants.O_WRONLY | constants.O_CREAT | constants.O_APPEND | noFollow, 0o600);
+    handle = await open(
+      filePath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_APPEND | constants.O_NOFOLLOW,
+      0o600,
+    );
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ELOOP") {
