@@ -4,10 +4,14 @@ import { fileURLToPath } from "url";
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
 const importSubagentPool = async () => await import(resolve(REPO_ROOT, "dist/subagent-pool.js"));
+const importConstants = async () => await import(resolve(REPO_ROOT, "dist/constants.js"));
 
 describe("buildDraftPoolPlan", () => {
   let mod: any;
-  beforeAll(async () => { mod = await importSubagentPool(); });
+  let constants: any;
+  beforeAll(async () => {
+    [mod, constants] = await Promise.all([importSubagentPool(), importConstants()]);
+  });
 
   it("creates a draft pool with correct kind", () => {
     const pool = mod.buildDraftPoolPlan({
@@ -95,6 +99,20 @@ describe("buildDraftPoolPlan", () => {
     });
     expect(pool.num_drafts).toBe(1);
     expect(pool.active_drafts.length).toBe(1);
+  });
+
+  it("rejects unsafe draft counts", () => {
+    const unsafeDraftCount = constants.MAX_DRAFTS + 1;
+
+    expect(() => mod.buildDraftPoolPlan({
+      num_drafts: unsafeDraftCount,
+      branch_selection_policy: "best",
+    })).toThrow(`Invalid num_drafts: ${unsafeDraftCount}`);
+
+    expect(() => mod.buildDraftPoolPlan({
+      num_drafts: Number.POSITIVE_INFINITY,
+      branch_selection_policy: "best",
+    })).toThrow("Invalid num_drafts: Infinity");
   });
 });
 

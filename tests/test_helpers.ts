@@ -5,6 +5,7 @@ import { writeFileSync, unlinkSync, existsSync, mkdirSync, rmSync, readFileSync,
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
 const importHelpers = async () => await import(resolve(REPO_ROOT, "dist/helpers.js"));
+const importConstants = async () => await import(resolve(REPO_ROOT, "dist/constants.js"));
 
 describe("normalizeDirection", () => {
   let mod: any;
@@ -516,7 +517,10 @@ describe("AutoresearchError", () => {
 
 describe("parsePositiveInt", () => {
   let mod: any;
-  beforeAll(async () => { mod = await importHelpers(); });
+  let constants: any;
+  beforeAll(async () => {
+    [mod, constants] = await Promise.all([importHelpers(), importConstants()]);
+  });
 
   it("returns undefined for undefined", () => {
     expect(mod.parsePositiveInt(undefined, "field")).toBeUndefined();
@@ -544,6 +548,15 @@ describe("parsePositiveInt", () => {
 
   it("throws on negative", () => {
     expect(() => mod.parsePositiveInt("-5", "field")).toThrow("Invalid field: -5");
+  });
+
+  it("throws on non-finite integer input", () => {
+    expect(() => mod.parsePositiveInt("9".repeat(400), "field")).toThrow("Invalid field:");
+  });
+
+  it("throws when value exceeds configured maximum", () => {
+    expect(() => mod.parsePositiveInt(String(constants.MAX_DRAFTS + 1), "field", { max: constants.MAX_DRAFTS }))
+      .toThrow(`must be at most ${constants.MAX_DRAFTS}`);
   });
 });
 
