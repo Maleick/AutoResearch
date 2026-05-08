@@ -98,10 +98,12 @@ describe("buildDraftPoolPlan", () => {
   });
 
   it("rejects unsafe draft counts", () => {
+    const unsafeDraftCount = mod.MAX_DRAFTS + 1;
+
     expect(() => mod.buildDraftPoolPlan({
-      num_drafts: 65,
+      num_drafts: unsafeDraftCount,
       branch_selection_policy: "best",
-    })).toThrow("Invalid num_drafts: 65");
+    })).toThrow(`Invalid num_drafts: ${unsafeDraftCount}`);
 
     expect(() => mod.buildDraftPoolPlan({
       num_drafts: Number.POSITIVE_INFINITY,
