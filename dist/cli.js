@@ -93,6 +93,12 @@ const parseArgs = (args) => {
     }
     return result;
 };
+const tsvField = (headers, cols, field, legacyIndex) => {
+    const fieldIndex = headers.indexOf(field);
+    if (fieldIndex >= 0)
+        return cols[fieldIndex] ?? "";
+    return cols[legacyIndex] ?? "";
+};
 const markdownInlineEscapes = {
     "\\": "\\\\",
     "`": "\\`",
@@ -359,9 +365,9 @@ const main = async () => {
                     break;
                 }
                 const limit = parsePositiveInt(grouped.limit, "limit") ?? 10;
+                const headers = lines[0].split("\t");
                 const records = lines.slice(1).reverse().slice(0, limit);
                 if (useJson) {
-                    const headers = lines[0].split("\t");
                     const parsed = records.map((r) => {
                         const cols = r.split("\t");
                         const obj = {};
@@ -375,9 +381,10 @@ const main = async () => {
                 }
                 for (const r of records) {
                     const cols = r.split("\t");
-                    if (cols.length >= 8) {
+                    if (cols.length >= 4) {
                         const emoji = cols[2] === "keep" ? "✓" : cols[2] === "discard" ? "✗" : "⚠";
-                        console.log(`${emoji}  #${formatDisplayValue(cols[1])}  ${formatDisplayValue(cols[2])}  (${formatMetricValue(cols[3])})  ${formatDisplayValue(cols[7].substring(0, 60))}`);
+                        const changeSummary = tsvField(headers, cols, "change_summary", 7);
+                        console.log(`${emoji}  #${formatDisplayValue(cols[1])}  ${formatDisplayValue(cols[2])}  (${formatMetricValue(cols[3])})  ${formatDisplayValue(changeSummary.substring(0, 60))}`);
                     }
                 }
                 console.log(`\nShowing ${Math.min(limit, records.length)} of ${lines.length - 1} records.`);
@@ -523,9 +530,12 @@ const main = async () => {
                 }
                 const state = parseRunState(readJsonFile(statePath));
                 let results = [];
+                let resultHeaders = [];
                 if (existsSync(resultsPath)) {
                     const content = readFileSync(resultsPath, "utf-8");
-                    results = content.trim().split("\n").slice(1).filter(Boolean);
+                    const resultLines = content.trim().split("\n");
+                    resultHeaders = resultLines[0]?.split("\t") ?? [];
+                    results = resultLines.slice(1).filter(Boolean);
                 }
                 if (useJson) {
                     printJson({ state, results_count: results.length });
@@ -554,8 +564,9 @@ const main = async () => {
                     console.log(`\n## Iterations`);
                     for (const r of results) {
                         const cols = r.split("\t");
-                        if (cols.length >= 8) {
-                            console.log(`- ${formatMarkdownField(cols[1])}: ${formatMarkdownField(cols[2])} (${formatMarkdownField(cols[3])}) — ${formatMarkdownField(cols[7]).substring(0, 60)}`);
+                        if (cols.length >= 4) {
+                            const changeSummary = tsvField(resultHeaders, cols, "change_summary", 7);
+                            console.log(`- ${formatMarkdownField(cols[1])}: ${formatMarkdownField(cols[2])} (${formatMarkdownField(cols[3])}) — ${formatMarkdownField(changeSummary).substring(0, 60)}`);
                         }
                     }
                 }
