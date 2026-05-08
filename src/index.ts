@@ -3,8 +3,6 @@ import { dirname, join, relative, resolve, sep } from "path";
 import { fileURLToPath } from "url";
 import {
   VERSION,
-  PACKAGE_NAME,
-  PRODUCT_BRAND,
   SKILL_NAME,
 } from "./constants.js";
 
@@ -72,7 +70,42 @@ export async function server() {
 
 export default { id, server };
 
-export { VERSION, PACKAGE_NAME, PRODUCT_BRAND, SKILL_NAME };
+export {
+  VERSION,
+  PACKAGE_NAME,
+  PRODUCT_BRAND,
+  SKILL_NAME,
+} from "./constants.js";
+
+export {
+  createTaskContext,
+  validateTaskContext,
+} from "./task-schema.js";
+
+export {
+  taskContextFromRunConfig,
+  runConfigFromTaskContext,
+} from "./translators/cli.js";
+
+export {
+  taskContextFromHermesPayload,
+  hermesPayloadFromTaskContext,
+  taskContextFromRunState,
+} from "./translators/hermes.js";
+
+export type {
+  TaskSource,
+  TaskContext,
+  TaskMetric,
+  TaskConstraints,
+  TaskIterationPolicy,
+  TaskResult,
+} from "./task-schema.js";
+
+export type {
+  HermesTaskPayload,
+} from "./translators/hermes.js";
+
 export type {
   RunConfig,
   WizardConfig,
