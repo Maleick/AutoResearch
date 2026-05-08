@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
@@ -508,7 +508,7 @@ describe("CLI Commands", () => {
 
     it("fails on invalid branch policy", () => {
       expect(() => {
-        execSync(`node ${CLI} init --goal "test" --metric "m" --verify "echo" --branch-policy nope --repo ${tmpDir}`, { encoding: "utf-8" });
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy", "nope", "--repo", tmpDir], { encoding: "utf-8" });
       }).toThrow("Invalid branch policy");
     });
   });
