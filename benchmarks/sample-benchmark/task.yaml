@@ -1,0 +1,7 @@
+goal: "Calculate the sum of two numbers"
+verify: |
+  Given two integers a and b, return a + b.
+metric: "accuracy"
+direction: "maximize"
+expected_baseline: 0.95
+fixture: "data.txt"

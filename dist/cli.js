@@ -34,6 +34,7 @@ const usage = () => {
     console.error("  --mode          foreground or background");
     console.error("  --scope         In-scope files or subsystem");
     console.error("  --iterations    Iteration cap");
+    console.error("  --max-no-progress  Max consecutive discards before stop");
     console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
     console.error("  --json          Output raw JSON (default: human-readable)");
     console.error("  --results-path  Custom results TSV path");
@@ -69,7 +70,7 @@ const parseArgs = (args) => {
             const shortToLong = {
                 r: "repo", g: "goal", m: "metric", d: "direction",
                 v: "verify", n: "guard", o: "mode", s: "scope",
-                i: "iterations", t: "duration",
+                i: "iterations", t: "duration", p: "max-no-progress",
             };
             const key = shortToLong[args[i][1]] ?? args[i].slice(1);
             if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
@@ -193,6 +194,7 @@ const main = async () => {
                     guard: grouped.guard,
                     mode: grouped.mode,
                     iterations: parsePositiveInt(grouped.iterations, "iterations"),
+                    max_no_progress: parsePositiveInt(grouped["max-no-progress"], "max-no-progress"),
                     duration: grouped.duration,
                     memory_path: grouped["memory-path"],
                     required_keep_labels: grouped["required-keep-labels"],
@@ -226,6 +228,7 @@ const main = async () => {
                     scope: grouped.scope,
                     guard: grouped.guard,
                     iterations: parsePositiveInt(grouped.iterations, "iterations"),
+                    max_no_progress: parsePositiveInt(grouped["max-no-progress"], "max-no-progress"),
                     duration: grouped.duration,
                     memory_path: grouped["memory-path"],
                     required_keep_labels: grouped["required-keep-labels"],
@@ -654,6 +657,7 @@ const main = async () => {
                     scope: grouped.scope,
                     guard: grouped.guard,
                     iterations: parsePositiveInt(grouped.iterations, "iterations"),
+                    max_no_progress: parsePositiveInt(grouped["max-no-progress"], "max-no-progress"),
                     duration: grouped.duration,
                     memory_path: grouped["memory-path"],
                     required_keep_labels: grouped["required-keep-labels"],
