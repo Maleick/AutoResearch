@@ -1,7 +1,7 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { execFileSync, execSync } from "child_process";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const CLI = resolve(REPO_ROOT, "dist/cli.js");
@@ -188,6 +188,35 @@ describe("CLI Commands", () => {
       const out = execSync(`node ${CLI} doctor`, { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("autoresearch");
       expect(out).toContain("✓");
+    });
+
+    it("does not execute repository-local npm during source diagnostics", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-doctor-path");
+      const markerPath = resolve(tmpDir, "npm-executed");
+      const fakeNpmPath = resolve(tmpDir, process.platform === "win32" ? "npm.cmd" : "npm");
+      rmSync(tmpDir, { recursive: true, force: true });
+      try {
+        mkdirSync(tmpDir, { recursive: true });
+        if (process.platform === "win32") {
+          writeFileSync(fakeNpmPath, `@echo off\r\necho hijacked > "${markerPath}"\r\necho C:\\fake-prefix\r\n`, "utf-8");
+        } else {
+          writeFileSync(fakeNpmPath, `#!/bin/sh\necho hijacked > "${markerPath}"\necho /tmp/fake-prefix\n`, "utf-8");
+          chmodSync(fakeNpmPath, 0o755);
+        }
+
+        const pathSeparator = process.platform === "win32" ? ";" : ":";
+        const existingPath = process.env.PATH;
+        const env = {
+          ...process.env,
+          PATH: existingPath ? `${tmpDir}${pathSeparator}${existingPath}` : tmpDir,
+        };
+        const out = execFileSync(process.execPath, [CLI, "doctor", "--json"], { encoding: "utf-8", cwd: tmpDir, env });
+        const json = JSON.parse(out);
+        expect(json.source.global_prefix).not.toBe(process.platform === "win32" ? "C:\\fake-prefix" : "/tmp/fake-prefix");
+        expect(existsSync(markerPath)).toBe(false);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
     });
   });
 
