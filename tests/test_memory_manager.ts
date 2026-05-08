@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { unlinkSync, existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from "fs";
+import { unlinkSync, existsSync, readFileSync, writeFileSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
