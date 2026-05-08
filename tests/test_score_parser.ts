@@ -3,7 +3,7 @@ import { fileURLToPath } from "url";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
-const importScoreParser = async () => await import(resolve(REPO_ROOT, "dist/score-parser.js"));
+const importScoreParser = async () => await import(resolve(REPO_ROOT, "dist/index.js"));
 
 describe("score-parser module exports", () => {
   let mod: any;
