@@ -734,7 +734,7 @@ describe("CLI Commands", () => {
     });
 
     it("shows human-readable scores with trends", () => {
-      const out = execSync(`node ${CLI} scores --limit 3 --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
+      const out = execFileSync("node", [CLI, "scores", "--limit", "3", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("Score History (latest 3):");
       expect(out).toContain("#3  ↓  5  (discard)  fail");
       expect(out).toContain("#2  ↑  0  (keep)  pass");
@@ -742,7 +742,7 @@ describe("CLI Commands", () => {
     });
 
     it("shows scores as json object with count and scores", () => {
-      const out = execSync(`node ${CLI} scores --json --limit 2 --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
+      const out = execFileSync("node", [CLI, "scores", "--json", "--limit", "2", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
       const json = JSON.parse(out);
       expect(json.count).toBe(2);
       expect(Array.isArray(json.scores)).toBe(true);
