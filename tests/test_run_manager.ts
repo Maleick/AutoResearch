@@ -270,5 +270,26 @@ describe("run-manager", () => {
       expect(snapshot.decision).toBe("stop");
       expect(snapshot.reason).toBe("stop_requested");
     });
+
+    it("stops when max-no-progress threshold reached", async () => {
+      const { initializeRun, appendIteration, buildSupervisorSnapshot } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+        max_no_progress: 3,
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      await appendIteration(tmpDir, undefined, undefined, "discard", "10", "fail", "pass", "", "bad1", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "discard", "10", "fail", "pass", "", "bad2", [], "");
+      const snapshot1 = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
+      expect(snapshot1.decision).toBe("relaunch");
+      await appendIteration(tmpDir, undefined, undefined, "discard", "10", "fail", "pass", "", "bad3", [], "");
+      const snapshot2 = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
+      expect(snapshot2.decision).toBe("stop");
+      expect(snapshot2.reason).toBe("no_progress");
+    });
   });
 });
