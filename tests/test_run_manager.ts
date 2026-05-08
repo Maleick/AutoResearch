@@ -81,7 +81,7 @@ describe("run-manager", () => {
       await initializeRun(tmpDir, undefined, undefined, config, false);
       const state = await appendIteration(
         tmpDir, undefined, undefined,
-        "keep", "42", "pass", "pass",
+        "keep", "42", undefined, "pass", "pass",
         "test hypothesis", "test change", ["progress"], "note"
       );
       expect(state.stats.total_iterations).toBe(1);
@@ -101,9 +101,9 @@ describe("run-manager", () => {
         mode: "foreground",
       };
       await initializeRun(tmpDir, undefined, undefined, config, false);
-      await appendIteration(tmpDir, undefined, undefined, "keep", "10", "pass", "pass", "", "first", [], "");
-      await appendIteration(tmpDir, undefined, undefined, "keep", "20", "pass", "pass", "", "second", [], "");
-      const state = await appendIteration(tmpDir, undefined, undefined, "discard", "15", "fail", "pass", "", "third", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "keep", "10", undefined, "pass", "pass", "", "first", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "keep", "20", undefined, "pass", "pass", "", "second", [], "");
+      const state = await appendIteration(tmpDir, undefined, undefined, "discard", "15", undefined, "fail", "pass", "", "third", [], "");
       expect(state.stats.total_iterations).toBe(3);
     });
   });
@@ -135,7 +135,7 @@ describe("run-manager", () => {
         mode: "foreground",
       };
       await initializeRun(tmpDir, undefined, undefined, config, false);
-      await appendIteration(tmpDir, undefined, undefined, "keep", "10", "pass", "pass", "", "first", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "keep", "10", undefined, "pass", "pass", "", "first", [], "");
       const snapshot = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
       expect(snapshot.run_id).toBeDefined();
       expect(snapshot.status).toBe("running");
@@ -153,7 +153,7 @@ describe("run-manager", () => {
         mode: "foreground",
       };
       await initializeRun(tmpDir, undefined, undefined, config, false);
-      await appendIteration(tmpDir, undefined, undefined, "keep", "42", "pass", "pass", "", "test", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "keep", "42", undefined, "pass", "pass", "", "test", [], "");
       const snapshot = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
       expect(snapshot.metric).toBeDefined();
       expect(snapshot.metric.name).toBe("defects");
@@ -170,7 +170,7 @@ describe("run-manager", () => {
         mode: "foreground",
       };
       await initializeRun(tmpDir, undefined, undefined, config, false);
-      await appendIteration(tmpDir, undefined, undefined, "discard", "30", "fail", "pass", "", "bad", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "discard", "30", undefined, "fail", "pass", "", "bad", [], "");
       const snapshot = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
       expect(snapshot.last_iteration).toBeDefined();
       expect(snapshot.last_iteration.decision).toBe("discard");
@@ -187,7 +187,7 @@ describe("run-manager", () => {
         mode: "foreground",
       };
       await initializeRun(tmpDir, undefined, undefined, config, false);
-      await appendIteration(tmpDir, undefined, undefined, "keep", "10", "pass", "pass", "", "good", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "keep", "10", undefined, "pass", "pass", "", "good", [], "");
       const snapshot = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
       expect(snapshot.flags).toBeDefined();
       expect(snapshot.flags.stop_ready).toBe(true);
@@ -203,8 +203,8 @@ describe("run-manager", () => {
         mode: "foreground",
       };
       await initializeRun(tmpDir, undefined, undefined, config, false);
-      await appendIteration(tmpDir, undefined, undefined, "keep", "10", "pass", "pass", "", "first", [], "");
-      await appendIteration(tmpDir, undefined, undefined, "keep", "20", "pass", "pass", "", "second", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "keep", "10", undefined, "pass", "pass", "", "first", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "keep", "20", undefined, "pass", "pass", "", "second", [], "");
       const snapshot = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
       expect(snapshot.results_rows).toBe(2);
     });
@@ -263,12 +263,33 @@ describe("run-manager", () => {
         mode: "background",
       };
       await initializeRun(tmpDir, undefined, undefined, config, false);
-      await appendIteration(tmpDir, undefined, undefined, "keep", "10", "pass", "pass", "", "test", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "keep", "10", undefined, "pass", "pass", "", "test", [], "");
       const { setStopRequested } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
       await setStopRequested(tmpDir, undefined);
       const snapshot = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
       expect(snapshot.decision).toBe("stop");
       expect(snapshot.reason).toBe("stop_requested");
+    });
+
+    it("stops when max-no-progress threshold reached", async () => {
+      const { initializeRun, appendIteration, buildSupervisorSnapshot } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+        max_no_progress: 3,
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      await appendIteration(tmpDir, undefined, undefined, "discard", "10", undefined, "fail", "pass", "", "bad1", [], "");
+      await appendIteration(tmpDir, undefined, undefined, "discard", "10", undefined, "fail", "pass", "", "bad2", [], "");
+      const snapshot1 = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
+      expect(snapshot1.decision).toBe("relaunch");
+      await appendIteration(tmpDir, undefined, undefined, "discard", "10", undefined, "fail", "pass", "", "bad3", [], "");
+      const snapshot2 = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
+      expect(snapshot2.decision).toBe("stop");
+      expect(snapshot2.reason).toBe("no_progress");
     });
   });
 });

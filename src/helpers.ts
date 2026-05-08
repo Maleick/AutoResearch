@@ -1,5 +1,9 @@
 import { writeFileSync, mkdirSync, readFileSync, renameSync, unlinkSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
+import { resolve, dirname, join } from "path";
+import { execFileSync } from "child_process";
+import { PACKAGE_NAME } from "./constants.js";
+
+export { PACKAGE_NAME };
 
 export class AutoresearchError extends Error {
   constructor(message: string) {
@@ -10,6 +14,17 @@ export class AutoresearchError extends Error {
 
 export function printJson(payload: unknown): void {
   console.log(JSON.stringify(payload, null, 2));
+}
+
+export function sanitizeForTerminal(value: unknown): string {
+  return String(value).replace(/[\x00-\x1f\x7f-\x9f]/g, (char) => {
+    switch (char) {
+      case "\n": return "\\n";
+      case "\r": return "\\r";
+      case "\t": return "\\t";
+      default: return `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`;
+    }
+  });
 }
 
 export function utcNow(): string {
@@ -74,6 +89,15 @@ export function normalizeMode(value: string | undefined | null): string {
     throw new AutoresearchError("Unsupported mode: " + value);
   }
   return normalized;
+}
+
+export function normalizeOperatingMode(value: string | undefined | null): OperatingMode {
+  if (!value) return "continuous";
+  const normalized = value.trim().toLowerCase();
+  if (normalized !== "converge" && normalized !== "continuous" && normalized !== "supervised") {
+    throw new AutoresearchError("Unsupported operating mode: " + value + ". Valid: converge, continuous, supervised");
+  }
+  return normalized as OperatingMode;
 }
 
 export function normalizeResultStatus(value: string | undefined | null, fieldName: string): string {
@@ -182,7 +206,7 @@ export function countTsvDataRows(content: string): number {
   return lines.length > 1 ? lines.slice(1).filter((l) => l.trim()).length : 0;
 }
 
-import type { RunState } from "./types.js";
+import type { OperatingMode, RunState } from "./types.js";
 
 export function parseRunState(value: unknown): RunState {
   if (typeof value !== "object" || value === null) {
@@ -196,6 +220,12 @@ export function parseRunState(value: unknown): RunState {
       throw new AutoresearchError(`Invalid state: missing required field "${key}"`);
     }
   }
+
+  const rawOperatingMode: unknown = "operating_mode" in obj ? obj.operating_mode : undefined;
+  if (rawOperatingMode !== undefined && rawOperatingMode !== null && typeof rawOperatingMode !== "string") {
+    throw new AutoresearchError("Invalid state: operating_mode must be a string");
+  }
+  const operating_mode = normalizeOperatingMode(rawOperatingMode);
 
   if (typeof obj.metric !== "object" || obj.metric === null) {
     throw new AutoresearchError("Invalid state: metric must be an object");
@@ -221,5 +251,84 @@ export function parseRunState(value: unknown): RunState {
     throw new AutoresearchError("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
   }
 
-  return obj as unknown as RunState;
+  return {
+    ...obj,
+    operating_mode,
+  } as RunState;
+}
+
+export interface UpdateCacheData {
+  last_check: string;
+  current_version: string;
+  latest_version: string;
+  update_available: boolean;
+}
+
+export function getUpdateCachePath(): string {
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  return join(home, ".cache", "opencode-autoresearch", "update-check.json");
+}
+
+export function readUpdateCache(): UpdateCacheData | null {
+  const cachePath = getUpdateCachePath();
+  if (!existsSync(cachePath)) {
+    return null;
+  }
+  try {
+    const content = readFileSync(cachePath, "utf-8");
+    return JSON.parse(content) as UpdateCacheData;
+  } catch {
+    return null;
+  }
+}
+
+function getBundledNpmCliPath(): string | null {
+  const nodeDir = dirname(process.execPath);
+  const candidates = [
+    join(nodeDir, "node_modules", "npm", "bin", "npm-cli.js"),
+    join(dirname(nodeDir), "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
+
+export function getGlobalNpmPrefix(): string | null {
+  try {
+    const npmCliPath = getBundledNpmCliPath();
+    if (!npmCliPath) return null;
+    return execFileSync(process.execPath, [npmCliPath, "prefix", "-g"], { encoding: "utf-8", timeout: 5000 }).trim();
+  } catch {
+    return null;
+  }
+}
+
+export function getInstalledPackagePath(packageName: string): string | null {
+  try {
+    const prefix = getGlobalNpmPrefix();
+    if (!prefix) return null;
+    const pkgJsonPath = join(prefix, "lib", "node_modules", packageName, "package.json");
+    if (existsSync(pkgJsonPath)) {
+      return join(prefix, "lib", "node_modules", packageName);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function getInstalledPackageInfo(packageName: string): { version?: string; description?: string; repository?: string } | null {
+  try {
+    const prefix = getGlobalNpmPrefix();
+    if (!prefix) return null;
+    const pkgJsonPath = join(prefix, "lib", "node_modules", packageName, "package.json");
+    if (!existsSync(pkgJsonPath)) return null;
+    const content = readFileSync(pkgJsonPath, "utf-8");
+    const pkg = JSON.parse(content);
+    return {
+      version: pkg.version,
+      description: pkg.description,
+      repository: pkg.repository?.url || pkg.repository,
+    };
+  } catch {
+    return null;
+  }
 }

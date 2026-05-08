@@ -7,14 +7,18 @@ import {
   parseRunState,
   resolvePath,
   normalizeDirection,
+  normalizeOperatingMode,
   parseDurationSeconds,
   normalizeLabels,
   missingRequiredLabels,
   AutoresearchError,
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT } from "./constants.js";
-import { buildSubagentPoolPlan, buildContinuationPolicy } from "./subagent-pool.js";
-import { writeFileSync, readFileSync, appendFileSync, existsSync } from "fs";
+import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
+import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
+import { lstat, open } from "fs/promises";
+
+const MAX_RESULTS_BYTES = 10 * 1024 * 1024;
 
 export async function initializeRun(
   repo: string | undefined,
@@ -30,7 +34,7 @@ export async function initializeRun(
     throw new AutoresearchError(`${statePath} already exists. Use --fresh-start to archive.`);
   }
 
-  const header = "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n";
+  const header = "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n";
   ensureParent(resultsPath);
   if (!existsSync(resultsPath)) {
     writeFileSync(resultsPath, header, "utf-8");
@@ -47,6 +51,7 @@ export async function appendIteration(
   statePathValue: string | undefined,
   decision: string,
   metricValue: string | undefined,
+  instrumentValue: string | undefined,
   verifyStatus: string,
   guardStatus: string,
   hypothesis: string | undefined,
@@ -77,6 +82,7 @@ export async function appendIteration(
     String(currentIteration),
     decision,
     metricValue ?? "",
+    instrumentValue ?? "",
     verifyStatus,
     guardStatus,
     hypothesis ?? "",
@@ -117,6 +123,7 @@ export async function appendIteration(
     iteration: currentIteration,
     decision,
     metric_value: metricValue,
+    instrument_value: instrumentValue,
     change_summary: changeSummary,
     labels: labelList,
     timestamp: now,
@@ -147,6 +154,13 @@ export function makeStatePayload(
     mode: config.mode,
   });
   const continuationPolicy = buildContinuationPolicy(config.mode);
+  const draftPool = (config.num_drafts ?? 1) > 1
+    ? buildDraftPoolPlan({
+        num_drafts: config.num_drafts ?? 1,
+        branch_selection_policy: config.branch_selection_policy ?? "best",
+        baseline_iteration: 0,
+      })
+    : undefined;
 
   return {
     schema_version: 1,
@@ -155,17 +169,26 @@ export function makeStatePayload(
     updated_at: now,
     status: "initialized",
     mode: config.mode,
+    operating_mode: normalizeOperatingMode(config.operating_mode),
     goal: config.goal,
     scope: config.scope ?? "current repository",
     metric: {
-      name: config.metric,
-      direction: normalizeDirection(config.direction),
+      name: config.outcome_metric ?? config.metric,
+      direction: normalizeDirection(config.outcome_direction ?? config.direction),
       baseline: config.baseline,
       best: config.baseline,
       latest: config.baseline,
     },
+    instrument_metric: config.instrument_metric ? {
+      name: config.instrument_metric,
+      direction: normalizeDirection(config.instrument_direction ?? config.direction),
+      baseline: config.baseline,
+      best: config.baseline,
+      latest: config.baseline,
+    } : undefined,
     verify: config.verify,
     guard: config.guard,
+    max_no_progress: config.max_no_progress,
     iterations_cap: config.iterations,
     duration: config.duration,
     duration_seconds: durationSeconds ?? undefined,
@@ -195,6 +218,7 @@ export function makeStatePayload(
     },
     subagent_pool: subagentPool,
     continuation_policy: continuationPolicy,
+    draft_pool: draftPool,
   };
 }
 
@@ -253,6 +277,49 @@ export async function completeRun(
   return state;
 }
 
+
+async function countResultsRows(resultsPath: string): Promise<number> {
+  try {
+    const pathStats = await lstat(resultsPath);
+    if (pathStats.isSymbolicLink()) {
+      throw new AutoresearchError(`Refusing to read symlinked results file: ${resultsPath}`);
+    }
+  } catch (err) {
+    if (err instanceof AutoresearchError) throw err;
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return 0;
+    throw err;
+  }
+
+  let handle;
+  try {
+    const noFollow = typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
+    handle = await open(resultsPath, constants.O_RDONLY | noFollow);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return 0;
+    if (code === "ELOOP") {
+      throw new AutoresearchError(`Refusing to read symlinked results file: ${resultsPath}`);
+    }
+    throw err;
+  }
+
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile()) {
+      throw new AutoresearchError(`Refusing to read non-regular results file: ${resultsPath}`);
+    }
+    if (stats.size > MAX_RESULTS_BYTES) {
+      throw new AutoresearchError(`Refusing to read results file larger than ${MAX_RESULTS_BYTES} bytes: ${resultsPath}`);
+    }
+
+    const content = await handle.readFile("utf-8");
+    return content.split("\n").filter((l: string) => l.trim() && !l.startsWith("timestamp")).length;
+  } finally {
+    await handle.close();
+  }
+}
+
 export async function buildSupervisorSnapshot(
   repo: string | undefined,
   resultsPathValue: string | undefined,
@@ -262,11 +329,7 @@ export async function buildSupervisorSnapshot(
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
   const state = parseRunState(readJsonFile(statePath));
 
-  let resultsRows = 0;
-  if (existsSync(resultsPath)) {
-    const content = readFileSync(resultsPath, "utf-8");
-    resultsRows = content.split("\n").filter((l: string) => l.trim() && !l.startsWith("timestamp")).length;
-  }
+  const resultsRows = await countResultsRows(resultsPath);
 
   let decision = "relaunch";
   let reason = "ready_for_next_iteration";
@@ -283,6 +346,9 @@ export async function buildSupervisorSnapshot(
   } else if (state.iterations_cap != null && state.stats.total_iterations >= state.iterations_cap) {
     decision = "stop";
     reason = "iteration_cap_reached";
+  } else if (state.max_no_progress != null && state.stats.consecutive_discards >= state.max_no_progress) {
+    decision = "stop";
+    reason = "no_progress";
   } else if (state.status === "completed" || state.status === "stopped") {
     decision = "stop";
     reason = `state_${state.status}`;
@@ -294,13 +360,18 @@ export async function buildSupervisorSnapshot(
     run_id: state.run_id,
     status: state.status,
     mode: state.mode,
+    operating_mode: state.operating_mode,
     goal: state.goal,
     metric: state.metric,
+    instrument_metric: state.instrument_metric,
     stats: state.stats,
     last_iteration: state.last_iteration,
     results_rows: resultsRows,
     artifact_paths: state.artifact_paths,
     flags: state.flags,
     label_requirements: state.label_requirements,
+    subagent_pool: state.subagent_pool,
+    continuation_policy: state.continuation_policy,
+    draft_pool: state.draft_pool,
   };
 }

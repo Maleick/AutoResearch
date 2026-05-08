@@ -1,7 +1,7 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { execFileSync, execSync } from "child_process";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const CLI = resolve(REPO_ROOT, "dist/cli.js");
@@ -101,10 +101,58 @@ describe("CLI Commands", () => {
   });
 
   describe("--dry-run flag", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-dry-run");
+    const tmpState = resolve(tmpDir, ".autoresearch", "state.json");
+    const tmpResults = resolve(tmpDir, "autoresearch-results.tsv");
+    const tmpLaunch = resolve(tmpDir, ".autoresearch", "launch.json");
+
+    afterEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
     it("prevents file creation in init", () => {
-      const out = execSync(`node ${CLI} init --goal "test" --metric "test" --verify "echo" --dry-run 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT });
+      const out = execSync(`node ${CLI} init --goal "test" --metric "test" --verify "echo" --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("Would initialize");
       expect(out).toContain("test");
+      expect(existsSync(tmpState)).toBe(false);
+      expect(existsSync(tmpResults)).toBe(false);
+    });
+
+    it("prevents file creation in launch", () => {
+      const out = execSync(`node ${CLI} launch --goal "test" --metric "test" --verify "echo" --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("Would launch");
+      expect(existsSync(tmpState)).toBe(false);
+      expect(existsSync(tmpResults)).toBe(false);
+      expect(existsSync(tmpLaunch)).toBe(false);
+    });
+
+    it("prevents state and result mutations in record", () => {
+      execSync(`node ${CLI} init --goal "test" --metric "test" --verify "echo" --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
+      const stateBefore = readFileSync(tmpState, "utf-8");
+      const resultsBefore = readFileSync(tmpResults, "utf-8");
+
+      const out = execSync(`node ${CLI} record --decision keep --metric-value 1 --verify-status pass --guard-status pass --change-summary "dry" --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT });
+
+      expect(out).toContain("Would record");
+      expect(readFileSync(tmpState, "utf-8")).toBe(stateBefore);
+      expect(readFileSync(tmpResults, "utf-8")).toBe(resultsBefore);
+    });
+
+    it("prevents state mutations in stop, resume, and complete", () => {
+      execSync(`node ${CLI} init --goal "test" --metric "test" --verify "echo" --mode background --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
+
+      const beforeStop = readFileSync(tmpState, "utf-8");
+      expect(execSync(`node ${CLI} stop --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT })).toContain("Would request");
+      expect(readFileSync(tmpState, "utf-8")).toBe(beforeStop);
+
+      execSync(`node ${CLI} stop --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
+      const beforeResume = readFileSync(tmpState, "utf-8");
+      expect(execSync(`node ${CLI} resume --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT })).toContain("Would resume");
+      expect(readFileSync(tmpState, "utf-8")).toBe(beforeResume);
+
+      const beforeComplete = readFileSync(tmpState, "utf-8");
+      expect(execSync(`node ${CLI} complete --dry-run --repo ${tmpDir} 2>&1`, { encoding: "utf-8", cwd: REPO_ROOT })).toContain("Would mark");
+      expect(readFileSync(tmpState, "utf-8")).toBe(beforeComplete);
     });
   });
 
@@ -140,6 +188,35 @@ describe("CLI Commands", () => {
       const out = execSync(`node ${CLI} doctor`, { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("autoresearch");
       expect(out).toContain("✓");
+    });
+
+    it("does not execute repository-local npm during source diagnostics", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-doctor-path");
+      const markerPath = resolve(tmpDir, "npm-executed");
+      const fakeNpmPath = resolve(tmpDir, process.platform === "win32" ? "npm.cmd" : "npm");
+      rmSync(tmpDir, { recursive: true, force: true });
+      try {
+        mkdirSync(tmpDir, { recursive: true });
+        if (process.platform === "win32") {
+          writeFileSync(fakeNpmPath, `@echo off\r\necho hijacked > "${markerPath}"\r\necho C:\\fake-prefix\r\n`, "utf-8");
+        } else {
+          writeFileSync(fakeNpmPath, `#!/bin/sh\necho hijacked > "${markerPath}"\necho /tmp/fake-prefix\n`, "utf-8");
+          chmodSync(fakeNpmPath, 0o755);
+        }
+
+        const pathSeparator = process.platform === "win32" ? ";" : ":";
+        const existingPath = process.env.PATH;
+        const env = {
+          ...process.env,
+          PATH: existingPath ? `${tmpDir}${pathSeparator}${existingPath}` : tmpDir,
+        };
+        const out = execFileSync(process.execPath, [CLI, "doctor", "--json"], { encoding: "utf-8", cwd: tmpDir, env });
+        const json = JSON.parse(out);
+        expect(json.source.global_prefix).not.toBe(process.platform === "win32" ? "C:\\fake-prefix" : "/tmp/fake-prefix");
+        expect(existsSync(markerPath)).toBe(false);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
     });
   });
 
@@ -223,6 +300,27 @@ describe("CLI Commands", () => {
         execSync(`node ${CLI} validate`, { encoding: "utf-8", cwd: REPO_ROOT });
       }).toThrow("Missing required");
     });
+
+    it("requires explicit verify even when a command could be inferred", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-validate-infer");
+      rmSync(tmpDir, { recursive: true, force: true });
+      mkdirSync(tmpDir, { recursive: true });
+      writeFileSync(resolve(tmpDir, "package.json"), JSON.stringify({ scripts: { test: "echo ok" } }), "utf-8");
+
+      try {
+        try {
+          execSync(`node ${CLI} validate --repo ${tmpDir} --goal "test" --metric "test" --json`, { encoding: "utf-8", cwd: REPO_ROOT });
+          throw new Error("validate unexpectedly succeeded");
+        } catch (error) {
+          const stdout = (error as { stdout?: string }).stdout ?? "";
+          const json = JSON.parse(stdout) as { valid: boolean; errors: string[] };
+          expect(json.valid).toBe(false);
+          expect(json.errors).toContain("Missing required: --verify");
+        }
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("summary command", () => {
@@ -249,6 +347,64 @@ describe("CLI Commands", () => {
     it("generates markdown report", () => {
       const out = execSync(`node ${CLI} report`, { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("# Auto Research Report");
+    });
+
+    it("escapes untrusted fields in markdown reports", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-report-sanitize");
+      const tmpStateDir = resolve(tmpDir, ".autoresearch");
+      const tmpState = resolve(tmpStateDir, "state.json");
+      const tmpResults = resolve(tmpDir, "autoresearch-results.tsv");
+
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+      mkdirSync(tmpStateDir, { recursive: true });
+      writeFileSync(tmpState, JSON.stringify({
+        schema_version: 1,
+        run_id: "run-1",
+        created_at: "2026-05-03T00:00:00Z",
+        updated_at: "2026-05-03T00:01:00Z",
+        status: "running",
+        mode: "foreground",
+        goal: "reduce flaky tests\n\n## Forged Section\n- hidden discarded: 0\u001b[31m",
+        scope: "tests",
+        metric: {
+          name: "tests",
+          direction: "lower",
+          baseline: "1",
+          best: "0",
+          latest: "0",
+        },
+        verify: "npm test",
+        label_requirements: { keep: [], stop: [] },
+        artifact_paths: { results: tmpResults, state: tmpState },
+        stats: {
+          total_iterations: 1,
+          kept: 1,
+          discarded: 0,
+          needs_human: 0,
+          consecutive_discards: 0,
+        },
+        flags: {
+          stop_requested: false,
+          needs_human: false,
+          background_active: false,
+          stop_ready: false,
+        },
+      }, null, 2) + "\n", "utf-8");
+      writeFileSync(tmpResults, [
+        "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote",
+        "2026-05-03T00:01:00Z\t1\tkeep\t0\tpass\tpass\tfixture\t**bold**\u001b[31m\n## forged result\tfixture\tbaseline",
+      ].join("\n") + "\n", "utf-8");
+
+      try {
+        const out = execSync(`node ${CLI} report --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
+        expect(out).not.toContain("\n## Forged Section");
+        expect(out).not.toContain("\n## forged result");
+        expect(out).not.toContain("\u001b");
+        expect(out).toContain("\\#\\# Forged Section");
+        expect(out).toContain("\\*\\*bold\\*\\*");
+      } finally {
+        try { rmSync(tmpDir, { recursive: true }); } catch {}
+      }
     });
   });
 
@@ -350,6 +506,34 @@ describe("CLI Commands", () => {
       const json = JSON.parse(out);
       expect(json.exported_at).toBeDefined();
       expect(json.state).toBeDefined();
+    });
+
+    it("escapes attacker-controlled markdown export fields", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-export-md");
+      const stateDir = resolve(tmpDir, ".autoresearch");
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+      try {
+        mkdirSync(stateDir, { recursive: true });
+        writeFileSync(resolve(stateDir, "state.json"), JSON.stringify({
+          run_id: "run-1\n## forged heading",
+          goal: "<script>alert(1)</script> | approve",
+        }), "utf-8");
+        writeFileSync(resolve(tmpDir, "autoresearch-results.tsv"), [
+          "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote",
+          "2026-05-03T00:01:00Z\t1|2\tkeep\t<0.1>\tpass\tpass\tfixture\tbad | cell\n## hidden\tfixture\tbaseline",
+        ].join("\n") + "\n", "utf-8");
+
+        const out = execSync(`node ${CLI} export --repo ${tmpDir} --format md`, { encoding: "utf-8", cwd: REPO_ROOT });
+
+        expect(out).not.toContain("## forged heading");
+        expect(out).not.toContain("<script>");
+        expect(out).not.toContain("bad | cell");
+        expect(out).toContain("run\\-1\\\\n\\#\\# forged heading");
+        expect(out).toContain("&lt;script&gt;alert\\(1\\)&lt;/script&gt; \\| approve");
+        expect(out).toContain("bad \\| cell");
+      } finally {
+        try { rmSync(tmpDir, { recursive: true }); } catch {}
+      }
     });
   });
 
@@ -505,6 +689,18 @@ describe("CLI Commands", () => {
       expect(state.guard).toBe("npm run lint");
       expect(state.iterations_cap).toBe(50);
     });
+
+    it("fails on invalid branch policy", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy", "nope", "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow("Invalid branch policy: nope. Expected one of: best, roulette, diverse");
+    });
+
+    it("accepts valid branch policy values", () => {
+      execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy", "roulette", "--num-drafts", "2", "--repo", tmpDir], { encoding: "utf-8" });
+      const state = JSON.parse(readFileSync(tmpState, "utf-8"));
+      expect(state.draft_pool.branch_selection_policy).toBe("roulette");
+    });
   });
 
   describe("validate command", () => {
@@ -569,6 +765,99 @@ describe("CLI Commands", () => {
     it("includes iteration count in output", () => {
       const out = execSync(`node ${CLI} status`, { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toMatch(/1 iteration|1 kept/i);
+    });
+  });
+
+  describe("terminal-safe human-readable output", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-terminal-safe");
+    const statePath = resolve(tmpDir, ".autoresearch", "state.json");
+    const resultsPath = resolve(tmpDir, "autoresearch-results.tsv");
+    const memoryPath = resolve(tmpDir, "autoresearch-memory.md");
+    const controlText = "clear\u001b[2J\u001b[Hbell\u0007\nFORGED: completed";
+    const inlineControlText = "clear\u001b[2J\u001b[Hbell\u0007";
+
+    beforeAll(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+      mkdirSync(resolve(tmpDir, ".autoresearch"), { recursive: true });
+      writeFileSync(statePath, JSON.stringify({
+        schema_version: 1,
+        run_id: `run-${controlText}`,
+        created_at: "2026-05-03T00:00:00Z",
+        updated_at: "2026-05-03T00:01:00Z",
+        status: "running",
+        mode: "foreground",
+        goal: `goal ${controlText}`,
+        scope: `scope ${controlText}`,
+        metric: {
+          name: `metric ${controlText}`,
+          direction: "lower",
+          baseline: "1",
+          best: `best ${controlText}`,
+          latest: "0",
+        },
+        verify: `npm test ${controlText}`,
+        guard: `guard ${controlText}`,
+        label_requirements: { keep: [], stop: [] },
+        artifact_paths: {
+          results: resultsPath,
+          state: statePath,
+        },
+        stats: {
+          total_iterations: 1,
+          kept: 1,
+          discarded: 0,
+          needs_human: 0,
+          consecutive_discards: 0,
+        },
+        flags: {
+          stop_requested: false,
+          needs_human: false,
+          background_active: false,
+          stop_ready: false,
+        },
+        last_iteration: {
+          iteration: 1,
+          decision: `keep${controlText}`,
+          metric_value: `0${controlText}`,
+          change_summary: `change ${controlText}`,
+          labels: [],
+          timestamp: "2026-05-03T00:01:00Z",
+          keep_labels_satisfied: true,
+          stop_labels_satisfied: true,
+          missing_keep_labels: [],
+          missing_stop_labels: [],
+        },
+      }, null, 2) + "\n", "utf-8");
+      writeFileSync(resultsPath, [
+        "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote",
+        `2026-05-03T00:01:00Z\t1\tkeep\t0${inlineControlText}\tpass\tpass\tfixture\tchange ${inlineControlText}\tfixture\tbaseline`,
+      ].join("\n") + "\n", "utf-8");
+      writeFileSync(memoryPath, `### Pattern: pattern ${controlText}\n\nDetails.\n`, "utf-8");
+    });
+
+    afterAll(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    it("escapes controls from attacker-controlled artifacts in text commands", () => {
+      const commands = ["status", "explain", "history", "config", "suggest", "report", "export --format md"];
+      for (const command of commands) {
+        const out = execSync(`node ${CLI} ${command} --repo ${tmpDir}`, { encoding: "utf-8" });
+        expect(out).not.toContain("\u001b");
+        expect(out).not.toContain("\u0007");
+        expect(out).not.toContain("\nFORGED: completed");
+      }
+
+      const statusOut = execSync(`node ${CLI} status --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(statusOut).toContain("\\u001b");
+      expect(statusOut).toContain("\\nFORGED: completed");
+    });
+
+    it("keeps JSON output raw so JSON.stringify escapes controls", () => {
+      const out = execSync(`node ${CLI} status --json --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(out).not.toContain("\u001b");
+      expect(out).toContain("\\u001b");
+      expect(JSON.parse(out).goal).toContain("\u001b");
     });
   });
 
