@@ -998,5 +998,17 @@ describe("CLI Commands", () => {
       const results = readFileSync(tmpResults, "utf-8");
       expect(results).toContain("my hypothesis");
     });
+
+    it("shows change summary, not hypothesis, in history and report", () => {
+      execSync(`node ${CLI} record --decision keep --metric-value 42 --instrument-value 7 --verify-status pass --guard-status pass --change-summary "visible change summary" --hypothesis "hidden hypothesis" --repo ${tmpDir}`, { encoding: "utf-8" });
+
+      const history = execSync(`node ${CLI} history --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(history).toContain("visible change summary");
+      expect(history).not.toContain("hidden hypothesis");
+
+      const report = execSync(`node ${CLI} report --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(report).toContain("visible change summary");
+      expect(report).not.toContain("hidden hypothesis");
+    });
   });
 });
