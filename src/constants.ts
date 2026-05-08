@@ -10,3 +10,4 @@ export const MEMORY_DEFAULT = "autoresearch-memory.md";
 export const MEMORY_AUDIT_DEFAULT = ".autoresearch/memory-audit.log";
 export const MEMORY_CONSOLIDATION_THRESHOLD = 3;
 export const MEMORY_EXPIRY_DAYS = 30;
+export const SCORE_HISTORY_DEFAULT = ".autoresearch/score-history.jsonl";
