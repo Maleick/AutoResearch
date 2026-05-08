@@ -13,7 +13,7 @@ import {
   missingRequiredLabels,
   AutoresearchError,
 } from "./helpers.js";
-import { RESULTS_DEFAULT, STATE_DEFAULT } from "./constants.js";
+import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
 import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
 import { lstat, open } from "fs/promises";

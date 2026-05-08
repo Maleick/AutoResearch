@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { unlinkSync, existsSync, readFileSync, writeFileSync } from "fs";
+import { unlinkSync, existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
@@ -36,6 +36,30 @@ describe("Memory Manager", () => {
     it("allows threshold of 1", () => {
       const state = mod.createMemoryStateWithThreshold(1);
       expect(state.consolidation_threshold).toBe(1);
+    });
+
+    it("throws for threshold of 0", () => {
+      expect(() => mod.createMemoryStateWithThreshold(0)).toThrow(
+        /Invalid consolidation threshold/
+      );
+    });
+
+    it("throws for negative threshold", () => {
+      expect(() => mod.createMemoryStateWithThreshold(-5)).toThrow(
+        /Invalid consolidation threshold/
+      );
+    });
+
+    it("throws for NaN threshold", () => {
+      expect(() => mod.createMemoryStateWithThreshold(NaN)).toThrow(
+        /Invalid consolidation threshold/
+      );
+    });
+
+    it("throws for non-integer threshold", () => {
+      expect(() => mod.createMemoryStateWithThreshold(2.5)).toThrow(
+        /Invalid consolidation threshold/
+      );
     });
   });
 
@@ -103,6 +127,51 @@ describe("Memory Manager", () => {
       expect(result.pending_items).toHaveLength(1);
       expect(result.pending_items[0].verification_count).toBe(2);
       expect(result.pending_items[0].provenance).toEqual(provenance2);
+    });
+
+    it("updates description when stored description is empty and incoming is non-empty", () => {
+      const state = mod.createInitialMemoryState();
+      const provenance = {
+        run_id: "test-run",
+        iteration: 1,
+        goal: "test goal",
+        metric_name: "test_metric",
+        metric_value: "0.5",
+        direction: "lower",
+        timestamp: "2024-01-01T00:00:00Z",
+        labels: [],
+      };
+
+      // First add via recordSuccessfulVerification (empty description)
+      let result = mod.recordSuccessfulVerification(state, "pattern-a", provenance);
+      expect(result.pending_items[0].description).toBe("");
+
+      // Then update with real description via addPendingMemoryItem
+      result = mod.addPendingMemoryItem(result, "pattern-a", "Real description", provenance);
+      expect(result.pending_items[0].description).toBe("Real description");
+      expect(result.pending_items[0].verification_count).toBe(2);
+    });
+
+    it("does not overwrite non-empty description with empty incoming description", () => {
+      const state = mod.createInitialMemoryState();
+      const provenance = {
+        run_id: "test-run",
+        iteration: 1,
+        goal: "test goal",
+        metric_name: "test_metric",
+        metric_value: "0.5",
+        direction: "lower",
+        timestamp: "2024-01-01T00:00:00Z",
+        labels: [],
+      };
+
+      // First add with real description
+      let result = mod.addPendingMemoryItem(state, "pattern-b", "Real description", provenance);
+      // Then call recordSuccessfulVerification (empty description)
+      result = mod.recordSuccessfulVerification(result, "pattern-b", provenance);
+
+      expect(result.pending_items[0].description).toBe("Real description");
+      expect(result.pending_items[0].verification_count).toBe(2);
     });
   });
 
@@ -297,6 +366,35 @@ describe("Memory Manager", () => {
           unlinkSync(auditLogPath);
         } catch {}
       }
+    });
+
+    it("skips re-promotion when active pattern already exists in consolidated_items", () => {
+      const state = mod.createMemoryStateWithThreshold(1);
+      const provenance = {
+        run_id: "test-run",
+        iteration: 1,
+        goal: "test goal",
+        metric_name: "test_metric",
+        metric_value: "0.5",
+        direction: "lower",
+        timestamp: "2024-01-01T00:00:00Z",
+        labels: [],
+      };
+
+      // First promotion
+      let result = mod.addPendingMemoryItem(state, "pattern1", "Description", provenance);
+      const { state: afterFirst } = mod.consolidateReadyItems(result);
+      expect(afterFirst.consolidated_items).toHaveLength(1);
+
+      // Re-add same pattern to pending and try to consolidate again
+      result = mod.addPendingMemoryItem(afterFirst, "pattern1", "Description", provenance);
+      const { state: afterSecond, auditEntries } = mod.consolidateReadyItems(result);
+
+      // Should not create a duplicate active entry
+      const activePatterns = afterSecond.consolidated_items.filter((i: { status: string }) => i.status === "active");
+      expect(activePatterns).toHaveLength(1);
+      // Audit entries should be empty (skipped the duplicate)
+      expect(auditEntries).toHaveLength(0);
     });
   });
 
@@ -647,6 +745,112 @@ describe("Memory Manager", () => {
       expect(provenance.metric_value).toBe("85%");
       expect(provenance.direction).toBe("higher");
       expect(provenance.labels).toEqual(["label1", "label2"]);
+    });
+  });
+
+  describe("writeMemoryFile", () => {
+    const makeProvenance = () => ({
+      run_id: "run-abc",
+      iteration: 2,
+      goal: "reduce error rate",
+      metric_name: "error_rate",
+      metric_value: "0.02",
+      direction: "lower",
+      timestamp: "2024-06-01T00:00:00Z",
+      labels: ["prod", "fast"],
+    });
+
+    const makeItem = (overrides: Record<string, unknown> = {}) => ({
+      id: "mem-test-1",
+      pattern: "cache results between runs",
+      description: "Caching avoids redundant computation",
+      provenance: makeProvenance(),
+      verification_count: 4,
+      first_observed: "2024-06-01T00:00:00Z",
+      consolidated_at: "2024-06-02T00:00:00Z",
+      status: "active" as const,
+      ...overrides,
+    });
+
+    it("writes a file with the correct header", () => {
+      const memPath = resolve(REPO_ROOT, ".autoresearch-test-write-memory.md");
+      try {
+        mod.writeMemoryFile(memPath, [makeItem()]);
+        const content = readFileSync(memPath, "utf-8");
+        expect(content).toContain("# AutoResearch Memory");
+        expect(content).toContain("Patterns extracted from successful iteration cycles.");
+      } finally {
+        try { unlinkSync(memPath); } catch {}
+      }
+    });
+
+    it("includes pattern heading and description", () => {
+      const memPath = resolve(REPO_ROOT, ".autoresearch-test-write-memory2.md");
+      try {
+        mod.writeMemoryFile(memPath, [makeItem()]);
+        const content = readFileSync(memPath, "utf-8");
+        expect(content).toContain("### Pattern: cache results between runs");
+        expect(content).toContain("**Description:** Caching avoids redundant computation");
+      } finally {
+        try { unlinkSync(memPath); } catch {}
+      }
+    });
+
+    it("includes provenance fields", () => {
+      const memPath = resolve(REPO_ROOT, ".autoresearch-test-write-memory3.md");
+      try {
+        mod.writeMemoryFile(memPath, [makeItem()]);
+        const content = readFileSync(memPath, "utf-8");
+        expect(content).toContain("run-abc");
+        expect(content).toContain("reduce error rate");
+        expect(content).toContain("error_rate=0.02 (lower)");
+        expect(content).toContain("prod, fast");
+        expect(content).toContain("Verifications: 4");
+      } finally {
+        try { unlinkSync(memPath); } catch {}
+      }
+    });
+
+    it("filters out expired items", () => {
+      const memPath = resolve(REPO_ROOT, ".autoresearch-test-write-memory4.md");
+      try {
+        const active = makeItem({ pattern: "active-pattern" });
+        const expired = makeItem({
+          id: "mem-test-2",
+          pattern: "expired-pattern",
+          status: "expired",
+          expired_at: "2024-06-10T00:00:00Z",
+        });
+        mod.writeMemoryFile(memPath, [active, expired]);
+        const content = readFileSync(memPath, "utf-8");
+        expect(content).toContain("active-pattern");
+        expect(content).not.toContain("expired-pattern");
+      } finally {
+        try { unlinkSync(memPath); } catch {}
+      }
+    });
+
+    it("uses fallback description when description is empty", () => {
+      const memPath = resolve(REPO_ROOT, ".autoresearch-test-write-memory5.md");
+      try {
+        mod.writeMemoryFile(memPath, [makeItem({ description: "" })]);
+        const content = readFileSync(memPath, "utf-8");
+        expect(content).toContain("**Description:** Auto-generated pattern");
+      } finally {
+        try { unlinkSync(memPath); } catch {}
+      }
+    });
+
+    it("writes empty header when no active items", () => {
+      const memPath = resolve(REPO_ROOT, ".autoresearch-test-write-memory6.md");
+      try {
+        mod.writeMemoryFile(memPath, []);
+        const content = readFileSync(memPath, "utf-8");
+        expect(content).toContain("# AutoResearch Memory");
+        expect(content).not.toContain("### Pattern:");
+      } finally {
+        try { unlinkSync(memPath); } catch {}
+      }
     });
   });
 });
