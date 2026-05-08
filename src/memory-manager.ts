@@ -10,6 +10,8 @@ import { existsSync, readFileSync, appendFileSync, writeFileSync } from "fs";
 import {
   utcNow,
   ensureParent,
+  resolvePath,
+  AutoresearchError,
 } from "./helpers.js";
 import {
   MEMORY_DEFAULT,
@@ -17,7 +19,6 @@ import {
   MEMORY_CONSOLIDATION_THRESHOLD,
   MEMORY_EXPIRY_DAYS,
 } from "./constants.js";
-import { resolve } from "path";
 
 function generateId(): string {
   return `mem-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -34,6 +35,11 @@ export function createInitialMemoryState(): MemoryConsolidationState {
 export function createMemoryStateWithThreshold(
   threshold: number
 ): MemoryConsolidationState {
+  if (!Number.isInteger(threshold) || threshold < 1) {
+    throw new AutoresearchError(
+      `Invalid consolidation threshold: ${threshold} (must be a positive integer >= 1)`
+    );
+  }
   return {
     pending_items: [],
     consolidated_items: [],
@@ -66,9 +72,11 @@ export function addPendingMemoryItem(
 
   if (existingIndex >= 0) {
     const updated = [...state.pending_items];
+    const existing = updated[existingIndex];
     updated[existingIndex] = {
-      ...updated[existingIndex],
-      verification_count: updated[existingIndex].verification_count + 1,
+      ...existing,
+      description: !existing.description && description ? description : existing.description,
+      verification_count: existing.verification_count + 1,
       last_verified: utcNow(),
       provenance,
     };
@@ -168,7 +176,16 @@ export function consolidateReadyItems(
   const newConsolidated = toPromote.map(createMemoryItem);
   const now = utcNow();
 
+  const existingActivePatterns = new Set(
+    state.consolidated_items
+      .filter((item) => item.status === "active")
+      .map((item) => item.pattern)
+  );
+
   for (const item of toPromote) {
+    if (existingActivePatterns.has(item.pattern)) {
+      continue;
+    }
     const entry: MemoryAuditLogEntry = {
       timestamp: now,
       action: "promoted",
@@ -189,7 +206,10 @@ export function consolidateReadyItems(
     state: {
       ...state,
       pending_items: remaining,
-      consolidated_items: [...state.consolidated_items, ...newConsolidated],
+      consolidated_items: [
+        ...state.consolidated_items,
+        ...newConsolidated.filter((item) => !existingActivePatterns.has(item.pattern)),
+      ],
       last_consolidated: now,
     },
     auditEntries,
@@ -290,13 +310,6 @@ export function getAuditLogPath(
   auditPathValue: string | undefined
 ): string {
   return resolvePath(repo, auditPathValue, MEMORY_AUDIT_DEFAULT);
-}
-
-function resolvePath(repo: string | undefined, value: string | undefined, defaultName: string): string {
-  if (value) {
-    return value.startsWith("/") ? value : resolve(repo ?? ".", value);
-  }
-  return resolve(repo ?? ".", defaultName);
 }
 
 export function readAuditLog(path: string): MemoryAuditLogEntry[] {
