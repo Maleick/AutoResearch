@@ -12,6 +12,11 @@ docs/specs/
 # AutoShip runtime state
 .autoship/
 
+# Root-level AutoShip runtime artifacts
+/started_at
+/status
+/worker.pid
+
 # Autoresearch runtime artifacts
 .autoresearch/
 .autoresearch-test-tmp/
