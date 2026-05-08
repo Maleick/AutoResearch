@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, readdirSync } from "fs";
+import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
 const VERSION_FLAGS = ["--version", "-v"];
@@ -133,6 +133,46 @@ const formatTimestamp = (ts) => {
     }
     catch {
         return ts;
+    }
+};
+const readTailLines = (filePath, limit) => {
+    if (limit <= 0)
+        return [];
+    const fd = openSync(filePath, "r");
+    try {
+        const size = fstatSync(fd).size;
+        if (size === 0)
+            return [];
+        const chunkSize = 64 * 1024;
+        const lines = [];
+        let position = size;
+        let remainder = Buffer.alloc(0);
+        while (position > 0 && lines.length < limit) {
+            const bytesToRead = Math.min(chunkSize, position);
+            position -= bytesToRead;
+            const chunk = Buffer.allocUnsafe(bytesToRead);
+            const bytesRead = readSync(fd, chunk, 0, bytesToRead, position);
+            const data = Buffer.concat([chunk.subarray(0, bytesRead), remainder]);
+            let end = data.length;
+            for (let i = data.length - 1; i >= 0 && lines.length < limit; i -= 1) {
+                if (data[i] === 0x0a) {
+                    const line = data.subarray(i + 1, end).toString("utf-8").trim();
+                    if (line.length > 0)
+                        lines.push(line);
+                    end = i;
+                }
+            }
+            remainder = data.subarray(0, end);
+        }
+        if (lines.length < limit) {
+            const line = remainder.toString("utf-8").trim();
+            if (line.length > 0)
+                lines.push(line);
+        }
+        return lines.reverse();
+    }
+    finally {
+        closeSync(fd);
     }
 };
 const markdownEscapePattern = /([\\`*_{}[\]()#+\-.!|>])/g;
@@ -367,14 +407,12 @@ const main = async () => {
                     console.log("No score history found.");
                     break;
                 }
-                const content = readFileSync(scoreHistoryPath, "utf-8");
-                const lines = content.trim().split("\n").filter(Boolean);
-                if (lines.length === 0) {
+                const limit = parsePositiveInt(grouped.limit, "limit") ?? 10;
+                const records = readTailLines(scoreHistoryPath, limit);
+                if (records.length === 0) {
                     console.log("No score records yet.");
                     break;
                 }
-                const limit = parsePositiveInt(grouped.limit, "limit") ?? 10;
-                const records = lines.slice(-limit);
                 if (useJson) {
                     const parsed = records.map((r) => {
                         try {
@@ -389,19 +427,49 @@ const main = async () => {
                 }
                 console.log("Score History (latest " + Math.min(limit, records.length) + "):");
                 const recordsOrdered = records.slice().reverse();
-                for (const r of recordsOrdered) {
+                const parseMetricNumber = (value) => {
+                    if (typeof value === "number") {
+                        return Number.isFinite(value) ? value : null;
+                    }
+                    if (typeof value === "string") {
+                        const parsed = Number(value);
+                        return Number.isFinite(parsed) ? parsed : null;
+                    }
+                    return null;
+                };
+                for (let i = 0; i < recordsOrdered.length; i += 1) {
+                    const r = recordsOrdered[i];
                     try {
                         const rec = JSON.parse(r);
-                        const trend = rec.metric_direction === "higher"
-                            ? (rec.metric_value && rec.metric_value > 0 ? "↑" : "↓")
-                            : (rec.metric_value && rec.metric_value > 0 ? "↓" : "↑");
+                        let trend = "";
+                        if (i + 1 < recordsOrdered.length) {
+                            try {
+                                const previousRec = JSON.parse(recordsOrdered[i + 1]);
+                                const currentMetricValue = parseMetricNumber(rec.metric_value);
+                                const previousMetricValue = parseMetricNumber(previousRec.metric_value);
+                                if (currentMetricValue !== null && previousMetricValue !== null) {
+                                    if (currentMetricValue === previousMetricValue) {
+                                        trend = "→";
+                                    }
+                                    else if (rec.metric_direction === "higher") {
+                                        trend = currentMetricValue > previousMetricValue ? "↑" : "↓";
+                                    }
+                                    else {
+                                        trend = currentMetricValue < previousMetricValue ? "↑" : "↓";
+                                    }
+                                }
+                            }
+                            catch {
+                                trend = "";
+                            }
+                        }
                         console.log(`  #${rec.iteration}  ${trend}  ${rec.metric_value ?? "—"}  (${rec.decision})  ${rec.verify_status}`);
                     }
                     catch {
                         console.log(`  [parse error]`);
                     }
                 }
-                console.log(`\n${records.length} total score records.`);
+                console.log(`\nShowing ${records.length} score records.`);
                 break;
             }
             case "config": {

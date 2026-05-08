@@ -84,7 +84,7 @@ The score history is stored as JSON Lines (one JSON object per line):
 | `iteration` | number | Iteration number |
 | `run_id` | string | Unique run identifier |
 | `decision` | string | `keep`, `discard`, or `needs_human` |
-| `metric_value` | number\|null | Numeric metric value |
+| `metric_value` | string\|null | Metric value captured from CLI input |
 | `metric_name` | string | Name of tracked metric |
 | `metric_direction` | string | `lower` or `higher` (better direction) |
 | `verify_status` | string | `pass`, `fail`, or `skip` |

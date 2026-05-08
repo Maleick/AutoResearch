@@ -19,10 +19,10 @@ export async function initializeRun(repo, resultsPathValue, statePathValue, conf
     atomicWriteJson(statePath, state);
     return state;
 }
-export async function appendIteration(repo, resultsPathValue, statePathValue, decision, metricValue, verifyStatus, guardStatus, hypothesis, changeSummary, labels, note, iteration) {
+export async function appendIteration(repo, resultsPathValue, statePathValue, decision, metricValue, verifyStatus, guardStatus, hypothesis, changeSummary, labels, note, iteration, scoreHistoryPathValue) {
     const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
     const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
-    const scoreHistoryPath = resolvePath(repo, undefined, SCORE_HISTORY_DEFAULT);
+    const scoreHistoryPath = resolvePath(repo, scoreHistoryPathValue, SCORE_HISTORY_DEFAULT);
     const state = parseRunState(readJsonFile(statePath));
     const currentIteration = iteration ?? state.stats.total_iterations + 1;
     const now = utcNow();

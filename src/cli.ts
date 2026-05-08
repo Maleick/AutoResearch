@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, readdirSync } from "fs";
+import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
 
@@ -140,6 +140,49 @@ const formatTimestamp = (ts: string): string => {
     return d.toLocaleString();
   } catch {
     return ts;
+  }
+};
+
+const readTailLines = (filePath: string, limit: number): string[] => {
+  if (limit <= 0) return [];
+
+  const fd = openSync(filePath, "r");
+  try {
+    const size = fstatSync(fd).size;
+    if (size === 0) return [];
+
+    const chunkSize = 64 * 1024;
+    const lines: string[] = [];
+    let position = size;
+    let remainder = Buffer.alloc(0);
+
+    while (position > 0 && lines.length < limit) {
+      const bytesToRead = Math.min(chunkSize, position);
+      position -= bytesToRead;
+
+      const chunk = Buffer.allocUnsafe(bytesToRead);
+      const bytesRead = readSync(fd, chunk, 0, bytesToRead, position);
+      const data = Buffer.concat([chunk.subarray(0, bytesRead), remainder]);
+
+      let end = data.length;
+      for (let i = data.length - 1; i >= 0 && lines.length < limit; i -= 1) {
+        if (data[i] === 0x0a) {
+          const line = data.subarray(i + 1, end).toString("utf-8").trim();
+          if (line.length > 0) lines.push(line);
+          end = i;
+        }
+      }
+      remainder = data.subarray(0, end);
+    }
+
+    if (lines.length < limit) {
+      const line = remainder.toString("utf-8").trim();
+      if (line.length > 0) lines.push(line);
+    }
+
+    return lines.reverse();
+  } finally {
+    closeSync(fd);
   }
 };
 const markdownEscapePattern = /([\\`*_{}[\]()#+\-.!|>])/g;
@@ -389,14 +432,12 @@ const main = async (): Promise<number> => {
           console.log("No score history found.");
           break;
         }
-        const content = readFileSync(scoreHistoryPath, "utf-8");
-        const lines = content.trim().split("\n").filter(Boolean);
-        if (lines.length === 0) {
+        const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
+        const records = readTailLines(scoreHistoryPath, limit);
+        if (records.length === 0) {
           console.log("No score records yet.");
           break;
         }
-        const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
-        const records = lines.slice(-limit);
         if (useJson) {
           const parsed = records.map((r: string) => {
             try {
@@ -448,7 +489,7 @@ const main = async (): Promise<number> => {
             console.log(`  [parse error]`);
           }
         }
-        console.log(`\n${lines.length} total score records.`);
+        console.log(`\nShowing ${records.length} score records.`);
         break;
       }
       case "config": {
