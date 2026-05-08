@@ -4,6 +4,7 @@ import { resolve } from "path";
 import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
 const VERSION_FLAGS = ["--version", "-v"];
 const HELP_FLAGS = ["--help", "-h", "help"];
+const BRANCH_POLICIES = ["best", "roulette", "diverse"];
 const usage = () => {
     console.error("Usage: autoresearch <command> [options]");
     console.error("");
@@ -27,14 +28,22 @@ const usage = () => {
     console.error("Options:");
     console.error("  --repo          Repository root (default: current directory)");
     console.error("  --goal          Desired run outcome");
-    console.error("  --metric        Metric name to track");
-    console.error("  --direction     lower or higher");
+    console.error("  --metric        Metric name to track (default outcome metric)");
+    console.error("  --direction     lower or higher (for outcome metric)");
+    console.error("  --outcome-metric    Primary metric for keep decisions");
+    console.error("  --outcome-direction Direction for outcome metric");
+    console.error("  --instrument-metric Measurement quality/risk metric (surfaced separately)");
+    console.error("  --instrument-direction Direction for instrument metric");
+    console.error("  --instrument-value  Recorded value for the instrument metric");
     console.error("  --verify        Mechanical verification command");
     console.error("  --guard         Guard command for regression catch");
     console.error("  --mode          foreground or background");
     console.error("  --scope         In-scope files or subsystem");
     console.error("  --iterations    Iteration cap");
+    console.error("  --max-no-progress  Max consecutive discards before stop");
     console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
+    console.error("  --num-drafts    Number of parallel drafts (default: 1)");
+    console.error("  --branch-policy Branch selection policy: best, roulette, diverse");
     console.error("  --json          Output raw JSON (default: human-readable)");
     console.error("  --results-path  Custom results TSV path");
     console.error("  --state-path    Custom state JSON path");
@@ -70,6 +79,8 @@ const parseArgs = (args) => {
                 r: "repo", g: "goal", m: "metric", d: "direction",
                 v: "verify", n: "guard", o: "mode", s: "scope",
                 i: "iterations", t: "duration",
+                f: "num-drafts", b: "branch-policy",
+                p: "max-no-progress",
             };
             const key = shortToLong[args[i][1]] ?? args[i].slice(1);
             if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
@@ -148,6 +159,13 @@ const sanitizeMarkdownText = (value) => {
 const formatMarkdownField = (value) => {
     return sanitizeMarkdownText(value).replace(markdownEscapePattern, "\\$1");
 };
+const normalizeBranchPolicy = (value) => {
+    if (value == null || value === "")
+        return "best";
+    if (BRANCH_POLICIES.includes(value))
+        return value;
+    throw new Error(`Invalid branch policy: ${value}. Expected one of: ${BRANCH_POLICIES.join(", ")}`);
+};
 const main = async () => {
     const args = process.argv.slice(2);
     // Handle standalone flags
@@ -193,6 +211,7 @@ const main = async () => {
                     guard: grouped.guard,
                     mode: grouped.mode,
                     iterations: parsePositiveInt(grouped.iterations, "iterations"),
+                    max_no_progress: parsePositiveInt(grouped["max-no-progress"], "max-no-progress"),
                     duration: grouped.duration,
                     memory_path: grouped["memory-path"],
                     required_keep_labels: grouped["required-keep-labels"],
@@ -219,13 +238,14 @@ const main = async () => {
                 const { initializeRun } = await import("./run-manager.js");
                 const config = {
                     goal: grouped.goal,
-                    metric: grouped.metric,
-                    direction: grouped.direction || "lower",
+                    metric: (grouped.metric || grouped["outcome-metric"]),
+                    direction: (grouped.direction || grouped["outcome-direction"]) || "lower",
                     verify: grouped.verify,
                     mode: grouped.mode || "foreground",
                     scope: grouped.scope,
                     guard: grouped.guard,
                     iterations: parsePositiveInt(grouped.iterations, "iterations"),
+                    max_no_progress: parsePositiveInt(grouped["max-no-progress"], "max-no-progress"),
                     duration: grouped.duration,
                     memory_path: grouped["memory-path"],
                     required_keep_labels: grouped["required-keep-labels"],
@@ -233,6 +253,12 @@ const main = async () => {
                     run_tag: grouped["run-tag"],
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
+                    num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts") ?? 1,
+                    branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"]),
+                    outcome_metric: grouped["outcome-metric"],
+                    outcome_direction: grouped["outcome-direction"],
+                    instrument_metric: grouped["instrument-metric"],
+                    instrument_direction: grouped["instrument-direction"],
                 };
                 const state = await initializeRun(grouped.repo, grouped["results-path"], grouped["state-path"], config, grouped["fresh-start"] === "true");
                 printJson(state);
@@ -250,6 +276,7 @@ const main = async () => {
                     console.log(`Run:     ${formatDisplayValue(s.run_id)}`);
                     console.log(`Status:  ${formatDisplayValue(s.status)}`);
                     console.log(`Mode:    ${formatDisplayValue(s.mode)}`);
+                    console.log(`Op Mode: ${formatDisplayValue(s.operating_mode)}`);
                     console.log(`Goal:    ${formatDisplayValue(s.goal)}`);
                     if (s.metric) {
                         const m = s.metric;
@@ -296,6 +323,7 @@ const main = async () => {
                 console.log(`   Goal:      ${formatDisplayValue(s.goal)}`);
                 console.log(`   Status:    ${formatDisplayValue(s.status)}`);
                 console.log(`   Mode:      ${formatDisplayValue(s.mode)}`);
+                console.log(`   Op Mode:   ${formatDisplayValue(s.operating_mode)}`);
                 if (s.metric) {
                     const m = s.metric;
                     console.log(`   Metric:    ${formatDisplayValue(m.name)} → ${formatMetricValue(m.latest)} (best: ${formatMetricValue(m.best)}, dir: ${formatDisplayValue(m.direction)})`);
@@ -382,6 +410,7 @@ const main = async () => {
                 console.log("Run Configuration:");
                 console.log(`  Goal:     ${formatDisplayValue(state.goal)}`);
                 console.log(`  Mode:     ${formatDisplayValue(state.mode)}`);
+                console.log(`  Op Mode:  ${formatDisplayValue(state.operating_mode)}`);
                 if (state.metric) {
                     const m = state.metric;
                     console.log(`  Metric:   ${formatDisplayValue(m.name)} (${formatDisplayValue(m.direction)})`);
@@ -445,8 +474,8 @@ const main = async () => {
                 const errors = [];
                 if (!grouped.goal)
                     errors.push("Missing required: --goal");
-                if (!grouped.metric)
-                    errors.push("Missing required: --metric");
+                if (!grouped.metric && !grouped["outcome-metric"])
+                    errors.push("Missing required: --metric or --outcome-metric");
                 try {
                     if (grouped.direction)
                         normalizeDirection(grouped.direction);
@@ -470,7 +499,7 @@ const main = async () => {
                 if (errors.length === 0) {
                     console.log("✓ Configuration is valid");
                     console.log(`  Goal: ${grouped.goal}`);
-                    console.log(`  Metric: ${grouped.metric} (${grouped.direction || "lower"})`);
+                    console.log(`  Metric: ${grouped.metric || grouped["outcome-metric"]} (${grouped.direction || grouped["outcome-direction"] || "lower"})`);
                     console.log(`  Verify: ${grouped.verify}`);
                     console.log(`  Mode: ${grouped.mode || "foreground"}`);
                 }
@@ -507,6 +536,7 @@ const main = async () => {
                 console.log(`**Goal:** ${formatMarkdownField(state.goal)}`);
                 console.log(`**Status:** ${formatMarkdownField(state.status)}`);
                 console.log(`**Mode:** ${formatMarkdownField(state.mode)}`);
+                console.log(`**Op Mode:** ${formatMarkdownField(state.operating_mode)}`);
                 if (state.metric) {
                     const m = state.metric;
                     console.log(`**Metric:** ${formatMarkdownField(m.name)} (${formatMarkdownField(m.direction)})`);
@@ -612,7 +642,7 @@ const main = async () => {
             case "completion": {
                 const shell = grouped.shell || "bash";
                 const commands = ["init", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
-                const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
+                const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
                 if (shell === "bash" || shell === "zsh") {
                     console.log(`# Auto Research CLI completion for ${shell}`);
                     console.log(`_autoresearch() {`);
@@ -647,13 +677,14 @@ const main = async () => {
                 const { LAUNCH_DEFAULT } = await import("./constants.js");
                 const config = {
                     goal: grouped.goal,
-                    metric: grouped.metric,
-                    direction: grouped.direction || "lower",
+                    metric: (grouped.metric || grouped["outcome-metric"]),
+                    direction: (grouped.direction || grouped["outcome-direction"]) || "lower",
                     verify: grouped.verify,
                     mode: "background",
                     scope: grouped.scope,
                     guard: grouped.guard,
                     iterations: parsePositiveInt(grouped.iterations, "iterations"),
+                    max_no_progress: parsePositiveInt(grouped["max-no-progress"], "max-no-progress"),
                     duration: grouped.duration,
                     memory_path: grouped["memory-path"],
                     required_keep_labels: grouped["required-keep-labels"],
@@ -661,6 +692,12 @@ const main = async () => {
                     run_tag: grouped["run-tag"],
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
+                    num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts") ?? 1,
+                    branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"]),
+                    outcome_metric: grouped["outcome-metric"],
+                    outcome_direction: grouped["outcome-direction"],
+                    instrument_metric: grouped["instrument-metric"],
+                    instrument_direction: grouped["instrument-direction"],
                 };
                 const launchPath = resolvePath(grouped.repo, grouped["launch-path"], LAUNCH_DEFAULT);
                 if (dryRun) {
@@ -715,6 +752,7 @@ const main = async () => {
                     console.log(JSON.stringify({
                         decision: grouped.decision,
                         metric_value: grouped["metric-value"],
+                        instrument_value: grouped["instrument-value"],
                         verify_status: normalizeResultStatus(vs, "verify_status"),
                         guard_status: normalizeResultStatus(gs, "guard_status"),
                         hypothesis: grouped.hypothesis,
@@ -726,7 +764,7 @@ const main = async () => {
                     return 0;
                 }
                 const { appendIteration } = await import("./run-manager.js");
-                const state = await appendIteration(grouped.repo, grouped["results-path"], grouped["state-path"], grouped.decision, grouped["metric-value"], normalizeResultStatus(vs, "verify_status"), normalizeResultStatus(gs, "guard_status"), grouped.hypothesis, grouped["change-summary"], grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined, grouped.note, iteration);
+                const state = await appendIteration(grouped.repo, grouped["results-path"], grouped["state-path"], grouped.decision, grouped["metric-value"], grouped["instrument-value"], normalizeResultStatus(vs, "verify_status"), normalizeResultStatus(gs, "guard_status"), grouped.hypothesis, grouped["change-summary"], grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined, grouped.note, iteration);
                 printJson(state);
                 break;
             }

@@ -1,6 +1,6 @@
 import { writeFileSync, mkdirSync, readFileSync, renameSync, unlinkSync, existsSync } from "fs";
 import { resolve, dirname, join } from "path";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { PACKAGE_NAME } from "./constants.js";
 export { PACKAGE_NAME };
 export class AutoresearchError extends Error {
@@ -81,6 +81,15 @@ export function normalizeMode(value) {
     const normalized = value.trim().toLowerCase();
     if (normalized !== "foreground" && normalized !== "background") {
         throw new AutoresearchError("Unsupported mode: " + value);
+    }
+    return normalized;
+}
+export function normalizeOperatingMode(value) {
+    if (!value)
+        return "continuous";
+    const normalized = value.trim().toLowerCase();
+    if (normalized !== "converge" && normalized !== "continuous" && normalized !== "supervised") {
+        throw new AutoresearchError("Unsupported operating mode: " + value + ". Valid: converge, continuous, supervised");
     }
     return normalized;
 }
@@ -206,6 +215,11 @@ export function parseRunState(value) {
             throw new AutoresearchError(`Invalid state: missing required field "${key}"`);
         }
     }
+    const rawOperatingMode = "operating_mode" in obj ? obj.operating_mode : undefined;
+    if (rawOperatingMode !== undefined && rawOperatingMode !== null && typeof rawOperatingMode !== "string") {
+        throw new AutoresearchError("Invalid state: operating_mode must be a string");
+    }
+    const operating_mode = normalizeOperatingMode(rawOperatingMode);
     if (typeof obj.metric !== "object" || obj.metric === null) {
         throw new AutoresearchError("Invalid state: metric must be an object");
     }
@@ -227,7 +241,10 @@ export function parseRunState(value) {
     if (typeof flags.stop_requested !== "boolean" || typeof flags.needs_human !== "boolean" || typeof flags.background_active !== "boolean" || typeof flags.stop_ready !== "boolean") {
         throw new AutoresearchError("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
     }
-    return obj;
+    return {
+        ...obj,
+        operating_mode,
+    };
 }
 export function getUpdateCachePath() {
     const home = process.env.HOME || process.env.USERPROFILE || "";
@@ -246,9 +263,20 @@ export function readUpdateCache() {
         return null;
     }
 }
+function getBundledNpmCliPath() {
+    const nodeDir = dirname(process.execPath);
+    const candidates = [
+        join(nodeDir, "node_modules", "npm", "bin", "npm-cli.js"),
+        join(dirname(nodeDir), "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    ];
+    return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
 export function getGlobalNpmPrefix() {
     try {
-        return execSync("npm prefix -g", { encoding: "utf-8", timeout: 5000 }).trim();
+        const npmCliPath = getBundledNpmCliPath();
+        if (!npmCliPath)
+            return null;
+        return execFileSync(process.execPath, [npmCliPath, "prefix", "-g"], { encoding: "utf-8", timeout: 5000 }).trim();
     }
     catch {
         return null;
