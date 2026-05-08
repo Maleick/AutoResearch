@@ -206,9 +206,11 @@ describe("CLI Commands", () => {
           chmodSync(fakeNpmPath, 0o755);
         }
 
+        const pathSeparator = process.platform === "win32" ? ";" : ":";
+        const existingPath = process.env.PATH;
         const env = {
           ...process.env,
-          PATH: `${tmpDir}${process.platform === "win32" ? ";" : ":"}${process.env.PATH || ""}`,
+          PATH: existingPath ? `${tmpDir}${pathSeparator}${existingPath}` : tmpDir,
         };
         const out = execFileSync(process.execPath, [CLI, "doctor", "--json"], { encoding: "utf-8", cwd: tmpDir, env });
         const json = JSON.parse(out);
