@@ -96,6 +96,18 @@ describe("buildDraftPoolPlan", () => {
     expect(pool.num_drafts).toBe(1);
     expect(pool.active_drafts.length).toBe(1);
   });
+
+  it("rejects unsafe draft counts", () => {
+    expect(() => mod.buildDraftPoolPlan({
+      num_drafts: 65,
+      branch_selection_policy: "best",
+    })).toThrow("Invalid num_drafts: 65");
+
+    expect(() => mod.buildDraftPoolPlan({
+      num_drafts: Number.POSITIVE_INFINITY,
+      branch_selection_policy: "best",
+    })).toThrow("Invalid num_drafts: Infinity");
+  });
 });
 
 describe("selectNextBranch", () => {

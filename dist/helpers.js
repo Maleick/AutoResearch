@@ -102,12 +102,16 @@ export function normalizeResultStatus(value, fieldName) {
     }
     return normalized;
 }
-export function parsePositiveInt(value, fieldName) {
+export function parsePositiveInt(value, fieldName, options = {}) {
     if (!value)
         return undefined;
-    const n = parseInt(value, 10);
-    if (isNaN(n) || n <= 0) {
+    const normalized = value.trim();
+    const n = Number(normalized);
+    if (!/^\d+$/.test(normalized) || !Number.isSafeInteger(n) || n <= 0) {
         throw new AutoresearchError(`Invalid ${fieldName}: ${value} (must be a positive integer)`);
+    }
+    if (options.max !== undefined && n > options.max) {
+        throw new AutoresearchError(`Invalid ${fieldName}: ${value} (must be at most ${options.max})`);
     }
     return n;
 }

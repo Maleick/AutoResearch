@@ -1,3 +1,5 @@
+import { MAX_DRAFTS } from "./constants.js";
+import { AutoresearchError } from "./helpers.js";
 const ROLE_LIMIT = 6;
 let poolKeyCounter = 0;
 let branchIdCounter = 0;
@@ -114,6 +116,9 @@ function selectFallbackBranch(pendingBranchId, completedDrafts, activeDrafts) {
 }
 export function buildDraftPoolPlan(input) {
     const { num_drafts, branch_selection_policy, baseline_iteration } = input;
+    if (!Number.isSafeInteger(num_drafts) || num_drafts <= 0 || num_drafts > MAX_DRAFTS) {
+        throw new AutoresearchError(`Invalid num_drafts: ${num_drafts} (must be a positive integer at most ${MAX_DRAFTS})`);
+    }
     const activeDrafts = [];
     for (let i = 0; i < num_drafts; i++) {
         activeDrafts.push({

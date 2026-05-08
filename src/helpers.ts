@@ -109,11 +109,19 @@ export function normalizeResultStatus(value: string | undefined | null, fieldNam
   return normalized;
 }
 
-export function parsePositiveInt(value: string | undefined | null, fieldName: string): number | undefined {
+export interface PositiveIntOptions {
+  max?: number;
+}
+
+export function parsePositiveInt(value: string | undefined | null, fieldName: string, options: PositiveIntOptions = {}): number | undefined {
   if (!value) return undefined;
-  const n = parseInt(value, 10);
-  if (isNaN(n) || n <= 0) {
+  const normalized = value.trim();
+  const n = Number(normalized);
+  if (!/^\d+$/.test(normalized) || !Number.isSafeInteger(n) || n <= 0) {
     throw new AutoresearchError(`Invalid ${fieldName}: ${value} (must be a positive integer)`);
+  }
+  if (options.max !== undefined && n > options.max) {
+    throw new AutoresearchError(`Invalid ${fieldName}: ${value} (must be at most ${options.max})`);
   }
   return n;
 }

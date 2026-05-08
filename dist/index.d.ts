@@ -25,4 +25,6 @@ export { taskContextFromHermesPayload, hermesPayloadFromTaskContext, taskContext
 export type { TaskSource, TaskContext, TaskMetric, TaskConstraints, TaskIterationPolicy, TaskResult, } from "./task-schema.js";
 export type { HermesTaskPayload, } from "./translators/hermes.js";
 export type { RunConfig, WizardConfig, Metric, RunStats, RunFlags, LastIteration, RunState, SupervisorSnapshot, LabelRequirements, ArtifactPaths, MemoryProvenance, MemoryItem, PendingMemoryItem, MemoryConsolidationState, MemoryAuditLogEntry, } from "./types.js";
+export { parseScoreOutput, } from "./score-parser.js";
+export type { ScoreOutput, } from "./score-parser.js";
 //# sourceMappingURL=index.d.ts.map

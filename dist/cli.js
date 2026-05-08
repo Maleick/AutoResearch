@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
+import { MAX_DRAFTS } from "./constants.js";
 import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
 const VERSION_FLAGS = ["--version", "-v"];
 const HELP_FLAGS = ["--help", "-h", "help"];
@@ -42,7 +43,7 @@ const usage = () => {
     console.error("  --iterations    Iteration cap");
     console.error("  --max-no-progress  Max consecutive discards before stop");
     console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
-    console.error("  --num-drafts    Number of parallel drafts (default: 1)");
+    console.error(`  --num-drafts    Number of parallel drafts (default: 1, max: ${MAX_DRAFTS})`);
     console.error("  --branch-policy Branch selection policy: best, roulette, diverse");
     console.error("  --json          Output raw JSON (default: human-readable)");
     console.error("  --results-path  Custom results TSV path");
@@ -253,7 +254,7 @@ const main = async () => {
                     run_tag: grouped["run-tag"],
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
-                    num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts") ?? 1,
+                    num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts", { max: MAX_DRAFTS }) ?? 1,
                     branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"]),
                     outcome_metric: grouped["outcome-metric"],
                     outcome_direction: grouped["outcome-direction"],
@@ -692,7 +693,7 @@ const main = async () => {
                     run_tag: grouped["run-tag"],
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
-                    num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts") ?? 1,
+                    num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts", { max: MAX_DRAFTS }) ?? 1,
                     branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"]),
                     outcome_metric: grouped["outcome-metric"],
                     outcome_direction: grouped["outcome-direction"],

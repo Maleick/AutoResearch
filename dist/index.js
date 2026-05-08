@@ -54,4 +54,5 @@ export { VERSION, PACKAGE_NAME, PRODUCT_BRAND, SKILL_NAME, } from "./constants.j
 export { createTaskContext, validateTaskContext, } from "./task-schema.js";
 export { taskContextFromRunConfig, runConfigFromTaskContext, } from "./translators/cli.js";
 export { taskContextFromHermesPayload, hermesPayloadFromTaskContext, taskContextFromRunState, } from "./translators/hermes.js";
+export { parseScoreOutput, } from "./score-parser.js";
 //# sourceMappingURL=index.js.map

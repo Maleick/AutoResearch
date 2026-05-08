@@ -545,6 +545,14 @@ describe("parsePositiveInt", () => {
   it("throws on negative", () => {
     expect(() => mod.parsePositiveInt("-5", "field")).toThrow("Invalid field: -5");
   });
+
+  it("throws on non-finite integer input", () => {
+    expect(() => mod.parsePositiveInt("9".repeat(400), "field")).toThrow("Invalid field:");
+  });
+
+  it("throws when value exceeds configured maximum", () => {
+    expect(() => mod.parsePositiveInt("65", "field", { max: 64 })).toThrow("must be at most 64");
+  });
 });
 
 describe("parseRunState", () => {
