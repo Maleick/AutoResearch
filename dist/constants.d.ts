@@ -6,4 +6,7 @@ export declare const RESULTS_DEFAULT = "autoresearch-results.tsv";
 export declare const STATE_DEFAULT = ".autoresearch/state.json";
 export declare const LAUNCH_DEFAULT = ".autoresearch/launch.json";
 export declare const MEMORY_DEFAULT = "autoresearch-memory.md";
+export declare const MEMORY_AUDIT_DEFAULT = ".autoresearch/memory-audit.log";
+export declare const MEMORY_CONSOLIDATION_THRESHOLD = 3;
+export declare const MEMORY_EXPIRY_DAYS = 30;
 //# sourceMappingURL=constants.d.ts.map
