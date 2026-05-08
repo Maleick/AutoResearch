@@ -10,10 +10,18 @@ export function taskContextFromRunConfig(
   config: RunConfig
 ): TaskContext {
   const metric: TaskMetric = {
-    name: config.metric,
-    direction: config.direction as "lower" | "higher",
+    name: config.outcome_metric ?? config.metric,
+    direction: (config.outcome_direction ?? config.direction) as "lower" | "higher",
     baseline: config.baseline,
   };
+
+  const instrumentMetric: TaskMetric | undefined = config.instrument_metric
+    ? {
+        name: config.instrument_metric,
+        direction: (config.instrument_direction ?? config.direction) as "lower" | "higher",
+        baseline: config.baseline,
+      }
+    : undefined;
 
   const policy: TaskIterationPolicy = {
     mode: config.mode as "foreground" | "background",
@@ -26,6 +34,7 @@ export function taskContextFromRunConfig(
     goal: config.goal,
     scope: config.scope,
     metric,
+    instrument_metric: instrumentMetric,
     verify_command: config.verify,
     guard_command: config.guard,
     constraints: {
@@ -57,6 +66,10 @@ export function runConfigFromTaskContext(context: TaskContext): RunConfig {
     stop_condition: context.iteration_policy?.stop_condition,
     run_tag: (context.metadata?.run_tag as string) ?? undefined,
     baseline: context.metric.baseline,
+    outcome_metric: context.metric.name,
+    outcome_direction: context.metric.direction,
+    instrument_metric: context.instrument_metric?.name,
+    instrument_direction: context.instrument_metric?.direction,
   };
 }
 

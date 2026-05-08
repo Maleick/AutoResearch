@@ -689,6 +689,18 @@ describe("CLI Commands", () => {
       expect(state.guard).toBe("npm run lint");
       expect(state.iterations_cap).toBe(50);
     });
+
+    it("fails on invalid branch policy", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy", "nope", "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow("Invalid branch policy: nope. Expected one of: best, roulette, diverse");
+    });
+
+    it("accepts valid branch policy values", () => {
+      execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy", "roulette", "--num-drafts", "2", "--repo", tmpDir], { encoding: "utf-8" });
+      const state = JSON.parse(readFileSync(tmpState, "utf-8"));
+      expect(state.draft_pool.branch_selection_policy).toBe("roulette");
+    });
   });
 
   describe("validate command", () => {

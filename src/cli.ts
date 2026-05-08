@@ -6,6 +6,8 @@ import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTer
 
 const VERSION_FLAGS = ["--version", "-v"];
 const HELP_FLAGS = ["--help", "-h", "help"];
+const BRANCH_POLICIES = ["best", "roulette", "diverse"] as const;
+type BranchPolicy = typeof BRANCH_POLICIES[number];
 
 const usage = (): void => {
   console.error("Usage: autoresearch <command> [options]");
@@ -31,8 +33,13 @@ const usage = (): void => {
   console.error("Options:");
   console.error("  --repo          Repository root (default: current directory)");
   console.error("  --goal          Desired run outcome");
-  console.error("  --metric        Metric name to track");
-  console.error("  --direction     lower or higher");
+  console.error("  --metric        Metric name to track (default outcome metric)");
+  console.error("  --direction     lower or higher (for outcome metric)");
+  console.error("  --outcome-metric    Primary metric for keep decisions");
+  console.error("  --outcome-direction Direction for outcome metric");
+  console.error("  --instrument-metric Measurement quality/risk metric (surfaced separately)");
+  console.error("  --instrument-direction Direction for instrument metric");
+  console.error("  --instrument-value  Recorded value for the instrument metric");
   console.error("  --verify        Mechanical verification command");
   console.error("  --guard         Guard command for regression catch");
   console.error("  --mode          foreground or background");
@@ -40,6 +47,8 @@ const usage = (): void => {
   console.error("  --iterations    Iteration cap");
   console.error("  --max-no-progress  Max consecutive discards before stop");
   console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
+  console.error("  --num-drafts    Number of parallel drafts (default: 1)");
+  console.error("  --branch-policy Branch selection policy: best, roulette, diverse");
   console.error("  --json          Output raw JSON (default: human-readable)");
   console.error("  --results-path  Custom results TSV path");
   console.error("  --state-path    Custom state JSON path");
@@ -73,7 +82,9 @@ const parseArgs = (args: string[]): Record<string, string> => {
       const shortToLong: Record<string, string> = {
         r: "repo", g: "goal", m: "metric", d: "direction",
         v: "verify", n: "guard", o: "mode", s: "scope",
-        i: "iterations", t: "duration", p: "max-no-progress",
+        i: "iterations", t: "duration",
+        f: "num-drafts", b: "branch-policy",
+        p: "max-no-progress",
       };
       const key = shortToLong[args[i][1]] ?? args[i].slice(1);
       if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
@@ -203,6 +214,12 @@ const formatMarkdownField = (value: unknown): string => {
 };
 
 
+const normalizeBranchPolicy = (value: string | undefined): BranchPolicy => {
+  if (value == null || value === "") return "best";
+  if ((BRANCH_POLICIES as readonly string[]).includes(value)) return value as BranchPolicy;
+  throw new Error(`Invalid branch policy: ${value}. Expected one of: ${BRANCH_POLICIES.join(", ")}`);
+};
+
 const main = async (): Promise<number> => {
   const args = process.argv.slice(2);
 
@@ -278,8 +295,8 @@ const main = async (): Promise<number> => {
         const { initializeRun } = await import("./run-manager.js");
         const config = {
           goal: grouped.goal as string,
-          metric: grouped.metric as string,
-          direction: grouped.direction as string || "lower",
+          metric: (grouped.metric || grouped["outcome-metric"]) as string,
+          direction: (grouped.direction || grouped["outcome-direction"]) as string || "lower",
           verify: grouped.verify as string,
           mode: grouped.mode as string || "foreground",
           scope: grouped.scope as string | undefined,
@@ -293,6 +310,12 @@ const main = async (): Promise<number> => {
           run_tag: grouped["run-tag"] as string | undefined,
           stop_condition: grouped["stop-condition"] as string | undefined,
           baseline: grouped.baseline as string | undefined,
+          num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts") ?? 1,
+          branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
+          outcome_metric: grouped["outcome-metric"] as string | undefined,
+          outcome_direction: grouped["outcome-direction"] as string | undefined,
+          instrument_metric: grouped["instrument-metric"] as string | undefined,
+          instrument_direction: grouped["instrument-direction"] as string | undefined,
         };
         const state = await initializeRun(
           grouped.repo as string | undefined,
@@ -319,6 +342,7 @@ const main = async (): Promise<number> => {
           console.log(`Run:     ${formatDisplayValue(s.run_id)}`);
           console.log(`Status:  ${formatDisplayValue(s.status)}`);
           console.log(`Mode:    ${formatDisplayValue(s.mode)}`);
+          console.log(`Op Mode: ${formatDisplayValue(s.operating_mode)}`);
           console.log(`Goal:    ${formatDisplayValue(s.goal)}`);
           if (s.metric) {
             const m = s.metric;
@@ -369,6 +393,7 @@ const main = async (): Promise<number> => {
         console.log(`   Goal:      ${formatDisplayValue(s.goal)}`);
         console.log(`   Status:    ${formatDisplayValue(s.status)}`);
         console.log(`   Mode:      ${formatDisplayValue(s.mode)}`);
+        console.log(`   Op Mode:   ${formatDisplayValue(s.operating_mode)}`);
         if (s.metric) {
           const m = s.metric;
           console.log(`   Metric:    ${formatDisplayValue(m.name)} → ${formatMetricValue(m.latest)} (best: ${formatMetricValue(m.best)}, dir: ${formatDisplayValue(m.direction)})`);
@@ -519,6 +544,7 @@ const main = async (): Promise<number> => {
         console.log("Run Configuration:");
         console.log(`  Goal:     ${formatDisplayValue(state.goal)}`);
         console.log(`  Mode:     ${formatDisplayValue(state.mode)}`);
+        console.log(`  Op Mode:  ${formatDisplayValue(state.operating_mode)}`);
         if (state.metric) {
           const m = state.metric;
           console.log(`  Metric:   ${formatDisplayValue(m.name)} (${formatDisplayValue(m.direction)})`);
@@ -580,7 +606,7 @@ const main = async (): Promise<number> => {
         const errors: string[] = [];
         
         if (!grouped.goal) errors.push("Missing required: --goal");
-        if (!grouped.metric) errors.push("Missing required: --metric");
+        if (!grouped.metric && !grouped["outcome-metric"]) errors.push("Missing required: --metric or --outcome-metric");
         
         try {
           if (grouped.direction) normalizeDirection(grouped.direction as string);
@@ -604,7 +630,7 @@ const main = async (): Promise<number> => {
         if (errors.length === 0) {
           console.log("✓ Configuration is valid");
           console.log(`  Goal: ${grouped.goal}`);
-          console.log(`  Metric: ${grouped.metric} (${grouped.direction || "lower"})`);
+          console.log(`  Metric: ${grouped.metric || grouped["outcome-metric"]} (${grouped.direction || grouped["outcome-direction"] || "lower"})`);
           console.log(`  Verify: ${grouped.verify}`);
           console.log(`  Mode: ${grouped.mode || "foreground"}`);
         } else {
@@ -644,6 +670,7 @@ const main = async (): Promise<number> => {
         console.log(`**Goal:** ${formatMarkdownField(state.goal)}`);
         console.log(`**Status:** ${formatMarkdownField(state.status)}`);
         console.log(`**Mode:** ${formatMarkdownField(state.mode)}`);
+        console.log(`**Op Mode:** ${formatMarkdownField(state.operating_mode)}`);
         if (state.metric) {
           const m = state.metric;
           console.log(`**Metric:** ${formatMarkdownField(m.name)} (${formatMarkdownField(m.direction)})`);
@@ -751,7 +778,7 @@ const main = async (): Promise<number> => {
       case "completion": {
         const shell = grouped.shell as string || "bash";
         const commands = ["init", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
-        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
+        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
         
         if (shell === "bash" || shell === "zsh") {
           console.log(`# Auto Research CLI completion for ${shell}`);
@@ -785,8 +812,8 @@ const main = async (): Promise<number> => {
         const { LAUNCH_DEFAULT } = await import("./constants.js");
         const config = {
           goal: grouped.goal as string,
-          metric: grouped.metric as string,
-          direction: grouped.direction as string || "lower",
+          metric: (grouped.metric || grouped["outcome-metric"]) as string,
+          direction: (grouped.direction || grouped["outcome-direction"]) as string || "lower",
           verify: grouped.verify as string,
           mode: "background",
           scope: grouped.scope as string | undefined,
@@ -800,6 +827,12 @@ const main = async (): Promise<number> => {
           run_tag: grouped["run-tag"] as string | undefined,
           stop_condition: grouped["stop-condition"] as string | undefined,
           baseline: grouped.baseline as string | undefined,
+          num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts") ?? 1,
+          branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
+          outcome_metric: grouped["outcome-metric"] as string | undefined,
+          outcome_direction: grouped["outcome-direction"] as string | undefined,
+          instrument_metric: grouped["instrument-metric"] as string | undefined,
+          instrument_direction: grouped["instrument-direction"] as string | undefined,
         };
         const launchPath = resolvePath(grouped.repo as string | undefined, grouped["launch-path"] as string | undefined, LAUNCH_DEFAULT);
         if (dryRun) {
@@ -860,6 +893,7 @@ const main = async (): Promise<number> => {
           console.log(JSON.stringify({
             decision: grouped.decision,
             metric_value: grouped["metric-value"],
+            instrument_value: grouped["instrument-value"],
             verify_status: normalizeResultStatus(vs, "verify_status"),
             guard_status: normalizeResultStatus(gs, "guard_status"),
             hypothesis: grouped.hypothesis,
@@ -877,6 +911,7 @@ const main = async (): Promise<number> => {
           grouped["state-path"] as string | undefined,
           grouped.decision as string,
           grouped["metric-value"] as string | undefined,
+          grouped["instrument-value"] as string | undefined,
           normalizeResultStatus(vs, "verify_status"),
           normalizeResultStatus(gs, "guard_status"),
           grouped.hypothesis as string | undefined,
