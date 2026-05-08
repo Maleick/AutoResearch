@@ -161,19 +161,26 @@ export function buildDraftPoolPlan(input: DraftPoolConfigInput): Record<string, 
 export function selectNextBranch(
   activeDrafts: Array<{ branch_id: string; iteration: number; metric_value?: string; status: string }>,
   policy: "best" | "roulette" | "diverse",
-  direction: string,
+  direction: "lower" | "higher",
 ): string | undefined {
   const completedDrafts = activeDrafts.filter(d => d.status === "completed" && d.metric_value != null);
   if (completedDrafts.length === 0) {
     return activeDrafts.find(d => d.status === "pending")?.branch_id;
   }
 
+  const sortDirection =
+    direction === "lower" || direction === "higher"
+      ? direction
+      : (() => {
+          throw new Error(`Invalid branch selection direction: ${String(direction)}`);
+        })();
+
   switch (policy) {
     case "best": {
       const sorted = [...completedDrafts].sort((a, b) => {
         const aVal = parseFloat(a.metric_value ?? "0");
         const bVal = parseFloat(b.metric_value ?? "0");
-        return direction === "lower" ? aVal - bVal : bVal - aVal;
+        return sortDirection === "lower" ? aVal - bVal : bVal - aVal;
       });
       return sorted[0]?.branch_id;
     }
