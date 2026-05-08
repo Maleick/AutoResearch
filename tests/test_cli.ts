@@ -509,7 +509,7 @@ describe("CLI Commands", () => {
     it("fails on invalid branch policy", () => {
       expect(() => {
         execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy", "nope", "--repo", tmpDir], { encoding: "utf-8" });
-      }).toThrow("Invalid branch policy");
+      }).toThrow("Invalid branch policy: nope. Expected one of: best, roulette, diverse");
     });
   });
 
