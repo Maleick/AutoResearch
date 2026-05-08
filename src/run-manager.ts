@@ -59,9 +59,11 @@ export async function appendIteration(
   labels: string[] | undefined,
   note: string | undefined,
   iteration: number | undefined,
+  scoreHistoryPathValue?: string,
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
+  const scoreHistoryPath = resolvePath(repo, scoreHistoryPathValue, SCORE_HISTORY_DEFAULT);
   const state = parseRunState(readJsonFile(statePath));
 
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
@@ -92,6 +94,20 @@ export async function appendIteration(
   ].join("\t") + "\n";
 
   appendFileSync(resultsPath, resultRow, "utf-8");
+
+  const scoreRecord = {
+    timestamp: now,
+    iteration: currentIteration,
+    run_id: state.run_id,
+    decision,
+    metric_value: metricValue ?? null,
+    metric_name: state.metric.name,
+    metric_direction: state.metric.direction,
+    verify_status: verifyStatus,
+    guard_status: guardStatus,
+  };
+  ensureParent(scoreHistoryPath);
+  appendFileSync(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "utf-8");
 
   const newState: RunState = {
     ...state,

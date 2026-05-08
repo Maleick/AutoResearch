@@ -728,6 +728,41 @@ describe("CLI Commands", () => {
     });
   });
 
+  describe("scores command", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-scores");
+    const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+
+    beforeEach(() => {
+      mkdirSync(resolve(tmpDir, ".autoresearch"), { recursive: true });
+      writeFileSync(scoreHistoryPath, [
+        "{\"timestamp\":\"2026-05-08T10:00:00Z\",\"iteration\":1,\"run_id\":\"run-1\",\"decision\":\"keep\",\"metric_value\":\"10\",\"metric_name\":\"errors\",\"metric_direction\":\"lower\",\"verify_status\":\"pass\",\"guard_status\":\"pass\"}",
+        "{\"timestamp\":\"2026-05-08T10:01:00Z\",\"iteration\":2,\"run_id\":\"run-1\",\"decision\":\"keep\",\"metric_value\":\"0\",\"metric_name\":\"errors\",\"metric_direction\":\"lower\",\"verify_status\":\"pass\",\"guard_status\":\"pass\"}",
+        "{\"timestamp\":\"2026-05-08T10:02:00Z\",\"iteration\":3,\"run_id\":\"run-1\",\"decision\":\"discard\",\"metric_value\":\"5\",\"metric_name\":\"errors\",\"metric_direction\":\"lower\",\"verify_status\":\"fail\",\"guard_status\":\"pass\"}",
+      ].join("\n") + "\n", "utf-8");
+    });
+
+    afterEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    it("shows human-readable scores with trends", () => {
+      const out = execFileSync("node", [CLI, "scores", "--limit", "3", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("Score History (latest 3):");
+      expect(out).toContain("#3  ↓  5  (discard)  fail");
+      expect(out).toContain("#2  ↑  0  (keep)  pass");
+      expect(out).toContain("Showing 3 score records.");
+    });
+
+    it("shows scores as json object with count and scores", () => {
+      const out = execFileSync("node", [CLI, "scores", "--json", "--limit", "2", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+      const json = JSON.parse(out);
+      expect(json.count).toBe(2);
+      expect(Array.isArray(json.scores)).toBe(true);
+      expect(json.scores[0].metric_value).toBe("0");
+      expect(json.scores[1].iteration).toBe(3);
+    });
+  });
+
   describe("summary command", () => {
     it("shows summary with json", () => {
       const out = execSync(`node ${CLI} summary --json`, { encoding: "utf-8", cwd: REPO_ROOT });
