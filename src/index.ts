@@ -118,3 +118,11 @@ export type {
   LabelRequirements,
   ArtifactPaths,
 } from "./types.js";
+
+export {
+  parseScoreOutput,
+} from "./score-parser.js";
+
+export type {
+  ScoreOutput,
+} from "./score-parser.js";
