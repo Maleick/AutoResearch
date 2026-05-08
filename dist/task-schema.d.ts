@@ -7,6 +7,7 @@ export interface TaskContext {
     goal: string;
     scope?: string;
     metric: TaskMetric;
+    instrument_metric?: TaskMetric;
     verify_command?: string;
     guard_command?: string;
     constraints: TaskConstraints;
@@ -43,6 +44,7 @@ export declare function createTaskContext(params: {
     source: TaskSource;
     goal: string;
     metric: TaskMetric;
+    instrument_metric?: TaskMetric;
     verify_command?: string;
     guard_command?: string;
     scope?: string;
