@@ -221,7 +221,7 @@ export function parseRunState(value: unknown): RunState {
     }
   }
 
-  const rawOperatingMode = "operating_mode" in obj ? obj.operating_mode : undefined;
+  const rawOperatingMode: unknown = "operating_mode" in obj ? obj.operating_mode : undefined;
   if (rawOperatingMode !== undefined && rawOperatingMode !== null && typeof rawOperatingMode !== "string") {
     throw new AutoresearchError("Invalid state: operating_mode must be a string");
   }

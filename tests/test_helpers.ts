@@ -575,7 +575,9 @@ describe("parseRunState", () => {
 
   it("defaults operating_mode to continuous when missing", () => {
     const state = validState();
-    expect(mod.parseRunState(state).operating_mode).toBe("continuous");
+    const parsed = mod.parseRunState(state);
+    expect(parsed.operating_mode).toBe("continuous");
+    expect("operating_mode" in parsed).toBe(true);
     expect("operating_mode" in state).toBe(false);
   });
 
