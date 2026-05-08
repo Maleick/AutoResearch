@@ -14,6 +14,7 @@ export interface RunConfig {
   direction: string;
   verify: string;
   mode: string;
+  operating_mode?: string;
   scope?: string;
   guard?: string;
   iterations?: number;
@@ -73,6 +74,8 @@ export interface LastIteration {
   missing_stop_labels: string[];
 }
 
+export type OperatingMode = "converge" | "continuous" | "supervised";
+
 export interface RunState {
   schema_version: number;
   run_id: string;
@@ -80,6 +83,7 @@ export interface RunState {
   updated_at: string;
   status: string;
   mode: string;
+  operating_mode: OperatingMode;
   goal: string;
   scope: string;
   metric: Metric;
@@ -108,6 +112,7 @@ export interface SupervisorSnapshot {
   run_id: string;
   status: string;
   mode: string;
+  operating_mode: OperatingMode;
   goal: string;
   metric: Metric;
   instrument_metric?: Metric;
@@ -120,4 +125,54 @@ export interface SupervisorSnapshot {
   subagent_pool?: Record<string, unknown>;
   continuation_policy?: Record<string, unknown>;
   subagent_guidance?: Record<string, unknown>;
+}
+
+export interface MemoryProvenance {
+  run_id: string;
+  iteration: number;
+  goal: string;
+  metric_name: string;
+  metric_value: string;
+  direction: string;
+  timestamp: string;
+  labels: string[];
+}
+
+export interface MemoryItem {
+  id: string;
+  pattern: string;
+  description: string;
+  provenance: MemoryProvenance;
+  verification_count: number;
+  first_observed: string;
+  consolidated_at: string;
+  status: "active" | "expired";
+  expired_at?: string;
+}
+
+export interface PendingMemoryItem {
+  id: string;
+  pattern: string;
+  description: string;
+  provenance: MemoryProvenance;
+  verification_count: number;
+  first_observed: string;
+  last_verified: string;
+}
+
+export interface MemoryConsolidationState {
+  pending_items: PendingMemoryItem[];
+  consolidated_items: MemoryItem[];
+  consolidation_threshold: number;
+  last_consolidated?: string;
+}
+
+export interface MemoryAuditLogEntry {
+  timestamp: string;
+  action: "added" | "expired" | "promoted";
+  item_id: string;
+  pattern: string;
+  provenance: MemoryProvenance;
+  verification_count: number;
+  reason?: string;
 }

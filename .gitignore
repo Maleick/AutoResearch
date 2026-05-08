@@ -18,6 +18,11 @@ role
 model
 AUTOSHIP_PROMPT.md
 
+# Root-level AutoShip runtime artifacts
+/started_at
+/status
+/worker.pid
+
 # Autoresearch runtime artifacts
 .autoresearch/
 .autoresearch-test-tmp/

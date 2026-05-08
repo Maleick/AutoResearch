@@ -7,6 +7,7 @@ import {
   parseRunState,
   resolvePath,
   normalizeDirection,
+  normalizeOperatingMode,
   parseDurationSeconds,
   normalizeLabels,
   missingRequiredLabels,
@@ -161,6 +162,7 @@ export function makeStatePayload(
     updated_at: now,
     status: "initialized",
     mode: config.mode,
+    operating_mode: normalizeOperatingMode(config.operating_mode),
     goal: config.goal,
     scope: config.scope ?? "current repository",
     metric: {
@@ -350,6 +352,7 @@ export async function buildSupervisorSnapshot(
     run_id: state.run_id,
     status: state.status,
     mode: state.mode,
+    operating_mode: state.operating_mode,
     goal: state.goal,
     metric: state.metric,
     instrument_metric: state.instrument_metric,

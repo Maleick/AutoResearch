@@ -262,6 +262,7 @@ const main = async () => {
                     console.log(`Run:     ${formatDisplayValue(s.run_id)}`);
                     console.log(`Status:  ${formatDisplayValue(s.status)}`);
                     console.log(`Mode:    ${formatDisplayValue(s.mode)}`);
+                    console.log(`Op Mode: ${formatDisplayValue(s.operating_mode)}`);
                     console.log(`Goal:    ${formatDisplayValue(s.goal)}`);
                     if (s.metric) {
                         const m = s.metric;
@@ -308,6 +309,7 @@ const main = async () => {
                 console.log(`   Goal:      ${formatDisplayValue(s.goal)}`);
                 console.log(`   Status:    ${formatDisplayValue(s.status)}`);
                 console.log(`   Mode:      ${formatDisplayValue(s.mode)}`);
+                console.log(`   Op Mode:   ${formatDisplayValue(s.operating_mode)}`);
                 if (s.metric) {
                     const m = s.metric;
                     console.log(`   Metric:    ${formatDisplayValue(m.name)} → ${formatMetricValue(m.latest)} (best: ${formatMetricValue(m.best)}, dir: ${formatDisplayValue(m.direction)})`);
@@ -394,6 +396,7 @@ const main = async () => {
                 console.log("Run Configuration:");
                 console.log(`  Goal:     ${formatDisplayValue(state.goal)}`);
                 console.log(`  Mode:     ${formatDisplayValue(state.mode)}`);
+                console.log(`  Op Mode:  ${formatDisplayValue(state.operating_mode)}`);
                 if (state.metric) {
                     const m = state.metric;
                     console.log(`  Metric:   ${formatDisplayValue(m.name)} (${formatDisplayValue(m.direction)})`);
@@ -519,6 +522,7 @@ const main = async () => {
                 console.log(`**Goal:** ${formatMarkdownField(state.goal)}`);
                 console.log(`**Status:** ${formatMarkdownField(state.status)}`);
                 console.log(`**Mode:** ${formatMarkdownField(state.mode)}`);
+                console.log(`**Op Mode:** ${formatMarkdownField(state.operating_mode)}`);
                 if (state.metric) {
                     const m = state.metric;
                     console.log(`**Metric:** ${formatMarkdownField(m.name)} (${formatMarkdownField(m.direction)})`);
