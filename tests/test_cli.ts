@@ -194,9 +194,7 @@ describe("CLI Commands", () => {
       const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-doctor-path");
       const markerPath = resolve(tmpDir, "npm-executed");
       const fakeNpmPath = resolve(tmpDir, process.platform === "win32" ? "npm.cmd" : "npm");
-      try {
-        rmSync(tmpDir, { recursive: true });
-      } catch {}
+      rmSync(tmpDir, { recursive: true, force: true });
       try {
         mkdirSync(tmpDir, { recursive: true });
         if (process.platform === "win32") {
