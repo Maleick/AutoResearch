@@ -505,6 +505,12 @@ describe("CLI Commands", () => {
       expect(state.guard).toBe("npm run lint");
       expect(state.iterations_cap).toBe(50);
     });
+
+    it("fails on invalid branch policy", () => {
+      expect(() => {
+        execSync(`node ${CLI} init --goal "test" --metric "m" --verify "echo" --branch-policy nope --repo ${tmpDir}`, { encoding: "utf-8" });
+      }).toThrow("Invalid branch policy");
+    });
   });
 
   describe("validate command", () => {

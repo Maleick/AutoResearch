@@ -130,17 +130,25 @@ export function buildDraftPoolPlan(input) {
     };
 }
 export function selectNextBranch(activeDrafts, policy, direction) {
-    const completedDrafts = activeDrafts.filter(d => d.status === "completed" && d.metric_value != null);
+    const completedDrafts = activeDrafts.filter((d) => d.status === "completed");
+    const pendingBranchId = activeDrafts.find((d) => d.status === "pending")?.branch_id;
     if (completedDrafts.length === 0) {
-        return activeDrafts.find(d => d.status === "pending")?.branch_id;
+        return pendingBranchId;
     }
+    const sortDirection = direction === "lower" || direction === "higher"
+        ? direction
+        : (() => {
+            throw new Error(`Invalid branch selection direction: ${String(direction)}`);
+        })();
     switch (policy) {
         case "best": {
-            const sorted = [...completedDrafts].sort((a, b) => {
-                const aVal = parseFloat(a.metric_value ?? "0");
-                const bVal = parseFloat(b.metric_value ?? "0");
-                return direction === "lower" ? aVal - bVal : bVal - aVal;
-            });
+            const scoredDrafts = completedDrafts
+                .map((draft) => ({ ...draft, parsed_metric: Number.parseFloat(draft.metric_value ?? "") }))
+                .filter((draft) => Number.isFinite(draft.parsed_metric));
+            if (scoredDrafts.length === 0) {
+                return pendingBranchId ?? completedDrafts[0]?.branch_id ?? activeDrafts[0]?.branch_id;
+            }
+            const sorted = [...scoredDrafts].sort((a, b) => sortDirection === "lower" ? a.parsed_metric - b.parsed_metric : b.parsed_metric - a.parsed_metric);
             return sorted[0]?.branch_id;
         }
         case "roulette": {

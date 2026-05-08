@@ -6,6 +6,8 @@ import { printJson, resolveRepo, parseRunState, parsePositiveInt } from "./helpe
 
 const VERSION_FLAGS = ["--version", "-v"];
 const HELP_FLAGS = ["--help", "-h", "help"];
+const BRANCH_POLICIES = ["best", "roulette", "diverse"] as const;
+type BranchPolicy = typeof BRANCH_POLICIES[number];
 
 const usage = (): void => {
   console.error("Usage: autoresearch <command> [options]");
@@ -101,6 +103,12 @@ const formatTimestamp = (ts: string): string => {
   }
 };
 
+const normalizeBranchPolicy = (value: string | undefined): BranchPolicy => {
+  if (value == null || value === "") return "best";
+  if ((BRANCH_POLICIES as readonly string[]).includes(value)) return value as BranchPolicy;
+  throw new Error(`Invalid branch policy: ${value}. Expected one of: ${BRANCH_POLICIES.join(", ")}`);
+};
+
 const main = async (): Promise<number> => {
   const args = process.argv.slice(2);
 
@@ -190,7 +198,7 @@ const main = async (): Promise<number> => {
           stop_condition: grouped["stop-condition"] as string | undefined,
           baseline: grouped.baseline as string | undefined,
           num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts") ?? 1,
-          branch_selection_policy: (grouped["branch-policy"] as "best" | "roulette" | "diverse") || "best",
+          branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
         };
         const state = await initializeRun(
           grouped.repo as string | undefined,
@@ -630,7 +638,7 @@ const main = async (): Promise<number> => {
           stop_condition: grouped["stop-condition"] as string | undefined,
           baseline: grouped.baseline as string | undefined,
           num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts") ?? 1,
-          branch_selection_policy: (grouped["branch-policy"] as "best" | "roulette" | "diverse") || "best",
+          branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
         };
         const state = await initializeRun(
           grouped.repo as string | undefined,

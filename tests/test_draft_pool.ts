@@ -152,7 +152,16 @@ describe("selectNextBranch", () => {
       { branch_id: "draft-2", iteration: 2, metric_value: "xyz", status: "completed" },
     ];
     const next = mod.selectNextBranch(drafts, "best", "lower");
-    expect(next).toBeDefined();
+    expect(next).toBe("draft-1");
+  });
+
+  it("falls back to pending draft when completed metrics are non-numeric", () => {
+    const drafts = [
+      { branch_id: "draft-1", iteration: 1, metric_value: "abc", status: "completed" },
+      { branch_id: "draft-2", iteration: 2, status: "pending" },
+    ];
+    const next = mod.selectNextBranch(drafts, "best", "lower");
+    expect(next).toBe("draft-2");
   });
 
   it("considers only completed drafts for best selection", () => {

@@ -1,3 +1,5 @@
+import type { DraftBranch, DraftPoolConfig } from "./types.js";
+
 const ROLE_LIMIT = 6;
 let poolKeyCounter = 0;
 let branchIdCounter = 0;
@@ -135,9 +137,9 @@ export interface DraftPoolConfigInput {
   baseline_iteration?: number;
 }
 
-export function buildDraftPoolPlan(input: DraftPoolConfigInput): Record<string, unknown> {
+export function buildDraftPoolPlan(input: DraftPoolConfigInput): DraftPoolConfig {
   const { num_drafts, branch_selection_policy, baseline_iteration } = input;
-  const activeDrafts: Array<{ branch_id: string; iteration: number; parent_iteration: number; status: string }> = [];
+  const activeDrafts: DraftBranch[] = [];
 
   for (let i = 0; i < num_drafts; i++) {
     activeDrafts.push({
@@ -159,13 +161,14 @@ export function buildDraftPoolPlan(input: DraftPoolConfigInput): Record<string, 
 }
 
 export function selectNextBranch(
-  activeDrafts: Array<{ branch_id: string; iteration: number; metric_value?: string; status: string }>,
+  activeDrafts: DraftBranch[],
   policy: "best" | "roulette" | "diverse",
   direction: "lower" | "higher",
 ): string | undefined {
-  const completedDrafts = activeDrafts.filter(d => d.status === "completed" && d.metric_value != null);
+  const completedDrafts = activeDrafts.filter((d) => d.status === "completed");
+  const pendingBranchId = activeDrafts.find((d) => d.status === "pending")?.branch_id;
   if (completedDrafts.length === 0) {
-    return activeDrafts.find(d => d.status === "pending")?.branch_id;
+    return pendingBranchId;
   }
 
   const sortDirection =
@@ -177,11 +180,14 @@ export function selectNextBranch(
 
   switch (policy) {
     case "best": {
-      const sorted = [...completedDrafts].sort((a, b) => {
-        const aVal = parseFloat(a.metric_value ?? "0");
-        const bVal = parseFloat(b.metric_value ?? "0");
-        return sortDirection === "lower" ? aVal - bVal : bVal - aVal;
-      });
+      const scoredDrafts = completedDrafts
+        .map((draft) => ({ ...draft, parsed_metric: Number.parseFloat(draft.metric_value ?? "") }))
+        .filter((draft) => Number.isFinite(draft.parsed_metric));
+      if (scoredDrafts.length === 0) {
+        return pendingBranchId ?? completedDrafts[0]?.branch_id ?? activeDrafts[0]?.branch_id;
+      }
+      const sorted = [...scoredDrafts].sort((a, b) =>
+        sortDirection === "lower" ? a.parsed_metric - b.parsed_metric : b.parsed_metric - a.parsed_metric);
       return sorted[0]?.branch_id;
     }
     case "roulette": {

@@ -86,7 +86,7 @@ export interface RunState {
     stats: RunStats;
     flags: RunFlags;
     last_iteration?: LastIteration;
-    draft_pool?: Record<string, unknown>;
+    draft_pool?: DraftPoolConfig;
 }
 export interface SupervisorSnapshot {
     decision: string;
@@ -105,13 +105,7 @@ export interface SupervisorSnapshot {
     subagent_pool?: Record<string, unknown>;
     continuation_policy?: Record<string, unknown>;
     subagent_guidance?: Record<string, unknown>;
-    draft_pool?: Record<string, unknown>;
-}
-export interface DraftPoolConfig {
-    num_drafts: number;
-    branch_selection_policy: "best" | "roulette" | "diverse";
-    active_drafts: Record<string, unknown>[];
-    best_branch_id?: string;
+    draft_pool?: DraftPoolConfig;
 }
 export interface DraftBranch {
     branch_id: string;
@@ -119,5 +113,13 @@ export interface DraftBranch {
     parent_iteration: number;
     metric_value?: string;
     status: "pending" | "running" | "completed" | "discarded";
+}
+export interface DraftPoolConfig {
+    kind: "autoresearch_draft_pool";
+    version: number;
+    num_drafts: number;
+    branch_selection_policy: "best" | "roulette" | "diverse";
+    active_drafts: DraftBranch[];
+    best_branch_id?: string;
 }
 //# sourceMappingURL=types.d.ts.map
