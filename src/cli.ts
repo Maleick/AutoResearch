@@ -410,12 +410,39 @@ const main = async (): Promise<number> => {
         }
         console.log("Score History (latest " + Math.min(limit, records.length) + "):");
         const recordsOrdered = records.slice().reverse();
-        for (const r of recordsOrdered) {
+        const parseMetricNumber = (value: unknown): number | null => {
+          if (typeof value === "number") {
+            return Number.isFinite(value) ? value : null;
+          }
+          if (typeof value === "string") {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+          }
+          return null;
+        };
+        for (let i = 0; i < recordsOrdered.length; i += 1) {
+          const r = recordsOrdered[i];
           try {
             const rec = JSON.parse(r);
-            const trend = rec.metric_direction === "higher" 
-              ? (rec.metric_value && rec.metric_value > 0 ? "↑" : "↓")
-              : (rec.metric_value && rec.metric_value > 0 ? "↓" : "↑");
+            let trend = "";
+            if (i + 1 < recordsOrdered.length) {
+              try {
+                const previousRec = JSON.parse(recordsOrdered[i + 1]);
+                const currentMetricValue = parseMetricNumber(rec.metric_value);
+                const previousMetricValue = parseMetricNumber(previousRec.metric_value);
+                if (currentMetricValue !== null && previousMetricValue !== null) {
+                  if (currentMetricValue === previousMetricValue) {
+                    trend = "→";
+                  } else if (rec.metric_direction === "higher") {
+                    trend = currentMetricValue > previousMetricValue ? "↑" : "↓";
+                  } else {
+                    trend = currentMetricValue < previousMetricValue ? "↑" : "↓";
+                  }
+                }
+              } catch {
+                trend = "";
+              }
+            }
             console.log(`  #${rec.iteration}  ${trend}  ${rec.metric_value ?? "—"}  (${rec.decision})  ${rec.verify_status}`);
           } catch {
             console.log(`  [parse error]`);
