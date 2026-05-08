@@ -130,6 +130,7 @@ export function buildDraftPoolPlan(input) {
     };
 }
 export function selectNextBranch(activeDrafts, policy, direction) {
+    const fallbackBranchId = (pendingBranch, completed, active) => pendingBranch ?? completed[0]?.branch_id ?? active[0]?.branch_id;
     const completedDrafts = activeDrafts.filter((d) => d.status === "completed");
     const pendingBranchId = activeDrafts.find((d) => d.status === "pending")?.branch_id;
     if (completedDrafts.length === 0) {
@@ -146,7 +147,7 @@ export function selectNextBranch(activeDrafts, policy, direction) {
                 .map((draft) => ({ ...draft, parsed_metric: Number.parseFloat(draft.metric_value ?? "") }))
                 .filter((draft) => Number.isFinite(draft.parsed_metric));
             if (scoredDrafts.length === 0) {
-                return pendingBranchId ?? completedDrafts[0]?.branch_id ?? activeDrafts[0]?.branch_id;
+                return fallbackBranchId(pendingBranchId, completedDrafts, activeDrafts);
             }
             const sorted = [...scoredDrafts].sort((a, b) => sortDirection === "lower" ? a.parsed_metric - b.parsed_metric : b.parsed_metric - a.parsed_metric);
             return sorted[0]?.branch_id;
