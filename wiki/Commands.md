@@ -100,7 +100,7 @@ The score history is stored as JSON Lines (one JSON object per line):
 
 - `autoresearch scores` — Show latest 10 score records (default)
 - `autoresearch scores --limit N` — Show latest N scores
-- `autoresearch scores --json` — Output as JSON array
+- `autoresearch scores --json` — Output as a JSON object with `count` and `scores`
 - `autoresearch scores --score-history-path <path>` — Custom score history path
 
 ## CLI
