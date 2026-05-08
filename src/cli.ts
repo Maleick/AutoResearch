@@ -36,6 +36,7 @@ const usage = (): void => {
   console.error("  --outcome-direction Direction for outcome metric");
   console.error("  --instrument-metric Measurement quality/risk metric (surfaced separately)");
   console.error("  --instrument-direction Direction for instrument metric");
+  console.error("  --instrument-value  Recorded value for the instrument metric");
   console.error("  --verify        Mechanical verification command");
   console.error("  --guard         Guard command for regression catch");
   console.error("  --mode          foreground or background");
