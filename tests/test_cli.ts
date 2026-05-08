@@ -761,6 +761,38 @@ describe("CLI Commands", () => {
       expect(json.scores[0].metric_value).toBe("0");
       expect(json.scores[1].iteration).toBe(3);
     });
+
+    it("supports a custom score history path", () => {
+      const customPath = resolve(tmpDir, "custom-scores.jsonl");
+      writeFileSync(customPath, "{\"timestamp\":\"2026-05-08T10:03:00Z\",\"iteration\":9,\"run_id\":\"run-1\",\"decision\":\"keep\",\"metric_value\":\"1\",\"metric_name\":\"errors\",\"metric_direction\":\"lower\",\"verify_status\":\"pass\",\"guard_status\":\"pass\"}\n", "utf-8");
+
+      const out = execFileSync("node", [CLI, "scores", "--score-history-path", customPath, "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("#9");
+      expect(out).toContain("Showing 1 score records.");
+    });
+
+    it("reports when no score history exists", () => {
+      rmSync(scoreHistoryPath, { force: true });
+
+      const out = execFileSync("node", [CLI, "scores", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("No score history found.");
+    });
+
+    it("renders parse errors in text mode and skips invalid json in json mode", () => {
+      writeFileSync(scoreHistoryPath, [
+        "{\"timestamp\":\"2026-05-08T10:00:00Z\",\"iteration\":1,\"run_id\":\"run-1\",\"decision\":\"keep\",\"metric_value\":\"10\",\"metric_name\":\"errors\",\"metric_direction\":\"lower\",\"verify_status\":\"pass\",\"guard_status\":\"pass\"}",
+        "not-json",
+      ].join("\n") + "\n", "utf-8");
+
+      const textOut = execFileSync("node", [CLI, "scores", "--limit", "2", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(textOut).toContain("[parse error]");
+
+      const jsonOut = execFileSync("node", [CLI, "scores", "--json", "--limit", "2", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+      const json = JSON.parse(jsonOut);
+      expect(json.count).toBe(1);
+      expect(json.scores).toHaveLength(1);
+      expect(json.scores[0].iteration).toBe(1);
+    });
   });
 
   describe("summary command", () => {
