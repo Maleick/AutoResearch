@@ -1,6 +1,6 @@
 import { writeFileSync, mkdirSync, readFileSync, renameSync, unlinkSync, existsSync } from "fs";
 import { resolve, dirname, join } from "path";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { PACKAGE_NAME } from "./constants.js";
 
 export { PACKAGE_NAME };
@@ -264,9 +264,20 @@ export function readUpdateCache(): UpdateCacheData | null {
   }
 }
 
+function getBundledNpmCliPath(): string | null {
+  const nodeDir = dirname(process.execPath);
+  const candidates = [
+    join(nodeDir, "node_modules", "npm", "bin", "npm-cli.js"),
+    join(dirname(nodeDir), "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
+
 export function getGlobalNpmPrefix(): string | null {
   try {
-    return execSync("npm prefix -g", { encoding: "utf-8", timeout: 5000 }).trim();
+    const npmCliPath = getBundledNpmCliPath();
+    if (!npmCliPath) return null;
+    return execFileSync(process.execPath, [npmCliPath, "prefix", "-g"], { encoding: "utf-8", timeout: 5000 }).trim();
   } catch {
     return null;
   }
