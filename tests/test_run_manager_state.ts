@@ -427,6 +427,32 @@ describe("appendIteration", () => {
     expect(lines[1]).toContain("\tkeep\t90\t\tpass\tpass\t");
   });
 
+  it("writes a provided instrument value to the results file and state", async () => {
+    initState();
+    const instrumentValue = "instrument-123";
+    const result = await mod.appendIteration(
+      stateDir,
+      "autoresearch-results.tsv",
+      "state.json",
+      "keep",
+      "90",
+      undefined,
+      "pass",
+      "pass",
+      "hyp",
+      "change",
+      ["test"],
+      "note",
+      undefined,
+      instrumentValue,
+    );
+    const content = readFileSync(resultsFile, "utf-8");
+    const lines = content.trim().split("\n");
+    expect(lines.length).toBe(2); // header + 1 row
+    expect(lines[1]).toContain(`\t${instrumentValue}`);
+    expect(result.last_iteration.instrument_value).toBe(instrumentValue);
+  });
+
   it("uses explicit iteration number when provided", async () => {
     initState();
     const result = await mod.appendIteration(stateDir, "autoresearch-results.tsv", "state.json", "keep", "10", undefined, "pass", "pass", "", "explicit iter", [], "", 42);
