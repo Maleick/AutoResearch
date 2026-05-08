@@ -7,6 +7,7 @@ export function createTaskContext(params) {
         goal: params.goal,
         scope: params.scope,
         metric: params.metric,
+        instrument_metric: params.instrument_metric,
         verify_command: params.verify_command,
         guard_command: params.guard_command,
         constraints: {

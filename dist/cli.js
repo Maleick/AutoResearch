@@ -27,8 +27,12 @@ const usage = () => {
     console.error("Options:");
     console.error("  --repo          Repository root (default: current directory)");
     console.error("  --goal          Desired run outcome");
-    console.error("  --metric        Metric name to track");
-    console.error("  --direction     lower or higher");
+    console.error("  --metric        Metric name to track (default outcome metric)");
+    console.error("  --direction     lower or higher (for outcome metric)");
+    console.error("  --outcome-metric    Primary metric for keep decisions");
+    console.error("  --outcome-direction Direction for outcome metric");
+    console.error("  --instrument-metric Measurement quality/risk metric (surfaced separately)");
+    console.error("  --instrument-direction Direction for instrument metric");
     console.error("  --verify        Mechanical verification command");
     console.error("  --guard         Guard command for regression catch");
     console.error("  --mode          foreground or background");
@@ -236,6 +240,10 @@ const main = async () => {
                     run_tag: grouped["run-tag"],
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
+                    outcome_metric: grouped["outcome-metric"],
+                    outcome_direction: grouped["outcome-direction"],
+                    instrument_metric: grouped["instrument-metric"],
+                    instrument_direction: grouped["instrument-direction"],
                 };
                 const state = await initializeRun(grouped.repo, grouped["results-path"], grouped["state-path"], config, grouped["fresh-start"] === "true");
                 printJson(state);
@@ -665,6 +673,10 @@ const main = async () => {
                     run_tag: grouped["run-tag"],
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
+                    outcome_metric: grouped["outcome-metric"],
+                    outcome_direction: grouped["outcome-direction"],
+                    instrument_metric: grouped["instrument-metric"],
+                    instrument_direction: grouped["instrument-direction"],
                 };
                 const launchPath = resolvePath(grouped.repo, grouped["launch-path"], LAUNCH_DEFAULT);
                 if (dryRun) {
@@ -719,6 +731,7 @@ const main = async () => {
                     console.log(JSON.stringify({
                         decision: grouped.decision,
                         metric_value: grouped["metric-value"],
+                        instrument_value: grouped["instrument-value"],
                         verify_status: normalizeResultStatus(vs, "verify_status"),
                         guard_status: normalizeResultStatus(gs, "guard_status"),
                         hypothesis: grouped.hypothesis,
@@ -730,7 +743,7 @@ const main = async () => {
                     return 0;
                 }
                 const { appendIteration } = await import("./run-manager.js");
-                const state = await appendIteration(grouped.repo, grouped["results-path"], grouped["state-path"], grouped.decision, grouped["metric-value"], normalizeResultStatus(vs, "verify_status"), normalizeResultStatus(gs, "guard_status"), grouped.hypothesis, grouped["change-summary"], grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined, grouped.note, iteration);
+                const state = await appendIteration(grouped.repo, grouped["results-path"], grouped["state-path"], grouped.decision, grouped["metric-value"], grouped["instrument-value"], normalizeResultStatus(vs, "verify_status"), normalizeResultStatus(gs, "guard_status"), grouped.hypothesis, grouped["change-summary"], grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined, grouped.note, iteration);
                 printJson(state);
                 break;
             }

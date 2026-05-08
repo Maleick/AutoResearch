@@ -30,8 +30,12 @@ const usage = (): void => {
   console.error("Options:");
   console.error("  --repo          Repository root (default: current directory)");
   console.error("  --goal          Desired run outcome");
-  console.error("  --metric        Metric name to track");
-  console.error("  --direction     lower or higher");
+  console.error("  --metric        Metric name to track (default outcome metric)");
+  console.error("  --direction     lower or higher (for outcome metric)");
+  console.error("  --outcome-metric    Primary metric for keep decisions");
+  console.error("  --outcome-direction Direction for outcome metric");
+  console.error("  --instrument-metric Measurement quality/risk metric (surfaced separately)");
+  console.error("  --instrument-direction Direction for instrument metric");
   console.error("  --verify        Mechanical verification command");
   console.error("  --guard         Guard command for regression catch");
   console.error("  --mode          foreground or background");
@@ -249,6 +253,10 @@ const main = async (): Promise<number> => {
           run_tag: grouped["run-tag"] as string | undefined,
           stop_condition: grouped["stop-condition"] as string | undefined,
           baseline: grouped.baseline as string | undefined,
+          outcome_metric: grouped["outcome-metric"] as string | undefined,
+          outcome_direction: grouped["outcome-direction"] as string | undefined,
+          instrument_metric: grouped["instrument-metric"] as string | undefined,
+          instrument_direction: grouped["instrument-direction"] as string | undefined,
         };
         const state = await initializeRun(
           grouped.repo as string | undefined,
@@ -688,6 +696,10 @@ const main = async (): Promise<number> => {
           run_tag: grouped["run-tag"] as string | undefined,
           stop_condition: grouped["stop-condition"] as string | undefined,
           baseline: grouped.baseline as string | undefined,
+          outcome_metric: grouped["outcome-metric"] as string | undefined,
+          outcome_direction: grouped["outcome-direction"] as string | undefined,
+          instrument_metric: grouped["instrument-metric"] as string | undefined,
+          instrument_direction: grouped["instrument-direction"] as string | undefined,
         };
         const launchPath = resolvePath(grouped.repo as string | undefined, grouped["launch-path"] as string | undefined, LAUNCH_DEFAULT);
         if (dryRun) {
@@ -748,6 +760,7 @@ const main = async (): Promise<number> => {
           console.log(JSON.stringify({
             decision: grouped.decision,
             metric_value: grouped["metric-value"],
+            instrument_value: grouped["instrument-value"],
             verify_status: normalizeResultStatus(vs, "verify_status"),
             guard_status: normalizeResultStatus(gs, "guard_status"),
             hypothesis: grouped.hypothesis,
@@ -765,6 +778,7 @@ const main = async (): Promise<number> => {
           grouped["state-path"] as string | undefined,
           grouped.decision as string,
           grouped["metric-value"] as string | undefined,
+          grouped["instrument-value"] as string | undefined,
           normalizeResultStatus(vs, "verify_status"),
           normalizeResultStatus(gs, "guard_status"),
           grouped.hypothesis as string | undefined,

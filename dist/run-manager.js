@@ -10,7 +10,7 @@ export async function initializeRun(repo, resultsPathValue, statePathValue, conf
     if (existsSync(statePath) && !freshStart) {
         throw new AutoresearchError(`${statePath} already exists. Use --fresh-start to archive.`);
     }
-    const header = "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n";
+    const header = "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n";
     ensureParent(resultsPath);
     if (!existsSync(resultsPath)) {
         writeFileSync(resultsPath, header, "utf-8");
@@ -19,7 +19,7 @@ export async function initializeRun(repo, resultsPathValue, statePathValue, conf
     atomicWriteJson(statePath, state);
     return state;
 }
-export async function appendIteration(repo, resultsPathValue, statePathValue, decision, metricValue, verifyStatus, guardStatus, hypothesis, changeSummary, labels, note, iteration) {
+export async function appendIteration(repo, resultsPathValue, statePathValue, decision, metricValue, instrumentValue, verifyStatus, guardStatus, hypothesis, changeSummary, labels, note, iteration) {
     const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
     const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
     const state = parseRunState(readJsonFile(statePath));
@@ -39,6 +39,7 @@ export async function appendIteration(repo, resultsPathValue, statePathValue, de
         String(currentIteration),
         decision,
         metricValue ?? "",
+        instrumentValue ?? "",
         verifyStatus,
         guardStatus,
         hypothesis ?? "",
@@ -77,6 +78,7 @@ export async function appendIteration(repo, resultsPathValue, statePathValue, de
         iteration: currentIteration,
         decision,
         metric_value: metricValue,
+        instrument_value: instrumentValue,
         change_summary: changeSummary,
         labels: labelList,
         timestamp: now,
@@ -110,12 +112,19 @@ export function makeStatePayload(config, resultsPath, statePath) {
         goal: config.goal,
         scope: config.scope ?? "current repository",
         metric: {
-            name: config.metric,
-            direction: normalizeDirection(config.direction),
+            name: config.outcome_metric ?? config.metric,
+            direction: normalizeDirection(config.outcome_direction ?? config.direction),
             baseline: config.baseline,
             best: config.baseline,
             latest: config.baseline,
         },
+        instrument_metric: config.instrument_metric ? {
+            name: config.instrument_metric,
+            direction: normalizeDirection(config.instrument_direction ?? config.direction),
+            baseline: config.baseline,
+            best: config.baseline,
+            latest: config.baseline,
+        } : undefined,
         verify: config.verify,
         guard: config.guard,
         max_no_progress: config.max_no_progress,
@@ -277,6 +286,7 @@ export async function buildSupervisorSnapshot(repo, resultsPathValue, statePathV
         mode: state.mode,
         goal: state.goal,
         metric: state.metric,
+        instrument_metric: state.instrument_metric,
         stats: state.stats,
         last_iteration: state.last_iteration,
         results_rows: resultsRows,
