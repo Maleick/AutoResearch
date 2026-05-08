@@ -4,6 +4,7 @@ import { resolve } from "path";
 import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
 const VERSION_FLAGS = ["--version", "-v"];
 const HELP_FLAGS = ["--help", "-h", "help"];
+const BRANCH_POLICIES = ["best", "roulette", "diverse"];
 const usage = () => {
     console.error("Usage: autoresearch <command> [options]");
     console.error("");
@@ -153,6 +154,13 @@ const sanitizeMarkdownText = (value) => {
 const formatMarkdownField = (value) => {
     return sanitizeMarkdownText(value).replace(markdownEscapePattern, "\\$1");
 };
+const normalizeBranchPolicy = (value) => {
+    if (value == null || value === "")
+        return "best";
+    if (BRANCH_POLICIES.includes(value))
+        return value;
+    throw new Error(`Invalid branch policy: ${value}. Expected one of: ${BRANCH_POLICIES.join(", ")}`);
+};
 const main = async () => {
     const args = process.argv.slice(2);
     // Handle standalone flags
@@ -241,7 +249,7 @@ const main = async () => {
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
                     num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts") ?? 1,
-                    branch_selection_policy: grouped["branch-policy"] || "best",
+                    branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"]),
                 };
                 const state = await initializeRun(grouped.repo, grouped["results-path"], grouped["state-path"], config, grouped["fresh-start"] === "true");
                 printJson(state);
@@ -672,7 +680,7 @@ const main = async () => {
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
                     num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts") ?? 1,
-                    branch_selection_policy: grouped["branch-policy"] || "best",
+                    branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"]),
                 };
                 const launchPath = resolvePath(grouped.repo, grouped["launch-path"], LAUNCH_DEFAULT);
                 if (dryRun) {
