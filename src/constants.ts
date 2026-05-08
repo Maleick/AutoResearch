@@ -1,4 +1,4 @@
-export const VERSION = "3.4.0";
+export const VERSION = "3.6.0";
 export const PACKAGE_NAME = "opencode-autoresearch";
 export const SKILL_NAME = "autoresearch";
 export const PRODUCT_BRAND = "Auto Research";
@@ -6,3 +6,6 @@ export const RESULTS_DEFAULT = "autoresearch-results.tsv";
 export const STATE_DEFAULT = ".autoresearch/state.json";
 export const LAUNCH_DEFAULT = ".autoresearch/launch.json";
 export const MEMORY_DEFAULT = "autoresearch-memory.md";
+export const MEMORY_AUDIT_DEFAULT = ".autoresearch/memory-audit.log";
+export const MEMORY_CONSOLIDATION_THRESHOLD = 3;
+export const MEMORY_EXPIRY_DAYS = 30;

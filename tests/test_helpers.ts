@@ -427,6 +427,19 @@ describe("printJson", () => {
   });
 });
 
+describe("sanitizeForTerminal", () => {
+  let mod: any;
+  beforeAll(async () => { mod = await importHelpers(); });
+
+  it("escapes terminal control characters and embedded line breaks", () => {
+    expect(mod.sanitizeForTerminal("ok\u001b[2J\u0007next\nline\tcol\rreturn")).toBe("ok\\u001b[2J\\u0007next\\nline\\tcol\\rreturn");
+  });
+
+  it("preserves printable unicode text", () => {
+    expect(mod.sanitizeForTerminal("goal ✓ — ready")).toBe("goal ✓ — ready");
+  });
+});
+
 describe("resolveRepo", () => {
   let mod: any;
   beforeAll(async () => { mod = await importHelpers(); });

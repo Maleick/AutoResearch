@@ -17,6 +17,7 @@ export interface RunConfig {
   scope?: string;
   guard?: string;
   iterations?: number;
+  max_no_progress?: number;
   duration?: string;
   memory_path?: string;
   required_keep_labels?: string[];
@@ -81,6 +82,7 @@ export interface RunState {
   metric: Metric;
   verify: string;
   guard?: string;
+  max_no_progress?: number;
   iterations_cap?: number;
   duration?: string;
   duration_seconds?: number;
@@ -130,4 +132,54 @@ export interface DraftBranch {
   parent_iteration: number;
   metric_value?: string;
   status: "pending" | "running" | "completed" | "discarded";
+}
+
+export interface MemoryProvenance {
+  run_id: string;
+  iteration: number;
+  goal: string;
+  metric_name: string;
+  metric_value: string;
+  direction: string;
+  timestamp: string;
+  labels: string[];
+}
+
+export interface MemoryItem {
+  id: string;
+  pattern: string;
+  description: string;
+  provenance: MemoryProvenance;
+  verification_count: number;
+  first_observed: string;
+  consolidated_at: string;
+  status: "active" | "expired";
+  expired_at?: string;
+}
+
+export interface PendingMemoryItem {
+  id: string;
+  pattern: string;
+  description: string;
+  provenance: MemoryProvenance;
+  verification_count: number;
+  first_observed: string;
+  last_verified: string;
+}
+
+export interface MemoryConsolidationState {
+  pending_items: PendingMemoryItem[];
+  consolidated_items: MemoryItem[];
+  consolidation_threshold: number;
+  last_consolidated?: string;
+}
+
+export interface MemoryAuditLogEntry {
+  timestamp: string;
+  action: "added" | "expired" | "promoted";
+  item_id: string;
+  pattern: string;
+  provenance: MemoryProvenance;
+  verification_count: number;
+  reason?: string;
 }

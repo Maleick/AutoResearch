@@ -1,5 +1,8 @@
 import { writeFileSync, mkdirSync, readFileSync, renameSync, unlinkSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
+import { resolve, dirname, join } from "path";
+import { execFileSync } from "child_process";
+import { PACKAGE_NAME } from "./constants.js";
+export { PACKAGE_NAME };
 export class AutoresearchError extends Error {
     constructor(message) {
         super(message);
@@ -8,6 +11,16 @@ export class AutoresearchError extends Error {
 }
 export function printJson(payload) {
     console.log(JSON.stringify(payload, null, 2));
+}
+export function sanitizeForTerminal(value) {
+    return String(value).replace(/[\x00-\x1f\x7f-\x9f]/g, (char) => {
+        switch (char) {
+            case "\n": return "\\n";
+            case "\r": return "\\r";
+            case "\t": return "\\t";
+            default: return `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`;
+        }
+    });
 }
 export function utcNow() {
     return new Date().toISOString().replace("Z", "+00:00").split("+")[0] + "Z";
@@ -215,5 +228,76 @@ export function parseRunState(value) {
         throw new AutoresearchError("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
     }
     return obj;
+}
+export function getUpdateCachePath() {
+    const home = process.env.HOME || process.env.USERPROFILE || "";
+    return join(home, ".cache", "opencode-autoresearch", "update-check.json");
+}
+export function readUpdateCache() {
+    const cachePath = getUpdateCachePath();
+    if (!existsSync(cachePath)) {
+        return null;
+    }
+    try {
+        const content = readFileSync(cachePath, "utf-8");
+        return JSON.parse(content);
+    }
+    catch {
+        return null;
+    }
+}
+function getBundledNpmCliPath() {
+    const nodeDir = dirname(process.execPath);
+    const candidates = [
+        join(nodeDir, "node_modules", "npm", "bin", "npm-cli.js"),
+        join(dirname(nodeDir), "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    ];
+    return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
+export function getGlobalNpmPrefix() {
+    try {
+        const npmCliPath = getBundledNpmCliPath();
+        if (!npmCliPath)
+            return null;
+        return execFileSync(process.execPath, [npmCliPath, "prefix", "-g"], { encoding: "utf-8", timeout: 5000 }).trim();
+    }
+    catch {
+        return null;
+    }
+}
+export function getInstalledPackagePath(packageName) {
+    try {
+        const prefix = getGlobalNpmPrefix();
+        if (!prefix)
+            return null;
+        const pkgJsonPath = join(prefix, "lib", "node_modules", packageName, "package.json");
+        if (existsSync(pkgJsonPath)) {
+            return join(prefix, "lib", "node_modules", packageName);
+        }
+        return null;
+    }
+    catch {
+        return null;
+    }
+}
+export function getInstalledPackageInfo(packageName) {
+    try {
+        const prefix = getGlobalNpmPrefix();
+        if (!prefix)
+            return null;
+        const pkgJsonPath = join(prefix, "lib", "node_modules", packageName, "package.json");
+        if (!existsSync(pkgJsonPath))
+            return null;
+        const content = readFileSync(pkgJsonPath, "utf-8");
+        const pkg = JSON.parse(content);
+        return {
+            version: pkg.version,
+            description: pkg.description,
+            repository: pkg.repository?.url || pkg.repository,
+        };
+    }
+    catch {
+        return null;
+    }
 }
 //# sourceMappingURL=helpers.js.map

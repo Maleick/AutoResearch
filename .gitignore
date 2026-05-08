@@ -12,13 +12,31 @@ docs/specs/
 # AutoShip runtime state
 .autoship/
 
+# Root-level AutoShip runtime artifacts
+/started_at
+/status
+/worker.pid
+
 # Autoresearch runtime artifacts
 .autoresearch/
 .autoresearch-test-tmp/
+.archaeology/
 autoresearch-results.tsv
 autoresearch-report.md
 autoresearch-memory.md
 autoresearch-hook-context.json
+
+# Test and coverage output
+coverage/
+*.lcov
+
+# Build/package artifacts
+*.tsbuildinfo
+*.tgz
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # OS
 .DS_Store
