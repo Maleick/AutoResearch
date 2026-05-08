@@ -149,6 +149,19 @@ const formatDisplayValue = (val: unknown): string => {
   return sanitizeForTerminal(val);
 };
 
+const parseMemoryPatternHeading = (heading: string): string => {
+  const raw = heading.replace(/^### Pattern: /, "");
+  if (raw.startsWith('"')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === "string") return parsed;
+    } catch {
+      // Fall through to the raw heading text for backward compatibility.
+    }
+  }
+  return raw;
+};
+
 const formatMetricValue = formatDisplayValue;
 
 const formatTimestamp = (ts: string): string => {
@@ -716,15 +729,16 @@ const main = async (): Promise<number> => {
         }
         const memory = readFileSync(memoryPath, "utf-8");
         const patterns = memory.match(/### Pattern: [^\n]+/g) ?? [];
+        const suggestions = patterns.map(parseMemoryPatternHeading);
         if (useJson) {
-          printJson({ patterns_found: patterns.length, suggestions: patterns.map((p: string) => p.replace("### Pattern: ", "")) });
+          printJson({ patterns_found: suggestions.length, suggestions });
           break;
         }
         console.log("Memory Patterns — candidate next goals:");
-        for (const p of patterns) {
-          console.log(`  → ${formatDisplayValue(p.replace("### Pattern: ", ""))}`);
+        for (const suggestion of suggestions) {
+          console.log(`  → ${formatDisplayValue(suggestion)}`);
         }
-        console.log(`\n${patterns.length} patterns available. Use 'autoresearch init --goal "..."' to start a new run.`);
+        console.log(`\n${suggestions.length} patterns available. Use 'autoresearch init --goal "..."' to start a new run.`);
         break;
       }
       case "export": {
