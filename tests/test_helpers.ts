@@ -48,6 +48,27 @@ describe("normalizeMode", () => {
   });
 });
 
+describe("normalizeOperatingMode", () => {
+  let mod: any;
+  beforeAll(async () => { mod = await importHelpers(); });
+
+  it("defaults to continuous when undefined", () => {
+    expect(mod.normalizeOperatingMode(undefined)).toBe("continuous");
+  });
+  it("defaults to continuous when null", () => {
+    expect(mod.normalizeOperatingMode(null)).toBe("continuous");
+  });
+  it("normalizes casing and whitespace", () => {
+    expect(mod.normalizeOperatingMode("  Converge ")).toBe("converge");
+  });
+  it("returns supervised", () => {
+    expect(mod.normalizeOperatingMode("supervised")).toBe("supervised");
+  });
+  it("throws on unsupported operating mode", () => {
+    expect(() => mod.normalizeOperatingMode("detached")).toThrow("Unsupported operating mode");
+  });
+});
+
 describe("parseDurationSeconds", () => {
   let mod: any;
   beforeAll(async () => { mod = await importHelpers(); });
@@ -549,7 +570,30 @@ describe("parseRunState", () => {
 
   it("returns valid state", () => {
     const state = validState();
-    expect(mod.parseRunState(state)).toEqual(state);
+    expect(mod.parseRunState(state)).toEqual({ ...state, operating_mode: "continuous" });
+  });
+
+  it("defaults operating_mode to continuous when missing", () => {
+    const state = validState();
+    const parsed = mod.parseRunState(state);
+    expect(parsed.operating_mode).toBe("continuous");
+    expect("operating_mode" in parsed).toBe(true);
+    expect("operating_mode" in state).toBe(false);
+  });
+
+  it("normalizes operating_mode when present", () => {
+    const state = { ...validState(), operating_mode: "  Converge " };
+    expect(mod.parseRunState(state).operating_mode).toBe("converge");
+  });
+
+  it("throws on unsupported operating_mode", () => {
+    const state = { ...validState(), operating_mode: "detached" };
+    expect(() => mod.parseRunState(state)).toThrow("Unsupported operating mode: detached");
+  });
+
+  it("throws on non-string operating_mode", () => {
+    const state = { ...validState(), operating_mode: 42 };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: operating_mode must be a string");
   });
 
   it("throws on non-object", () => {

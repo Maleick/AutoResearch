@@ -324,7 +324,7 @@ export function readAuditLog(path: string): MemoryAuditLogEntry[] {
   const entries: MemoryAuditLogEntry[] = [];
   const lines = content.split("\n");
 
-  lines.forEach((line, index) => {
+  lines.forEach((line) => {
     if (!line.trim()) {
       return;
     }

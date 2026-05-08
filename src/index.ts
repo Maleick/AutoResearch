@@ -117,4 +117,17 @@ export type {
   SupervisorSnapshot,
   LabelRequirements,
   ArtifactPaths,
+  MemoryProvenance,
+  MemoryItem,
+  PendingMemoryItem,
+  MemoryConsolidationState,
+  MemoryAuditLogEntry,
 } from "./types.js";
+
+export {
+  parseScoreOutput,
+} from "./score-parser.js";
+
+export type {
+  ScoreOutput,
+} from "./score-parser.js";

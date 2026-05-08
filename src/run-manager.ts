@@ -7,13 +7,14 @@ import {
   parseRunState,
   resolvePath,
   normalizeDirection,
+  normalizeOperatingMode,
   parseDurationSeconds,
   normalizeLabels,
   missingRequiredLabels,
   AutoresearchError,
 } from "./helpers.js";
-import { RESULTS_DEFAULT, STATE_DEFAULT } from "./constants.js";
-import { buildSubagentPoolPlan, buildContinuationPolicy } from "./subagent-pool.js";
+import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT } from "./constants.js";
+import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
 import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
 import { lstat, open } from "fs/promises";
 
@@ -33,7 +34,7 @@ export async function initializeRun(
     throw new AutoresearchError(`${statePath} already exists. Use --fresh-start to archive.`);
   }
 
-  const header = "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n";
+  const header = "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n";
   ensureParent(resultsPath);
   if (!existsSync(resultsPath)) {
     writeFileSync(resultsPath, header, "utf-8");
@@ -50,6 +51,7 @@ export async function appendIteration(
   statePathValue: string | undefined,
   decision: string,
   metricValue: string | undefined,
+  instrumentValue: string | undefined,
   verifyStatus: string,
   guardStatus: string,
   hypothesis: string | undefined,
@@ -57,9 +59,11 @@ export async function appendIteration(
   labels: string[] | undefined,
   note: string | undefined,
   iteration: number | undefined,
+  scoreHistoryPathValue?: string,
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
+  const scoreHistoryPath = resolvePath(repo, scoreHistoryPathValue, SCORE_HISTORY_DEFAULT);
   const state = parseRunState(readJsonFile(statePath));
 
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
@@ -80,6 +84,7 @@ export async function appendIteration(
     String(currentIteration),
     decision,
     metricValue ?? "",
+    instrumentValue ?? "",
     verifyStatus,
     guardStatus,
     hypothesis ?? "",
@@ -89,6 +94,20 @@ export async function appendIteration(
   ].join("\t") + "\n";
 
   appendFileSync(resultsPath, resultRow, "utf-8");
+
+  const scoreRecord = {
+    timestamp: now,
+    iteration: currentIteration,
+    run_id: state.run_id,
+    decision,
+    metric_value: metricValue ?? null,
+    metric_name: state.metric.name,
+    metric_direction: state.metric.direction,
+    verify_status: verifyStatus,
+    guard_status: guardStatus,
+  };
+  ensureParent(scoreHistoryPath);
+  appendFileSync(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "utf-8");
 
   const newState: RunState = {
     ...state,
@@ -120,6 +139,7 @@ export async function appendIteration(
     iteration: currentIteration,
     decision,
     metric_value: metricValue,
+    instrument_value: instrumentValue,
     change_summary: changeSummary,
     labels: labelList,
     timestamp: now,
@@ -150,6 +170,13 @@ export function makeStatePayload(
     mode: config.mode,
   });
   const continuationPolicy = buildContinuationPolicy(config.mode);
+  const draftPool = (config.num_drafts ?? 1) > 1
+    ? buildDraftPoolPlan({
+        num_drafts: config.num_drafts ?? 1,
+        branch_selection_policy: config.branch_selection_policy ?? "best",
+        baseline_iteration: 0,
+      })
+    : undefined;
 
   return {
     schema_version: 1,
@@ -158,15 +185,23 @@ export function makeStatePayload(
     updated_at: now,
     status: "initialized",
     mode: config.mode,
+    operating_mode: normalizeOperatingMode(config.operating_mode),
     goal: config.goal,
     scope: config.scope ?? "current repository",
     metric: {
-      name: config.metric,
-      direction: normalizeDirection(config.direction),
+      name: config.outcome_metric ?? config.metric,
+      direction: normalizeDirection(config.outcome_direction ?? config.direction),
       baseline: config.baseline,
       best: config.baseline,
       latest: config.baseline,
     },
+    instrument_metric: config.instrument_metric ? {
+      name: config.instrument_metric,
+      direction: normalizeDirection(config.instrument_direction ?? config.direction),
+      baseline: config.baseline,
+      best: config.baseline,
+      latest: config.baseline,
+    } : undefined,
     verify: config.verify,
     guard: config.guard,
     max_no_progress: config.max_no_progress,
@@ -199,6 +234,7 @@ export function makeStatePayload(
     },
     subagent_pool: subagentPool,
     continuation_policy: continuationPolicy,
+    draft_pool: draftPool,
   };
 }
 
@@ -340,13 +376,18 @@ export async function buildSupervisorSnapshot(
     run_id: state.run_id,
     status: state.status,
     mode: state.mode,
+    operating_mode: state.operating_mode,
     goal: state.goal,
     metric: state.metric,
+    instrument_metric: state.instrument_metric,
     stats: state.stats,
     last_iteration: state.last_iteration,
     results_rows: resultsRows,
     artifact_paths: state.artifact_paths,
     flags: state.flags,
     label_requirements: state.label_requirements,
+    subagent_pool: state.subagent_pool,
+    continuation_policy: state.continuation_policy,
+    draft_pool: state.draft_pool,
   };
 }
