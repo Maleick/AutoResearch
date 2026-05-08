@@ -421,7 +421,7 @@ const main = async (): Promise<number> => {
             console.log(`  [parse error]`);
           }
         }
-        console.log(`\n${records.length} total score records.`);
+        console.log(`\n${lines.length} total score records.`);
         break;
       }
       case "config": {
