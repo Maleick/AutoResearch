@@ -304,11 +304,26 @@ export function readAuditLog(path: string): MemoryAuditLogEntry[] {
     return [];
   }
   const content = readFileSync(path, "utf-8");
-  return content
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as MemoryAuditLogEntry);
+  if (!content.trim()) {
+    return [];
+  }
+
+  const entries: MemoryAuditLogEntry[] = [];
+  const lines = content.split("\n");
+
+  lines.forEach((line, index) => {
+    if (!line.trim()) {
+      return;
+    }
+
+    try {
+      entries.push(JSON.parse(line) as MemoryAuditLogEntry);
+    } catch {
+      return;
+    }
+  });
+
+  return entries;
 }
 
 export function getActivePatterns(state: MemoryConsolidationState): string[] {
