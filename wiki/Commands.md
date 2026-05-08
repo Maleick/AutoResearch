@@ -94,7 +94,7 @@ The score history is stored as JSON Lines (one JSON object per line):
 
 - No automatic rotation — file grows indefinitely
 - Manual cleanup: `tail -n 1000 .autoresearch/score-history.jsonl > tmp && mv tmp .autoresearch/score-history.jsonl`
-- Or use `autoresearch scores --limit N` to view only recent records without reading full file
+- Or use `autoresearch scores --limit N` to display only the most recent N records
 
 ### CLI Command
 
