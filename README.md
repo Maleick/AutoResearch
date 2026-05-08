@@ -48,30 +48,30 @@ Auto Research is a **subagent-first autonomous iteration engine** that runs stru
 
 ```mermaid
 flowchart LR
-    A[Plan] --> B[Modify]
-    B --> C[Verify]
-    C --> D{Keep?}
-    D -->|yes| E[Learn]
+    A["Plan"] --> B["Modify"]
+    B --> C["Verify"]
+    C --> D{"Keep?"}
+    D -->|yes| E["Learn"]
     D -->|no| B
-    E --> F[Memory]
+    E --> F["Memory"]
     F --> A
 ```
 
 ```mermaid
 flowchart TD
-    A[Goal + Metric + Verify] --> B[Baseline]
-    B --> C[Pool Init]
-    C --> D[Iteration N]
-    D --> E[Subagent Context]
-    E --> F[Focused Change]
-    F --> G[Mechanical Verify]
-    G --> H{Strict Improvement?}
-    H -->|yes| I[Keep + Record]
-    H -->|no| J[Discard + Reset]
-    I --> K{Stop Condition?}
+    A["Goal + Metric + Verify"] --> B["Baseline"]
+    B --> C["Pool Init"]
+    C --> D["Iteration N"]
+    D --> E["Subagent Context"]
+    E --> F["Focused Change"]
+    F --> G["Mechanical Verify"]
+    G --> H{"Strict Improvement?"}
+    H -->|yes| I["Keep + Record"]
+    H -->|no| J["Discard + Reset"]
+    I --> K{"Stop Condition?"}
     J --> K
     K -->|no| D
-    K -->|yes| L[Report + Memory]
+    K -->|yes| L["Report + Memory"]
 ```
 
 ## The Self-Improvement Loop
@@ -80,17 +80,17 @@ Auto Research can run on itself. The recursive loop adds a meta-orchestrator tha
 
 ```mermaid
 flowchart TD
-    A[Meta-Goal: Improve AutoResearch] --> B[Run Child Loop]
-    B --> C[Measure: Tests pass? Docs improved?]
-    C --> D{Child Success?}
-    D -->|yes| E[Update Memory + Strategy]
-    D -->|no| F[Adapt Approach]
-    E --> G[Persist Learnings]
+    A["Meta-Goal: Improve AutoResearch"] --> B["Run Child Loop"]
+    B --> C["Measure: Tests pass? Docs improved?"]
+    C --> D{"Child Success?"}
+    D -->|yes| E["Update Memory + Strategy"]
+    D -->|no| F["Adapt Approach"]
+    E --> G["Persist Learnings"]
     F --> B
-    G --> H[Meta-Report]
-    H --> I{Meta-Stop?}
+    G --> H["Meta-Report"]
+    H --> I{"Meta-Stop?"}
     I -->|no| B
-    I -->|yes| J[Archive Run]
+    I -->|yes| J["Archive Run"]
 ```
 
 See [`skills/autoresearch/references/self-improve-loop.md`](skills/autoresearch/references/self-improve-loop.md) for the full recursive loop specification.
@@ -248,17 +248,17 @@ cat .autoresearch/state.json | jq .
 
 ```mermaid
 flowchart LR
-    A[OpenCode /autoresearch] --> B[CLI]
-    H[Hermes Cronjob] --> B
-    B --> C[Run Manager]
-    C --> D[State JSON]
-    C --> E[Results TSV]
-    C --> F[Subagent Pool]
-    F --> G[Orchestrator]
-    F --> I[Scout]
-    F --> J[Analyst]
-    F --> K[Verifier]
-    F --> L[Synthesizer]
+    A["OpenCode /autoresearch"] --> B["CLI"]
+    H["Hermes Cronjob"] --> B
+    B --> C["Run Manager"]
+    C --> D["State JSON"]
+    C --> E["Results TSV"]
+    C --> F["Subagent Pool"]
+    F --> G["Orchestrator"]
+    F --> I["Scout"]
+    F --> J["Analyst"]
+    F --> K["Verifier"]
+    F --> L["Synthesizer"]
 ```
 
 ## Runtime Artifacts

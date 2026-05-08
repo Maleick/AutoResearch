@@ -8,20 +8,24 @@ CLAUDE.md
 # Internal planning/spec docs
 docs/superpowers/
 docs/specs/
+/AUTORESEARCH_FINDINGS.md
+/feature-list.json
 
 # AutoShip runtime state
 .autoship/
-worker.pid
-worker.command
-started_at
-role
-model
-AUTOSHIP_PROMPT.md
+/worker.pid
+/.autoship-event-*.sent
+/AUTOSHIP_PROMPT.md
+/AUTOSHIP_RESULT.md
+/AUTOSHIP_RUNNER.log
+/AUTOSHIP_VERIFICATION.log
+/model
+/role
 
 # Root-level AutoShip runtime artifacts
 /started_at
 /status
-/worker.pid
+/worker.command
 
 # Autoresearch runtime artifacts
 .autoresearch/
