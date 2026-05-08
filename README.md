@@ -99,10 +99,10 @@ See [`skills/autoresearch/references/self-improve-loop.md`](skills/autoresearch/
 
 ### OpenCode
 
-For OpenCode, paste this one-line install prompt into your agent. This URL is pinned to the immutable `v3.5.0` release instructions:
+For OpenCode, paste this one-line install prompt into your agent. This URL is pinned to the immutable `v3.6.0` release instructions:
 
 ```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.5.0/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.6.0/INSTALL.md
 ```
 
 Recommended plugin install in `opencode.json`:
