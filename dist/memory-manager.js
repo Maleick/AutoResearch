@@ -234,7 +234,7 @@ export function readAuditLog(path) {
     }
     const entries = [];
     const lines = content.split("\n");
-    lines.forEach((line, index) => {
+    lines.forEach((line) => {
         if (!line.trim()) {
             return;
         }
