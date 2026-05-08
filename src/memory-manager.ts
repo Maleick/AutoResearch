@@ -10,6 +10,7 @@ import { existsSync, readFileSync, appendFileSync, writeFileSync } from "fs";
 import {
   utcNow,
   ensureParent,
+  resolvePath,
 } from "./helpers.js";
 import {
   MEMORY_DEFAULT,
@@ -17,7 +18,6 @@ import {
   MEMORY_CONSOLIDATION_THRESHOLD,
   MEMORY_EXPIRY_DAYS,
 } from "./constants.js";
-import { resolve } from "path";
 
 function generateId(): string {
   return `mem-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -290,13 +290,6 @@ export function getAuditLogPath(
   auditPathValue: string | undefined
 ): string {
   return resolvePath(repo, auditPathValue, MEMORY_AUDIT_DEFAULT);
-}
-
-function resolvePath(repo: string | undefined, value: string | undefined, defaultName: string): string {
-  if (value) {
-    return value.startsWith("/") ? value : resolve(repo ?? ".", value);
-  }
-  return resolve(repo ?? ".", defaultName);
 }
 
 export function readAuditLog(path: string): MemoryAuditLogEntry[] {
