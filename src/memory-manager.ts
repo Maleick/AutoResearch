@@ -75,7 +75,7 @@ export function addPendingMemoryItem(
     const existing = updated[existingIndex];
     updated[existingIndex] = {
       ...existing,
-      description: !existing.description && description ? description : existing.description,
+      description: existing.description === "" && description !== "" ? description : existing.description,
       verification_count: existing.verification_count + 1,
       last_verified: utcNow(),
       provenance,

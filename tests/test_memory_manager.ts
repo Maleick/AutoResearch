@@ -391,7 +391,7 @@ describe("Memory Manager", () => {
       const { state: afterSecond, auditEntries } = mod.consolidateReadyItems(result);
 
       // Should not create a duplicate active entry
-      const activePatterns = afterSecond.consolidated_items.filter((i: any) => i.status === "active");
+      const activePatterns = afterSecond.consolidated_items.filter((i: { status: string }) => i.status === "active");
       expect(activePatterns).toHaveLength(1);
       // Audit entries should be empty (skipped the duplicate)
       expect(auditEntries).toHaveLength(0);
