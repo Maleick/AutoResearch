@@ -151,15 +151,16 @@ const formatDisplayValue = (val: unknown): string => {
 
 const parseMemoryPatternHeading = (heading: string): string => {
   const raw = heading.replace(/^### Pattern: /, "");
-  if (raw.startsWith('"')) {
+  const trimmed = raw.trimEnd();
+  if (trimmed.startsWith('"')) {
     try {
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(trimmed);
       if (typeof parsed === "string") return parsed;
     } catch {
       // Fall through to the raw heading text for backward compatibility.
     }
   }
-  return raw;
+  return trimmed;
 };
 
 const formatMetricValue = formatDisplayValue;
