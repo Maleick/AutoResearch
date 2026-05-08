@@ -551,7 +551,8 @@ describe("parsePositiveInt", () => {
   });
 
   it("throws when value exceeds configured maximum", () => {
-    expect(() => mod.parsePositiveInt("65", "field", { max: 64 })).toThrow("must be at most 64");
+    expect(() => mod.parsePositiveInt(String(mod.MAX_DRAFTS + 1), "field", { max: mod.MAX_DRAFTS }))
+      .toThrow(`must be at most ${mod.MAX_DRAFTS}`);
   });
 });
 
