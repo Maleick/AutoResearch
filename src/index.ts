@@ -117,6 +117,11 @@ export type {
   SupervisorSnapshot,
   LabelRequirements,
   ArtifactPaths,
+  MemoryProvenance,
+  MemoryItem,
+  PendingMemoryItem,
+  MemoryConsolidationState,
+  MemoryAuditLogEntry,
 } from "./types.js";
 
 export {
