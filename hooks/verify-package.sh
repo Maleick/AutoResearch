@@ -16,7 +16,7 @@ const packResult = JSON.parse(raw);
 const entries = Array.isArray(packResult) ? packResult : [packResult];
 const files = entries.flatMap((entry) => Array.isArray(entry.files) ? entry.files : []);
 
-const allowedRoots = new Set(["dist", "hooks", "commands", "skills", ".opencode-plugin"]);
+const allowedRoots = new Set(["dist", "hooks", "commands", "skills", ".opencode-plugin", ".vscode"]);
 const allowedFiles = new Set([
   "package.json",
   "README.md",
@@ -25,6 +25,8 @@ const allowedFiles = new Set([
   "VERSION",
   "INSTALL.md",
   "CHANGELOG.md",
+  ".editorconfig",
+  ".gitattributes",
   ".opencode/INSTALL.md",
   "plugins/autoresearch.ts",
   "docs/ARCHITECTURE.md",
@@ -46,6 +48,7 @@ const requiredFiles = [
   "hooks/init.sh",
   "skills/autoresearch/SKILL.md",
   "commands/autoresearch.md",
+  "CHANGELOG.md",
 ];
 
 const normalizePath = (filePath) => filePath.replace(/^package\//, "");
