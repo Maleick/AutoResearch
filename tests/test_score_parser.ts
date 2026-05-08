@@ -5,12 +5,12 @@ const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
 const importScoreParser = async () => await import(resolve(REPO_ROOT, "dist/score-parser.js"));
 
-describe("ScoreOutput interface", () => {
+describe("score-parser module exports", () => {
   let mod: any;
   beforeAll(async () => { mod = await importScoreParser(); });
 
-  it("should define ScoreOutput interface", () => {
-    // This test ensures the interface exists in the compiled output
+  it("should load the compiled module and export parseScoreOutput", () => {
+    // This test verifies the compiled module loads and exposes parseScoreOutput at runtime
     expect(typeof mod).toBe("object");
     expect(typeof mod.parseScoreOutput).toBe("function");
   });
