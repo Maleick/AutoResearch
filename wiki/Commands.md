@@ -65,6 +65,44 @@ See [`skills/hermes/INTEGRATION.md`](https://github.com/Maleick/AutoResearch/blo
 - **Hermes Agent support** — cron-based iteration loop with `delegate_task` subagents
 - Dual-runtime documentation and command mapping
 
+## New in v3.6.0
+
+- **Score trend artifacts** — `.autoresearch/score-history.jsonl` logs each iteration's metric score
+- `autoresearch scores` command — Export latest N score snapshots
+
+### Score History Format
+
+The score history is stored as JSON Lines (one JSON object per line):
+
+```json
+{"timestamp":"2026-05-08T10:30:00Z","iteration":1,"run_id":"run-abc123","decision":"keep","metric_value":"42","metric_name":"errors","metric_direction":"lower","verify_status":"pass","guard_status":"skip"}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | string | ISO 8601 timestamp |
+| `iteration` | number | Iteration number |
+| `run_id` | string | Unique run identifier |
+| `decision` | string | `keep`, `discard`, or `needs_human` |
+| `metric_value` | string\|null | Metric value captured from CLI input |
+| `metric_name` | string | Name of tracked metric |
+| `metric_direction` | string | `lower` or `higher` (better direction) |
+| `verify_status` | string | `pass`, `fail`, or `skip` |
+| `guard_status` | string | `pass`, `fail`, or `skip` |
+
+### Rotation Policy
+
+- No automatic rotation — file grows indefinitely
+- Manual cleanup: `tail -n 1000 .autoresearch/score-history.jsonl > tmp && mv tmp .autoresearch/score-history.jsonl`
+- Or use `autoresearch scores --limit N` to display only the most recent N records
+
+### CLI Command
+
+- `autoresearch scores` — Show latest 10 score records (default)
+- `autoresearch scores --limit N` — Show latest N scores
+- `autoresearch scores --json` — Output as a JSON object with `count` and `scores`
+- `autoresearch scores --score-history-path <path>` — Custom score history path
+
 ## CLI
 
 The `autoresearch` CLI provides background and foreground run control:
