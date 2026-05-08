@@ -1,1 +1,0 @@
-{"version":3,"file":"cli.d.ts","sourceRoot":"","sources":["../../src/translators/cli.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EACV,WAAW,EAGZ,MAAM,mBAAmB,CAAC;AAC3B,OAAO,KAAK,EAAE,SAAS,EAAE,MAAM,aAAa,CAAC;AAE7C,wBAAgB,wBAAwB,CACtC,EAAE,EAAE,MAAM,EACV,MAAM,EAAE,SAAS,GAChB,WAAW,CA6Bb;AAED,wBAAgB,wBAAwB,CAAC,OAAO,EAAE,WAAW,GAAG,SAAS,CAmBxE"}
