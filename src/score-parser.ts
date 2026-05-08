@@ -23,17 +23,22 @@ export interface ScoreOutput {
  * @throws AutoresearchError if the output is invalid
  */
 export function parseScoreOutput(output: string): ScoreOutput {
-  if (!output || typeof output !== 'string') {
+  if (typeof output !== 'string') {
     throw new AutoresearchError("Score output must be a non-empty string");
   }
 
-   let parsed: unknown;
-   try {
-     parsed = JSON.parse(output.trim());
-   } catch (error) {
-     const message = error instanceof Error ? error.message : String(error);
-     throw new AutoresearchError(`Invalid JSON in score output: ${message}`);
-   }
+  const trimmedOutput = output.trim();
+  if (!trimmedOutput) {
+    throw new AutoresearchError("Score output must be a non-empty string");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmedOutput);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new AutoresearchError(`Invalid JSON in score output: ${message}`);
+  }
 
   // Validate that we have an object
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
