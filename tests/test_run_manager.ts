@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { mkdirSync, rmSync, existsSync, readFileSync } from "fs";
+import { mkdirSync, rmSync, existsSync, readFileSync, symlinkSync, writeFileSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
@@ -170,6 +170,26 @@ describe("run-manager", () => {
         decision: "discard",
         metric_value: "12",
       });
+    });
+
+    it("rejects a symlinked score history artifact", async () => {
+      const { initializeRun, appendIteration } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      const targetPath = resolve(tmpDir, "outside-target");
+      writeFileSync(targetPath, "original", "utf-8");
+      symlinkSync(targetPath, scoreHistoryPath);
+
+      await expect(appendIteration(tmpDir, undefined, undefined, "keep", "42", undefined, "pass", "pass", "", "change", [], ""))
+        .rejects.toThrow("Refusing to append to symlinked score history file");
+      expect(readFileSync(targetPath, "utf-8")).toBe("original");
     });
   });
 
