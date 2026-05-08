@@ -95,15 +95,13 @@ export function validateTaskContext(context: unknown): context is TaskContext {
   if (typeof obj.id !== "string") return false;
   if (!["cli", "hermes", "mcp", "webhook", "api"].includes(obj.source as string)) return false;
   if (typeof obj.goal !== "string") return false;
-  if (typeof obj.metric !== "object" || obj.metric === null) return false;
-  const metric = obj.metric as Record<string, unknown>;
-  if (typeof metric.name !== "string") return false;
-  if (!["lower", "higher"].includes(metric.direction as string)) return false;
-  if (obj.instrument_metric !== undefined) {
-    if (typeof obj.instrument_metric !== "object" || obj.instrument_metric === null) return false;
-    const iMetric = obj.instrument_metric as Record<string, unknown>;
-    if (typeof iMetric.name !== "string") return false;
-    if (!["lower", "higher"].includes(iMetric.direction as string)) return false;
-  }
+  if (!isValidMetricShape(obj.metric)) return false;
+  if (obj.instrument_metric !== undefined && !isValidMetricShape(obj.instrument_metric)) return false;
   return true;
+}
+
+function isValidMetricShape(metric: unknown): boolean {
+  if (typeof metric !== "object" || metric === null) return false;
+  const m = metric as Record<string, unknown>;
+  return typeof m.name === "string" && ["lower", "higher"].includes(m.direction as string);
 }
