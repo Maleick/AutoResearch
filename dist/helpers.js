@@ -215,9 +215,11 @@ export function parseRunState(value) {
             throw new AutoresearchError(`Invalid state: missing required field "${key}"`);
         }
     }
-    if (!("operating_mode" in obj)) {
-        obj.operating_mode = "continuous";
+    const rawOperatingMode = "operating_mode" in obj ? obj.operating_mode : undefined;
+    if (rawOperatingMode !== undefined && rawOperatingMode !== null && typeof rawOperatingMode !== "string") {
+        throw new AutoresearchError("Invalid state: operating_mode must be a string");
     }
+    const operating_mode = normalizeOperatingMode(rawOperatingMode);
     if (typeof obj.metric !== "object" || obj.metric === null) {
         throw new AutoresearchError("Invalid state: metric must be an object");
     }
@@ -239,7 +241,10 @@ export function parseRunState(value) {
     if (typeof flags.stop_requested !== "boolean" || typeof flags.needs_human !== "boolean" || typeof flags.background_active !== "boolean" || typeof flags.stop_ready !== "boolean") {
         throw new AutoresearchError("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
     }
-    return obj;
+    return {
+        ...obj,
+        operating_mode,
+    };
 }
 export function getUpdateCachePath() {
     const home = process.env.HOME || process.env.USERPROFILE || "";
