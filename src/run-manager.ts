@@ -14,7 +14,10 @@ import {
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy } from "./subagent-pool.js";
-import { writeFileSync, readFileSync, appendFileSync, existsSync } from "fs";
+import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
+import { lstat, open } from "fs/promises";
+
+const MAX_RESULTS_BYTES = 10 * 1024 * 1024;
 
 export async function initializeRun(
   repo: string | undefined,
@@ -254,6 +257,49 @@ export async function completeRun(
   return state;
 }
 
+
+async function countResultsRows(resultsPath: string): Promise<number> {
+  try {
+    const pathStats = await lstat(resultsPath);
+    if (pathStats.isSymbolicLink()) {
+      throw new AutoresearchError(`Refusing to read symlinked results file: ${resultsPath}`);
+    }
+  } catch (err) {
+    if (err instanceof AutoresearchError) throw err;
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return 0;
+    throw err;
+  }
+
+  let handle;
+  try {
+    const noFollow = typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
+    handle = await open(resultsPath, constants.O_RDONLY | noFollow);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return 0;
+    if (code === "ELOOP") {
+      throw new AutoresearchError(`Refusing to read symlinked results file: ${resultsPath}`);
+    }
+    throw err;
+  }
+
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile()) {
+      throw new AutoresearchError(`Refusing to read non-regular results file: ${resultsPath}`);
+    }
+    if (stats.size > MAX_RESULTS_BYTES) {
+      throw new AutoresearchError(`Refusing to read results file larger than ${MAX_RESULTS_BYTES} bytes: ${resultsPath}`);
+    }
+
+    const content = await handle.readFile("utf-8");
+    return content.split("\n").filter((l: string) => l.trim() && !l.startsWith("timestamp")).length;
+  } finally {
+    await handle.close();
+  }
+}
+
 export async function buildSupervisorSnapshot(
   repo: string | undefined,
   resultsPathValue: string | undefined,
@@ -263,11 +309,7 @@ export async function buildSupervisorSnapshot(
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
   const state = parseRunState(readJsonFile(statePath));
 
-  let resultsRows = 0;
-  if (existsSync(resultsPath)) {
-    const content = readFileSync(resultsPath, "utf-8");
-    resultsRows = content.split("\n").filter((l: string) => l.trim() && !l.startsWith("timestamp")).length;
-  }
+  const resultsRows = await countResultsRows(resultsPath);
 
   let decision = "relaunch";
   let reason = "ready_for_next_iteration";

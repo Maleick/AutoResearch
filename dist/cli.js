@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt } from "./helpers.js";
+import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
 const VERSION_FLAGS = ["--version", "-v"];
 const HELP_FLAGS = ["--help", "-h", "help"];
 const usage = () => {
@@ -83,11 +83,48 @@ const parseArgs = (args) => {
     }
     return result;
 };
-const formatMetricValue = (val) => {
+const markdownInlineEscapes = {
+    "\\": "\\\\",
+    "`": "\\`",
+    "*": "\\*",
+    "_": "\\_",
+    "{": "\\{",
+    "}": "\\}",
+    "[": "\\[",
+    "]": "\\]",
+    "(": "\\(",
+    ")": "\\)",
+    "#": "\\#",
+    "+": "\\+",
+    "-": "\\-",
+    ".": "\\.",
+    "!": "\\!",
+    "|": "\\|",
+};
+const markdownHtmlEscapes = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+};
+const escapeMarkdownInline = (value) => {
+    return sanitizeForTerminal(value ?? "")
+        .replace(/[&<>"]/g, (char) => markdownHtmlEscapes[char])
+        .replace(/[\r\n\t]+/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim()
+        .replace(/[\\`*_{}\[\]()#+\-.!|]/g, (char) => markdownInlineEscapes[char]);
+};
+const escapeMarkdownTableCell = (value) => {
+    const escaped = escapeMarkdownInline(value);
+    return escaped.length > 0 ? escaped : "—";
+};
+const formatDisplayValue = (val) => {
     if (val === undefined || val === null)
         return "—";
-    return String(val);
+    return sanitizeForTerminal(val);
 };
+const formatMetricValue = formatDisplayValue;
 const formatTimestamp = (ts) => {
     try {
         const d = new Date(ts);
@@ -96,6 +133,21 @@ const formatTimestamp = (ts) => {
     catch {
         return ts;
     }
+};
+const markdownEscapePattern = /([\\`*_{}[\]()#+\-.!|>])/g;
+const terminalControlPattern = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g;
+const controlCharacterPattern = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+const sanitizeMarkdownText = (value) => {
+    if (value === undefined || value === null)
+        return "—";
+    return String(value)
+        .replace(terminalControlPattern, "")
+        .replace(controlCharacterPattern, "")
+        .replace(/\r?\n|\r/g, " ")
+        .replace(/\t/g, " ");
+};
+const formatMarkdownField = (value) => {
+    return sanitizeMarkdownText(value).replace(markdownEscapePattern, "\\$1");
 };
 const main = async () => {
     const args = process.argv.slice(2);
@@ -155,7 +207,7 @@ const main = async () => {
             }
             case "init": {
                 if (verbose)
-                    console.error(`[verbose] Initializing run with goal: ${grouped.goal}`);
+                    console.error(`[verbose] Initializing run with goal: ${formatDisplayValue(grouped.goal)}`);
                 if (dryRun) {
                     console.log("[dry-run] Would initialize run with config:");
                     console.log(JSON.stringify({
@@ -198,13 +250,13 @@ const main = async () => {
                 else {
                     const s = snapshot;
                     const stats = s.stats;
-                    console.log(`Run:     ${s.run_id}`);
-                    console.log(`Status:  ${s.status}`);
-                    console.log(`Mode:    ${s.mode}`);
-                    console.log(`Goal:    ${s.goal}`);
+                    console.log(`Run:     ${formatDisplayValue(s.run_id)}`);
+                    console.log(`Status:  ${formatDisplayValue(s.status)}`);
+                    console.log(`Mode:    ${formatDisplayValue(s.mode)}`);
+                    console.log(`Goal:    ${formatDisplayValue(s.goal)}`);
                     if (s.metric) {
                         const m = s.metric;
-                        console.log(`Metric:  ${m.name} (${m.direction})`);
+                        console.log(`Metric:  ${formatDisplayValue(m.name)} (${formatDisplayValue(m.direction)})`);
                         console.log(`  best:  ${formatMetricValue(m.best)}`);
                         console.log(`  latest: ${formatMetricValue(m.latest)}`);
                     }
@@ -214,7 +266,7 @@ const main = async () => {
                     console.log(`Results: ${s.results_rows} rows`);
                     const lastIter = s.last_iteration;
                     if (lastIter && lastIter.iteration) {
-                        console.log(`Last:    iter ${lastIter.iteration} — ${lastIter.decision} (${lastIter.metric_value})`);
+                        console.log(`Last:    iter ${formatDisplayValue(lastIter.iteration)} — ${formatDisplayValue(lastIter.decision)} (${formatMetricValue(lastIter.metric_value)})`);
                     }
                     const flags = s.flags;
                     if (flags?.needs_human)
@@ -238,21 +290,26 @@ const main = async () => {
                 const statusEmoji = {
                     running: "🔄", completed: "✅", initialized: "📋", stopping: "⏹", stopped: "⏸",
                 };
-                console.log(`${statusEmoji[s.status] ?? "⚪"} Auto Research Run: ${s.run_id}`);
-                console.log(`   Goal:      ${s.goal ?? "—"}`);
-                console.log(`   Status:    ${s.status}`);
-                console.log(`   Mode:      ${s.mode}`);
+                const statusKey = typeof s.status === "string" ? s.status : "";
+                const candidateEmoji = Object.prototype.hasOwnProperty.call(statusEmoji, statusKey)
+                    ? statusEmoji[statusKey]
+                    : undefined;
+                const emoji = typeof candidateEmoji === "string" ? candidateEmoji : "⚪";
+                console.log(`${emoji} Auto Research Run: ${formatDisplayValue(s.run_id)}`);
+                console.log(`   Goal:      ${formatDisplayValue(s.goal)}`);
+                console.log(`   Status:    ${formatDisplayValue(s.status)}`);
+                console.log(`   Mode:      ${formatDisplayValue(s.mode)}`);
                 if (s.metric) {
                     const m = s.metric;
-                    console.log(`   Metric:    ${m.name} → ${formatMetricValue(m.latest)} (best: ${formatMetricValue(m.best)}, dir: ${m.direction})`);
+                    console.log(`   Metric:    ${formatDisplayValue(m.name)} → ${formatMetricValue(m.latest)} (best: ${formatMetricValue(m.best)}, dir: ${formatDisplayValue(m.direction)})`);
                 }
                 if (stats) {
                     console.log(`   Progress:  ${stats.total_iterations} iterations | ${stats.kept} kept | ${stats.discarded} discarded`);
                 }
                 if (lastIter && lastIter.iteration) {
-                    console.log(`   Last iter: #${lastIter.iteration} — ${lastIter.decision}`);
+                    console.log(`   Last iter: #${formatDisplayValue(lastIter.iteration)} — ${formatDisplayValue(lastIter.decision)}`);
                     if (lastIter.change_summary)
-                        console.log(`   Change:    ${lastIter.change_summary}`);
+                        console.log(`   Change:    ${formatDisplayValue(lastIter.change_summary)}`);
                 }
                 if (flags?.needs_human)
                     console.log("   ⚠  Needs human review");
@@ -295,7 +352,7 @@ const main = async () => {
                     const cols = r.split("\t");
                     if (cols.length >= 8) {
                         const emoji = cols[2] === "keep" ? "✓" : cols[2] === "discard" ? "✗" : "⚠";
-                        console.log(`${emoji}  #${cols[1]}  ${cols[2]}  (${formatMetricValue(cols[3])})  ${cols[7].substring(0, 60)}`);
+                        console.log(`${emoji}  #${formatDisplayValue(cols[1])}  ${formatDisplayValue(cols[2])}  (${formatMetricValue(cols[3])})  ${formatDisplayValue(cols[7].substring(0, 60))}`);
                     }
                 }
                 console.log(`\nShowing ${Math.min(limit, records.length)} of ${lines.length - 1} records.`);
@@ -326,17 +383,17 @@ const main = async () => {
                     break;
                 }
                 console.log("Run Configuration:");
-                console.log(`  Goal:     ${state.goal ?? "—"}`);
-                console.log(`  Mode:     ${state.mode ?? "—"}`);
+                console.log(`  Goal:     ${formatDisplayValue(state.goal)}`);
+                console.log(`  Mode:     ${formatDisplayValue(state.mode)}`);
                 if (state.metric) {
                     const m = state.metric;
-                    console.log(`  Metric:   ${m.name} (${m.direction})`);
+                    console.log(`  Metric:   ${formatDisplayValue(m.name)} (${formatDisplayValue(m.direction)})`);
                 }
-                console.log(`  Scope:    ${state.scope ?? "—"}`);
-                console.log(`  Iter cap: ${state.iterations_cap ?? "—"}`);
-                console.log(`  Deadline: ${state.deadline_at ? formatTimestamp(state.deadline_at) : "—"}`);
-                console.log(`  Verify:   ${state.verify ?? "—"}`);
-                console.log(`  Guard:    ${state.guard ?? "—"}`);
+                console.log(`  Scope:    ${formatDisplayValue(state.scope)}`);
+                console.log(`  Iter cap: ${formatDisplayValue(state.iterations_cap)}`);
+                console.log(`  Deadline: ${formatDisplayValue(state.deadline_at ? formatTimestamp(state.deadline_at) : "—")}`);
+                console.log(`  Verify:   ${formatDisplayValue(state.verify)}`);
+                console.log(`  Guard:    ${formatDisplayValue(state.guard)}`);
                 console.log(`  Pool:     ${state.subagent_pool ? "configured" : "none"}`);
                 break;
             }
@@ -387,7 +444,7 @@ const main = async () => {
                 break;
             }
             case "validate": {
-                const { normalizeDirection, normalizeMode, inferVerifyCommand } = await import("./helpers.js");
+                const { normalizeDirection, normalizeMode } = await import("./helpers.js");
                 const errors = [];
                 if (!grouped.goal)
                     errors.push("Missing required: --goal");
@@ -407,10 +464,8 @@ const main = async () => {
                 catch (e) {
                     errors.push(`Invalid mode: ${e.message}`);
                 }
-                const verify = grouped.verify || inferVerifyCommand(grouped.repo);
-                if (verify === "<set verify command>") {
-                    errors.push("Cannot infer verify command. Provide --verify explicitly.");
-                }
+                if (!grouped.verify)
+                    errors.push("Missing required: --verify");
                 if (useJson) {
                     printJson({ valid: errors.length === 0, errors });
                     return errors.length > 0 ? 1 : 0;
@@ -419,13 +474,13 @@ const main = async () => {
                     console.log("✓ Configuration is valid");
                     console.log(`  Goal: ${grouped.goal}`);
                     console.log(`  Metric: ${grouped.metric} (${grouped.direction || "lower"})`);
-                    console.log(`  Verify: ${verify}`);
+                    console.log(`  Verify: ${grouped.verify}`);
                     console.log(`  Mode: ${grouped.mode || "foreground"}`);
                 }
                 else {
                     console.error("✗ Configuration errors:");
                     for (const err of errors) {
-                        console.error(`  - ${err}`);
+                        console.error(`  - ${formatDisplayValue(err)}`);
                     }
                     return 1;
                 }
@@ -451,29 +506,29 @@ const main = async () => {
                     break;
                 }
                 console.log(`# Auto Research Report`);
-                console.log(`\n**Run:** ${state.run_id}`);
-                console.log(`**Goal:** ${state.goal}`);
-                console.log(`**Status:** ${state.status}`);
-                console.log(`**Mode:** ${state.mode}`);
+                console.log(`\n**Run:** ${formatMarkdownField(state.run_id)}`);
+                console.log(`**Goal:** ${formatMarkdownField(state.goal)}`);
+                console.log(`**Status:** ${formatMarkdownField(state.status)}`);
+                console.log(`**Mode:** ${formatMarkdownField(state.mode)}`);
                 if (state.metric) {
                     const m = state.metric;
-                    console.log(`**Metric:** ${m.name} (${m.direction})`);
-                    console.log(`**Best:** ${m.best} | **Latest:** ${m.latest}`);
+                    console.log(`**Metric:** ${formatMarkdownField(m.name)} (${formatMarkdownField(m.direction)})`);
+                    console.log(`**Best:** ${formatMarkdownField(m.best)} | **Latest:** ${formatMarkdownField(m.latest)}`);
                 }
                 if (state.stats) {
                     const s = state.stats;
                     console.log(`\n## Stats`);
-                    console.log(`- Iterations: ${s.total_iterations}`);
-                    console.log(`- Kept: ${s.kept}`);
-                    console.log(`- Discarded: ${s.discarded}`);
-                    console.log(`- Needs human: ${s.needs_human}`);
+                    console.log(`- Iterations: ${formatMarkdownField(s.total_iterations)}`);
+                    console.log(`- Kept: ${formatMarkdownField(s.kept)}`);
+                    console.log(`- Discarded: ${formatMarkdownField(s.discarded)}`);
+                    console.log(`- Needs human: ${formatMarkdownField(s.needs_human)}`);
                 }
                 if (results.length > 0) {
                     console.log(`\n## Iterations`);
                     for (const r of results) {
                         const cols = r.split("\t");
                         if (cols.length >= 8) {
-                            console.log(`- ${cols[1]}: ${cols[2]} (${cols[3]}) — ${cols[7].substring(0, 60)}`);
+                            console.log(`- ${formatMarkdownField(cols[1])}: ${formatMarkdownField(cols[2])} (${formatMarkdownField(cols[3])}) — ${formatMarkdownField(cols[7]).substring(0, 60)}`);
                         }
                     }
                 }
@@ -495,7 +550,7 @@ const main = async () => {
                 }
                 console.log("Memory Patterns — candidate next goals:");
                 for (const p of patterns) {
-                    console.log(`  → ${p.replace("### Pattern: ", "")}`);
+                    console.log(`  → ${formatDisplayValue(p.replace("### Pattern: ", ""))}`);
                 }
                 console.log(`\n${patterns.length} patterns available. Use 'autoresearch init --goal "..."' to start a new run.`);
                 break;
@@ -537,9 +592,9 @@ const main = async () => {
                 }
                 else if (format === "md" || format === "markdown") {
                     console.log(`# Auto Research Export`);
-                    console.log(`\n**Run:** ${exportData.state.run_id}`);
-                    console.log(`**Goal:** ${exportData.state.goal}`);
-                    console.log(`**Exported:** ${exportData.exported_at}`);
+                    console.log(`\n**Run:** ${escapeMarkdownInline(exportData.state.run_id) || "—"}`);
+                    console.log(`**Goal:** ${escapeMarkdownInline(exportData.state.goal) || "—"}`);
+                    console.log(`**Exported:** ${escapeMarkdownInline(exportData.exported_at)}`);
                     console.log(`\n## Summary`);
                     console.log(`- Total iterations: ${exportData.summary.total}`);
                     console.log(`- Kept: ${exportData.summary.kept}`);
@@ -548,7 +603,7 @@ const main = async () => {
                     console.log(`| # | Decision | Metric | Summary |`);
                     console.log(`|---|----------|--------|---------|`);
                     for (const r of records) {
-                        console.log(`| ${r.iteration} | ${r.decision} | ${r.metric_value || "—"} | ${r.change_summary?.substring(0, 50) || "—"} |`);
+                        console.log(`| ${escapeMarkdownTableCell(r.iteration)} | ${escapeMarkdownTableCell(r.decision)} | ${escapeMarkdownTableCell(r.metric_value)} | ${escapeMarkdownTableCell(r.change_summary?.substring(0, 50))} |`);
                     }
                 }
                 else {
@@ -592,8 +647,6 @@ const main = async () => {
             }
             case "launch": {
                 const { resolvePath } = await import("./helpers.js");
-                const { initializeRun } = await import("./run-manager.js");
-                const { writeFileSync } = await import("fs");
                 const { LAUNCH_DEFAULT } = await import("./constants.js");
                 const config = {
                     goal: grouped.goal,
@@ -613,43 +666,76 @@ const main = async () => {
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
                 };
-                const state = await initializeRun(grouped.repo, grouped["results-path"], grouped["state-path"], config, grouped["fresh-start"] === "true");
                 const launchPath = resolvePath(grouped.repo, grouped["launch-path"], LAUNCH_DEFAULT);
+                if (dryRun) {
+                    console.log("[dry-run] Would launch background run with config:");
+                    console.log(JSON.stringify({ ...config, launch_path: launchPath }, null, 2));
+                    return 0;
+                }
+                const { initializeRun } = await import("./run-manager.js");
+                const { writeFileSync } = await import("fs");
+                const state = await initializeRun(grouped.repo, grouped["results-path"], grouped["state-path"], config, grouped["fresh-start"] === "true");
                 writeFileSync(launchPath, JSON.stringify({ run_id: state.run_id, goal: state.goal, mode: "background" }, null, 2) + "\n", "utf-8");
                 printJson({ status: "launched", run_id: state.run_id, launch_path: launchPath });
                 break;
             }
             case "complete": {
+                if (dryRun) {
+                    console.log("[dry-run] Would mark run complete");
+                    return 0;
+                }
                 const { completeRun } = await import("./run-manager.js");
                 const state = await completeRun(grouped.repo, grouped["state-path"]);
                 printJson({ status: "completed", run_id: state.run_id });
                 break;
             }
             case "stop": {
+                if (dryRun) {
+                    console.log("[dry-run] Would request background run stop");
+                    return 0;
+                }
                 const { setStopRequested } = await import("./run-manager.js");
                 const state = await setStopRequested(grouped.repo, grouped["state-path"]);
                 printJson({ status: "stop_requested", run_id: state.run_id });
                 break;
             }
             case "resume": {
+                if (dryRun) {
+                    console.log("[dry-run] Would resume background run");
+                    return 0;
+                }
                 const { resumeBackgroundRun } = await import("./run-manager.js");
                 const state = await resumeBackgroundRun(grouped.repo, grouped["state-path"]);
                 printJson({ status: "resumed", run_id: state.run_id });
                 break;
             }
             case "record": {
-                const { appendIteration } = await import("./run-manager.js");
                 const { normalizeResultStatus } = await import("./helpers.js");
                 const vs = grouped["verify-status"] || "pass";
                 const gs = grouped["guard-status"] || "skip";
-                const state = await appendIteration(grouped.repo, grouped["results-path"], grouped["state-path"], grouped.decision, grouped["metric-value"], normalizeResultStatus(vs, "verify_status"), normalizeResultStatus(gs, "guard_status"), grouped.hypothesis, grouped["change-summary"], grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined, grouped.note, parsePositiveInt(grouped.iteration, "iteration"));
+                const iteration = parsePositiveInt(grouped.iteration, "iteration");
+                if (dryRun) {
+                    console.log("[dry-run] Would record experiment result:");
+                    console.log(JSON.stringify({
+                        decision: grouped.decision,
+                        metric_value: grouped["metric-value"],
+                        verify_status: normalizeResultStatus(vs, "verify_status"),
+                        guard_status: normalizeResultStatus(gs, "guard_status"),
+                        hypothesis: grouped.hypothesis,
+                        change_summary: grouped["change-summary"],
+                        labels: grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined,
+                        note: grouped.note,
+                        iteration,
+                    }, null, 2));
+                    return 0;
+                }
+                const { appendIteration } = await import("./run-manager.js");
+                const state = await appendIteration(grouped.repo, grouped["results-path"], grouped["state-path"], grouped.decision, grouped["metric-value"], normalizeResultStatus(vs, "verify_status"), normalizeResultStatus(gs, "guard_status"), grouped.hypothesis, grouped["change-summary"], grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined, grouped.note, iteration);
                 printJson(state);
                 break;
             }
             case "doctor": {
                 const { VERSION, PACKAGE_NAME, SKILL_NAME } = await import("./constants.js");
-                console.log(`${SKILL_NAME} ${VERSION} (${PACKAGE_NAME})`);
-                console.log("Runtime: Node.js " + process.version);
                 const base = resolveRepo(grouped.repo);
                 const checks = [];
                 const cmdDir = resolve(base, "commands");
@@ -664,6 +750,66 @@ const main = async () => {
                 checks.push({ name: "dist", ok: existsSync(resolve(base, "dist/cli.js")), detail: "dist/cli.js" });
                 checks.push({ name: "plugin", ok: existsSync(resolve(base, ".opencode-plugin/plugin.json")), detail: "plugin manifest" });
                 checks.push({ name: "VERSION", ok: existsSync(resolve(base, "VERSION")), detail: "version marker" });
+                const globalPrefix = getGlobalNpmPrefix();
+                const installedPath = getInstalledPackagePath(PACKAGE_NAME);
+                const installedInfo = installedPath ? getInstalledPackageInfo(PACKAGE_NAME) : null;
+                const updateCache = readUpdateCache();
+                const updateStatus = {
+                    cache_exists: updateCache !== null,
+                    last_check: updateCache?.last_check || null,
+                    current_version: updateCache?.current_version || null,
+                    latest_version: updateCache?.latest_version || null,
+                    update_available: updateCache?.update_available || false,
+                    update_disabled: process.env.AUTORESEARCH_NO_UPDATE === "1",
+                };
+                if (useJson) {
+                    printJson({
+                        version: VERSION,
+                        skill_name: SKILL_NAME,
+                        runtime: `Node.js ${process.version}`,
+                        source: {
+                            package_name: PACKAGE_NAME,
+                            global_path: installedPath || null,
+                            global_prefix: globalPrefix || null,
+                            installed_version: installedInfo?.version || null,
+                            installed_description: installedInfo?.description || null,
+                            installed_repository: installedInfo?.repository || null,
+                        },
+                        update: updateStatus,
+                        checks: checks,
+                        checks_passed: checks.filter((c) => !c.ok).length === 0,
+                    });
+                    break;
+                }
+                console.log(`${SKILL_NAME} ${VERSION} (${PACKAGE_NAME})`);
+                console.log(`Runtime: Node.js ${process.version}`);
+                console.log("");
+                console.log("Source:");
+                console.log(`  Package:    ${PACKAGE_NAME}`);
+                if (installedPath) {
+                    console.log(`  Global:     ${installedPath}`);
+                    if (globalPrefix)
+                        console.log(`  Prefix:     ${globalPrefix}`);
+                    if (installedInfo?.repository)
+                        console.log(`  Repo:       ${installedInfo.repository}`);
+                }
+                else {
+                    console.log("  Global:     not found via npm -g");
+                }
+                console.log("");
+                console.log("Update:");
+                if (updateCache) {
+                    console.log(`  Last check: ${updateCache.last_check}`);
+                    console.log(`  Current:    ${updateCache.current_version}`);
+                    console.log(`  Latest:     ${updateCache.latest_version}`);
+                    console.log(`  Available:  ${updateCache.update_available ? "yes" : "no"}`);
+                }
+                else {
+                    console.log("  Cache:      no update check recorded");
+                }
+                console.log(`  Disabled:   ${process.env.AUTORESEARCH_NO_UPDATE === "1" ? "yes (AUTORESEARCH_NO_UPDATE=1)" : "no"}`);
+                console.log("");
+                console.log("Installation Checks:");
                 let maxNameLen = 0;
                 for (const c of checks)
                     maxNameLen = Math.max(maxNameLen, c.name.length);
