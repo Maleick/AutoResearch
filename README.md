@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v3.4.0-58a6ff?style=flat" alt="v3.4.0">
+  <img src="https://img.shields.io/badge/version-v3.6.0-58a6ff?style=flat" alt="v3.6.0">
   <a href="https://github.com/Maleick/AutoResearch/stargazers"><img src="https://img.shields.io/github/stars/Maleick/AutoResearch?style=flat&color=58a6ff" alt="Stars"></a>
   <a href="https://github.com/Maleick/AutoResearch/commits/main"><img src="https://img.shields.io/github/last-commit/Maleick/AutoResearch?style=flat" alt="Last Commit"></a>
   <a href="https://github.com/Maleick/AutoResearch/releases"><img src="https://img.shields.io/github/v/release/Maleick/AutoResearch?style=flat" alt="Version"></a>
@@ -99,10 +99,10 @@ See [`skills/autoresearch/references/self-improve-loop.md`](skills/autoresearch/
 
 ### OpenCode
 
-For OpenCode, paste this one-line install prompt into your agent. This URL follows the latest `main` instructions:
+For OpenCode, paste this one-line install prompt into your agent. This URL is pinned to the immutable `v3.5.0` release instructions:
 
 ```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/heads/main/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.5.0/INSTALL.md
 ```
 
 Recommended plugin install in `opencode.json`:
