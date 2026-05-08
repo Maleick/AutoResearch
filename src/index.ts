@@ -123,3 +123,11 @@ export type {
   MemoryConsolidationState,
   MemoryAuditLogEntry,
 } from "./types.js";
+
+export {
+  parseScoreOutput,
+} from "./score-parser.js";
+
+export type {
+  ScoreOutput,
+} from "./score-parser.js";
