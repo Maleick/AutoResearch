@@ -28,8 +28,13 @@ const usage = () => {
     console.error("Options:");
     console.error("  --repo          Repository root (default: current directory)");
     console.error("  --goal          Desired run outcome");
-    console.error("  --metric        Metric name to track");
-    console.error("  --direction     lower or higher");
+    console.error("  --metric        Metric name to track (default outcome metric)");
+    console.error("  --direction     lower or higher (for outcome metric)");
+    console.error("  --outcome-metric    Primary metric for keep decisions");
+    console.error("  --outcome-direction Direction for outcome metric");
+    console.error("  --instrument-metric Measurement quality/risk metric (surfaced separately)");
+    console.error("  --instrument-direction Direction for instrument metric");
+    console.error("  --instrument-value  Recorded value for the instrument metric");
     console.error("  --verify        Mechanical verification command");
     console.error("  --guard         Guard command for regression catch");
     console.error("  --mode          foreground or background");
@@ -233,8 +238,8 @@ const main = async () => {
                 const { initializeRun } = await import("./run-manager.js");
                 const config = {
                     goal: grouped.goal,
-                    metric: grouped.metric,
-                    direction: grouped.direction || "lower",
+                    metric: (grouped.metric || grouped["outcome-metric"]),
+                    direction: (grouped.direction || grouped["outcome-direction"]) || "lower",
                     verify: grouped.verify,
                     mode: grouped.mode || "foreground",
                     scope: grouped.scope,
@@ -250,6 +255,10 @@ const main = async () => {
                     baseline: grouped.baseline,
                     num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts") ?? 1,
                     branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"]),
+                    outcome_metric: grouped["outcome-metric"],
+                    outcome_direction: grouped["outcome-direction"],
+                    instrument_metric: grouped["instrument-metric"],
+                    instrument_direction: grouped["instrument-direction"],
                 };
                 const state = await initializeRun(grouped.repo, grouped["results-path"], grouped["state-path"], config, grouped["fresh-start"] === "true");
                 printJson(state);
@@ -267,6 +276,7 @@ const main = async () => {
                     console.log(`Run:     ${formatDisplayValue(s.run_id)}`);
                     console.log(`Status:  ${formatDisplayValue(s.status)}`);
                     console.log(`Mode:    ${formatDisplayValue(s.mode)}`);
+                    console.log(`Op Mode: ${formatDisplayValue(s.operating_mode)}`);
                     console.log(`Goal:    ${formatDisplayValue(s.goal)}`);
                     if (s.metric) {
                         const m = s.metric;
@@ -313,6 +323,7 @@ const main = async () => {
                 console.log(`   Goal:      ${formatDisplayValue(s.goal)}`);
                 console.log(`   Status:    ${formatDisplayValue(s.status)}`);
                 console.log(`   Mode:      ${formatDisplayValue(s.mode)}`);
+                console.log(`   Op Mode:   ${formatDisplayValue(s.operating_mode)}`);
                 if (s.metric) {
                     const m = s.metric;
                     console.log(`   Metric:    ${formatDisplayValue(m.name)} → ${formatMetricValue(m.latest)} (best: ${formatMetricValue(m.best)}, dir: ${formatDisplayValue(m.direction)})`);
@@ -399,6 +410,7 @@ const main = async () => {
                 console.log("Run Configuration:");
                 console.log(`  Goal:     ${formatDisplayValue(state.goal)}`);
                 console.log(`  Mode:     ${formatDisplayValue(state.mode)}`);
+                console.log(`  Op Mode:  ${formatDisplayValue(state.operating_mode)}`);
                 if (state.metric) {
                     const m = state.metric;
                     console.log(`  Metric:   ${formatDisplayValue(m.name)} (${formatDisplayValue(m.direction)})`);
@@ -462,8 +474,8 @@ const main = async () => {
                 const errors = [];
                 if (!grouped.goal)
                     errors.push("Missing required: --goal");
-                if (!grouped.metric)
-                    errors.push("Missing required: --metric");
+                if (!grouped.metric && !grouped["outcome-metric"])
+                    errors.push("Missing required: --metric or --outcome-metric");
                 try {
                     if (grouped.direction)
                         normalizeDirection(grouped.direction);
@@ -487,7 +499,7 @@ const main = async () => {
                 if (errors.length === 0) {
                     console.log("✓ Configuration is valid");
                     console.log(`  Goal: ${grouped.goal}`);
-                    console.log(`  Metric: ${grouped.metric} (${grouped.direction || "lower"})`);
+                    console.log(`  Metric: ${grouped.metric || grouped["outcome-metric"]} (${grouped.direction || grouped["outcome-direction"] || "lower"})`);
                     console.log(`  Verify: ${grouped.verify}`);
                     console.log(`  Mode: ${grouped.mode || "foreground"}`);
                 }
@@ -524,6 +536,7 @@ const main = async () => {
                 console.log(`**Goal:** ${formatMarkdownField(state.goal)}`);
                 console.log(`**Status:** ${formatMarkdownField(state.status)}`);
                 console.log(`**Mode:** ${formatMarkdownField(state.mode)}`);
+                console.log(`**Op Mode:** ${formatMarkdownField(state.operating_mode)}`);
                 if (state.metric) {
                     const m = state.metric;
                     console.log(`**Metric:** ${formatMarkdownField(m.name)} (${formatMarkdownField(m.direction)})`);
@@ -664,8 +677,8 @@ const main = async () => {
                 const { LAUNCH_DEFAULT } = await import("./constants.js");
                 const config = {
                     goal: grouped.goal,
-                    metric: grouped.metric,
-                    direction: grouped.direction || "lower",
+                    metric: (grouped.metric || grouped["outcome-metric"]),
+                    direction: (grouped.direction || grouped["outcome-direction"]) || "lower",
                     verify: grouped.verify,
                     mode: "background",
                     scope: grouped.scope,
@@ -681,6 +694,10 @@ const main = async () => {
                     baseline: grouped.baseline,
                     num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts") ?? 1,
                     branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"]),
+                    outcome_metric: grouped["outcome-metric"],
+                    outcome_direction: grouped["outcome-direction"],
+                    instrument_metric: grouped["instrument-metric"],
+                    instrument_direction: grouped["instrument-direction"],
                 };
                 const launchPath = resolvePath(grouped.repo, grouped["launch-path"], LAUNCH_DEFAULT);
                 if (dryRun) {
@@ -735,6 +752,7 @@ const main = async () => {
                     console.log(JSON.stringify({
                         decision: grouped.decision,
                         metric_value: grouped["metric-value"],
+                        instrument_value: grouped["instrument-value"],
                         verify_status: normalizeResultStatus(vs, "verify_status"),
                         guard_status: normalizeResultStatus(gs, "guard_status"),
                         hypothesis: grouped.hypothesis,
@@ -746,7 +764,7 @@ const main = async () => {
                     return 0;
                 }
                 const { appendIteration } = await import("./run-manager.js");
-                const state = await appendIteration(grouped.repo, grouped["results-path"], grouped["state-path"], grouped.decision, grouped["metric-value"], normalizeResultStatus(vs, "verify_status"), normalizeResultStatus(gs, "guard_status"), grouped.hypothesis, grouped["change-summary"], grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined, grouped.note, iteration);
+                const state = await appendIteration(grouped.repo, grouped["results-path"], grouped["state-path"], grouped.decision, grouped["metric-value"], grouped["instrument-value"], normalizeResultStatus(vs, "verify_status"), normalizeResultStatus(gs, "guard_status"), grouped.hypothesis, grouped["change-summary"], grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined, grouped.note, iteration);
                 printJson(state);
                 break;
             }

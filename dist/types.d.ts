@@ -12,6 +12,7 @@ export interface RunConfig {
     direction: string;
     verify: string;
     mode: string;
+    operating_mode?: string;
     scope?: string;
     guard?: string;
     iterations?: number;
@@ -25,6 +26,10 @@ export interface RunConfig {
     baseline?: string;
     num_drafts?: number;
     branch_selection_policy?: "best" | "roulette" | "diverse";
+    outcome_metric?: string;
+    outcome_direction?: string;
+    instrument_metric?: string;
+    instrument_direction?: string;
 }
 export type WizardConfig = Partial<Omit<RunConfig, 'baseline'>> & {
     rollback_strategy?: string;
@@ -54,6 +59,7 @@ export interface LastIteration {
     iteration: number;
     decision: string;
     metric_value?: string;
+    instrument_value?: string;
     change_summary: string;
     labels: string[];
     timestamp: string;
@@ -62,6 +68,7 @@ export interface LastIteration {
     missing_keep_labels: string[];
     missing_stop_labels: string[];
 }
+export type OperatingMode = "converge" | "continuous" | "supervised";
 export interface RunState {
     schema_version: number;
     run_id: string;
@@ -69,9 +76,11 @@ export interface RunState {
     updated_at: string;
     status: string;
     mode: string;
+    operating_mode: OperatingMode;
     goal: string;
     scope: string;
     metric: Metric;
+    instrument_metric?: Metric;
     verify: string;
     guard?: string;
     max_no_progress?: number;
@@ -96,8 +105,10 @@ export interface SupervisorSnapshot {
     run_id: string;
     status: string;
     mode: string;
+    operating_mode: OperatingMode;
     goal: string;
     metric: Metric;
+    instrument_metric?: Metric;
     stats: RunStats;
     last_iteration?: LastIteration;
     results_rows: number;

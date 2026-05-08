@@ -91,6 +91,15 @@ export function normalizeMode(value: string | undefined | null): string {
   return normalized;
 }
 
+export function normalizeOperatingMode(value: string | undefined | null): OperatingMode {
+  if (!value) return "continuous";
+  const normalized = value.trim().toLowerCase();
+  if (normalized !== "converge" && normalized !== "continuous" && normalized !== "supervised") {
+    throw new AutoresearchError("Unsupported operating mode: " + value + ". Valid: converge, continuous, supervised");
+  }
+  return normalized as OperatingMode;
+}
+
 export function normalizeResultStatus(value: string | undefined | null, fieldName: string): string {
   if (!value) throw new AutoresearchError("Missing " + fieldName);
   const normalized = value.trim().toLowerCase();
@@ -197,7 +206,7 @@ export function countTsvDataRows(content: string): number {
   return lines.length > 1 ? lines.slice(1).filter((l) => l.trim()).length : 0;
 }
 
-import type { RunState } from "./types.js";
+import type { OperatingMode, RunState } from "./types.js";
 
 export function parseRunState(value: unknown): RunState {
   if (typeof value !== "object" || value === null) {
@@ -211,6 +220,12 @@ export function parseRunState(value: unknown): RunState {
       throw new AutoresearchError(`Invalid state: missing required field "${key}"`);
     }
   }
+
+  const rawOperatingMode: unknown = "operating_mode" in obj ? obj.operating_mode : undefined;
+  if (rawOperatingMode !== undefined && rawOperatingMode !== null && typeof rawOperatingMode !== "string") {
+    throw new AutoresearchError("Invalid state: operating_mode must be a string");
+  }
+  const operating_mode = normalizeOperatingMode(rawOperatingMode);
 
   if (typeof obj.metric !== "object" || obj.metric === null) {
     throw new AutoresearchError("Invalid state: metric must be an object");
@@ -236,7 +251,10 @@ export function parseRunState(value: unknown): RunState {
     throw new AutoresearchError("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
   }
 
-  return obj as unknown as RunState;
+  return {
+    ...obj,
+    operating_mode,
+  } as RunState;
 }
 
 export interface UpdateCacheData {

@@ -1,9 +1,16 @@
 export function taskContextFromRunConfig(id, config) {
     const metric = {
-        name: config.metric,
-        direction: config.direction,
+        name: config.outcome_metric ?? config.metric,
+        direction: (config.outcome_direction ?? config.direction),
         baseline: config.baseline,
     };
+    const instrumentMetric = config.instrument_metric
+        ? {
+            name: config.instrument_metric,
+            direction: (config.instrument_direction ?? config.direction),
+            baseline: config.baseline,
+        }
+        : undefined;
     const policy = {
         mode: config.mode,
         stop_condition: config.stop_condition,
@@ -14,6 +21,7 @@ export function taskContextFromRunConfig(id, config) {
         goal: config.goal,
         scope: config.scope,
         metric,
+        instrument_metric: instrumentMetric,
         verify_command: config.verify,
         guard_command: config.guard,
         constraints: {
@@ -44,6 +52,10 @@ export function runConfigFromTaskContext(context) {
         stop_condition: context.iteration_policy?.stop_condition,
         run_tag: context.metadata?.run_tag ?? undefined,
         baseline: context.metric.baseline,
+        outcome_metric: context.metric.name,
+        outcome_direction: context.metric.direction,
+        instrument_metric: context.instrument_metric?.name,
+        instrument_direction: context.instrument_metric?.direction,
     };
 }
 function parseDuration(value) {
