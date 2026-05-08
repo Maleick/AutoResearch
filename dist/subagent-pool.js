@@ -146,7 +146,10 @@ export function selectNextBranch(activeDrafts, policy, direction) {
     switch (policy) {
         case "best": {
             const scoredDrafts = completedDrafts
-                .map((draft) => ({ ...draft, parsed_metric: Number.parseFloat(draft.metric_value ?? "") }))
+                .map((draft) => ({
+                branch_id: draft.branch_id,
+                parsed_metric: Number.parseFloat(draft.metric_value ?? ""),
+            }))
                 .filter((draft) => Number.isFinite(draft.parsed_metric));
             if (scoredDrafts.length === 0) {
                 return selectFallbackBranch(pendingBranchId, completedDrafts, activeDrafts);
