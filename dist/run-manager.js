@@ -118,6 +118,7 @@ export function makeStatePayload(config, resultsPath, statePath) {
         },
         verify: config.verify,
         guard: config.guard,
+        max_no_progress: config.max_no_progress,
         iterations_cap: config.iterations,
         duration: config.duration,
         duration_seconds: durationSeconds ?? undefined,
@@ -259,6 +260,10 @@ export async function buildSupervisorSnapshot(repo, resultsPathValue, statePathV
     else if (state.iterations_cap != null && state.stats.total_iterations >= state.iterations_cap) {
         decision = "stop";
         reason = "iteration_cap_reached";
+    }
+    else if (state.max_no_progress != null && state.stats.consecutive_discards >= state.max_no_progress) {
+        decision = "stop";
+        reason = "no_progress";
     }
     else if (state.status === "completed" || state.status === "stopped") {
         decision = "stop";
