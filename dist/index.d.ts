@@ -1,5 +1,5 @@
 export declare const id = "autoresearch";
-export declare const repoRoot: any;
+export declare const repoRoot: string;
 export declare const version = "3.6.0";
 type OpenCodeConfig = {
     command?: Record<string, {

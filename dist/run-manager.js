@@ -1,6 +1,6 @@
 import { utcNow, ensureParent, atomicWriteJson, readJsonFile, parseRunState, resolvePath, normalizeDirection, normalizeOperatingMode, parseDurationSeconds, normalizeLabels, missingRequiredLabels, AutoresearchError, } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT } from "./constants.js";
-import { buildSubagentPoolPlan, buildContinuationPolicy } from "./subagent-pool.js";
+import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
 import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
 import { lstat, open } from "fs/promises";
 const MAX_RESULTS_BYTES = 10 * 1024 * 1024;
@@ -102,6 +102,13 @@ export function makeStatePayload(config, resultsPath, statePath) {
         mode: config.mode,
     });
     const continuationPolicy = buildContinuationPolicy(config.mode);
+    const draftPool = (config.num_drafts ?? 1) > 1
+        ? buildDraftPoolPlan({
+            num_drafts: config.num_drafts ?? 1,
+            branch_selection_policy: config.branch_selection_policy ?? "best",
+            baseline_iteration: 0,
+        })
+        : undefined;
     return {
         schema_version: 1,
         run_id: config.run_tag ?? `run-${Date.now().toString(36)}`,
@@ -158,6 +165,7 @@ export function makeStatePayload(config, resultsPath, statePath) {
         },
         subagent_pool: subagentPool,
         continuation_policy: continuationPolicy,
+        draft_pool: draftPool,
     };
 }
 export async function setStopRequested(repo, statePathValue) {
@@ -295,6 +303,9 @@ export async function buildSupervisorSnapshot(repo, resultsPathValue, statePathV
         artifact_paths: state.artifact_paths,
         flags: state.flags,
         label_requirements: state.label_requirements,
+        subagent_pool: state.subagent_pool,
+        continuation_policy: state.continuation_policy,
+        draft_pool: state.draft_pool,
     };
 }
 //# sourceMappingURL=run-manager.js.map

@@ -4,6 +4,7 @@ import { resolve } from "path";
 import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
 const VERSION_FLAGS = ["--version", "-v"];
 const HELP_FLAGS = ["--help", "-h", "help"];
+const BRANCH_POLICIES = ["best", "roulette", "diverse"];
 const usage = () => {
     console.error("Usage: autoresearch <command> [options]");
     console.error("");
@@ -41,6 +42,8 @@ const usage = () => {
     console.error("  --iterations    Iteration cap");
     console.error("  --max-no-progress  Max consecutive discards before stop");
     console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
+    console.error("  --num-drafts    Number of parallel drafts (default: 1)");
+    console.error("  --branch-policy Branch selection policy: best, roulette, diverse");
     console.error("  --json          Output raw JSON (default: human-readable)");
     console.error("  --results-path  Custom results TSV path");
     console.error("  --state-path    Custom state JSON path");
@@ -75,7 +78,9 @@ const parseArgs = (args) => {
             const shortToLong = {
                 r: "repo", g: "goal", m: "metric", d: "direction",
                 v: "verify", n: "guard", o: "mode", s: "scope",
-                i: "iterations", t: "duration", p: "max-no-progress",
+                i: "iterations", t: "duration",
+                f: "num-drafts", b: "branch-policy",
+                p: "max-no-progress",
             };
             const key = shortToLong[args[i][1]] ?? args[i].slice(1);
             if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
@@ -153,6 +158,13 @@ const sanitizeMarkdownText = (value) => {
 };
 const formatMarkdownField = (value) => {
     return sanitizeMarkdownText(value).replace(markdownEscapePattern, "\\$1");
+};
+const normalizeBranchPolicy = (value) => {
+    if (value == null || value === "")
+        return "best";
+    if (BRANCH_POLICIES.includes(value))
+        return value;
+    throw new Error(`Invalid branch policy: ${value}. Expected one of: ${BRANCH_POLICIES.join(", ")}`);
 };
 const main = async () => {
     const args = process.argv.slice(2);
@@ -241,6 +253,8 @@ const main = async () => {
                     run_tag: grouped["run-tag"],
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
+                    num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts") ?? 1,
+                    branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"]),
                     outcome_metric: grouped["outcome-metric"],
                     outcome_direction: grouped["outcome-direction"],
                     instrument_metric: grouped["instrument-metric"],
@@ -628,7 +642,7 @@ const main = async () => {
             case "completion": {
                 const shell = grouped.shell || "bash";
                 const commands = ["init", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
-                const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
+                const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
                 if (shell === "bash" || shell === "zsh") {
                     console.log(`# Auto Research CLI completion for ${shell}`);
                     console.log(`_autoresearch() {`);
@@ -678,6 +692,8 @@ const main = async () => {
                     run_tag: grouped["run-tag"],
                     stop_condition: grouped["stop-condition"],
                     baseline: grouped.baseline,
+                    num_drafts: parsePositiveInt(grouped["num-drafts"], "num_drafts") ?? 1,
+                    branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"]),
                     outcome_metric: grouped["outcome-metric"],
                     outcome_direction: grouped["outcome-direction"],
                     instrument_metric: grouped["instrument-metric"],

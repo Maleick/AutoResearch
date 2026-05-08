@@ -6,6 +6,8 @@ import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTer
 
 const VERSION_FLAGS = ["--version", "-v"];
 const HELP_FLAGS = ["--help", "-h", "help"];
+const BRANCH_POLICIES = ["best", "roulette", "diverse"] as const;
+type BranchPolicy = typeof BRANCH_POLICIES[number];
 
 const usage = (): void => {
   console.error("Usage: autoresearch <command> [options]");
@@ -44,6 +46,8 @@ const usage = (): void => {
   console.error("  --iterations    Iteration cap");
   console.error("  --max-no-progress  Max consecutive discards before stop");
   console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
+  console.error("  --num-drafts    Number of parallel drafts (default: 1)");
+  console.error("  --branch-policy Branch selection policy: best, roulette, diverse");
   console.error("  --json          Output raw JSON (default: human-readable)");
   console.error("  --results-path  Custom results TSV path");
   console.error("  --state-path    Custom state JSON path");
@@ -77,7 +81,9 @@ const parseArgs = (args: string[]): Record<string, string> => {
       const shortToLong: Record<string, string> = {
         r: "repo", g: "goal", m: "metric", d: "direction",
         v: "verify", n: "guard", o: "mode", s: "scope",
-        i: "iterations", t: "duration", p: "max-no-progress",
+        i: "iterations", t: "duration",
+        f: "num-drafts", b: "branch-policy",
+        p: "max-no-progress",
       };
       const key = shortToLong[args[i][1]] ?? args[i].slice(1);
       if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
@@ -163,6 +169,12 @@ const formatMarkdownField = (value: unknown): string => {
   return sanitizeMarkdownText(value).replace(markdownEscapePattern, "\\$1");
 };
 
+
+const normalizeBranchPolicy = (value: string | undefined): BranchPolicy => {
+  if (value == null || value === "") return "best";
+  if ((BRANCH_POLICIES as readonly string[]).includes(value)) return value as BranchPolicy;
+  throw new Error(`Invalid branch policy: ${value}. Expected one of: ${BRANCH_POLICIES.join(", ")}`);
+};
 
 const main = async (): Promise<number> => {
   const args = process.argv.slice(2);
@@ -254,6 +266,8 @@ const main = async (): Promise<number> => {
           run_tag: grouped["run-tag"] as string | undefined,
           stop_condition: grouped["stop-condition"] as string | undefined,
           baseline: grouped.baseline as string | undefined,
+          num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts") ?? 1,
+          branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
           outcome_metric: grouped["outcome-metric"] as string | undefined,
           outcome_direction: grouped["outcome-direction"] as string | undefined,
           instrument_metric: grouped["instrument-metric"] as string | undefined,
@@ -652,7 +666,7 @@ const main = async (): Promise<number> => {
       case "completion": {
         const shell = grouped.shell as string || "bash";
         const commands = ["init", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
-        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
+        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
         
         if (shell === "bash" || shell === "zsh") {
           console.log(`# Auto Research CLI completion for ${shell}`);
@@ -701,6 +715,8 @@ const main = async (): Promise<number> => {
           run_tag: grouped["run-tag"] as string | undefined,
           stop_condition: grouped["stop-condition"] as string | undefined,
           baseline: grouped.baseline as string | undefined,
+          num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts") ?? 1,
+          branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
           outcome_metric: grouped["outcome-metric"] as string | undefined,
           outcome_direction: grouped["outcome-direction"] as string | undefined,
           instrument_metric: grouped["instrument-metric"] as string | undefined,
