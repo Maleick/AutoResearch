@@ -12,6 +12,7 @@ export interface RunConfig {
     direction: string;
     verify: string;
     mode: string;
+    operating_mode?: string;
     scope?: string;
     guard?: string;
     iterations?: number;
@@ -60,6 +61,7 @@ export interface LastIteration {
     missing_keep_labels: string[];
     missing_stop_labels: string[];
 }
+export type OperatingMode = "converge" | "continuous" | "supervised";
 export interface RunState {
     schema_version: number;
     run_id: string;
@@ -67,6 +69,7 @@ export interface RunState {
     updated_at: string;
     status: string;
     mode: string;
+    operating_mode: OperatingMode;
     goal: string;
     scope: string;
     metric: Metric;
@@ -93,6 +96,7 @@ export interface SupervisorSnapshot {
     run_id: string;
     status: string;
     mode: string;
+    operating_mode: OperatingMode;
     goal: string;
     metric: Metric;
     stats: RunStats;

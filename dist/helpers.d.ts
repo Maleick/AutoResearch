@@ -13,6 +13,7 @@ export declare function readJsonFile(filePath: string): Record<string, unknown>;
 export declare function resolvePath(repo: string | undefined, value: string | undefined, defaultName: string): string;
 export declare function normalizeDirection(value: string | undefined | null): string;
 export declare function normalizeMode(value: string | undefined | null): string;
+export declare function normalizeOperatingMode(value: string | undefined | null): "converge" | "continuous" | "supervised";
 export declare function normalizeResultStatus(value: string | undefined | null, fieldName: string): string;
 export declare function parsePositiveInt(value: string | undefined | null, fieldName: string): number | undefined;
 export declare function parseDurationSeconds(value: string | undefined | null): number | null;
