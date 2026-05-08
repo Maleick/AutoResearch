@@ -87,14 +87,51 @@ export function createTaskContext(params: {
 }
 
 export function validateTaskContext(context: unknown): context is TaskContext {
-  if (typeof context !== "object" || context === null) return false;
-  const obj = context as Record<string, unknown>;
+  if (!isRecord(context)) return false;
+  const obj = context;
   if (typeof obj.id !== "string") return false;
   if (!["cli", "hermes", "mcp", "webhook", "api"].includes(obj.source as string)) return false;
+  if (!isOptionalString(obj.origin)) return false;
+  if (!isOptionalString(obj.owner)) return false;
   if (typeof obj.goal !== "string") return false;
-  if (typeof obj.metric !== "object" || obj.metric === null) return false;
-  const metric = obj.metric as Record<string, unknown>;
+  if (!isOptionalString(obj.scope)) return false;
+  if (!isRecord(obj.metric)) return false;
+  const metric = obj.metric;
   if (typeof metric.name !== "string") return false;
   if (!["lower", "higher"].includes(metric.direction as string)) return false;
+  if (!isOptionalString(metric.baseline)) return false;
+  if (!isOptionalString(metric.target)) return false;
+  if (!isOptionalString(obj.verify_command)) return false;
+  if (!isOptionalString(obj.guard_command)) return false;
+  if (!isRecord(obj.constraints)) return false;
+  const constraints = obj.constraints;
+  if (!isOptionalNumber(constraints.max_iterations)) return false;
+  if (!isOptionalNumber(constraints.max_duration_seconds)) return false;
+  if (!isOptionalStringArray(constraints.required_keep_labels)) return false;
+  if (!isOptionalStringArray(constraints.required_stop_labels)) return false;
+  if (obj.iteration_policy !== undefined) {
+    if (!isRecord(obj.iteration_policy)) return false;
+    const policy = obj.iteration_policy;
+    if (!["foreground", "background"].includes(policy.mode as string)) return false;
+    if (!isOptionalString(policy.stop_condition)) return false;
+    if (!isOptionalString(policy.rollback_strategy)) return false;
+  }
+  if (obj.metadata !== undefined && !isRecord(obj.metadata)) return false;
   return true;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
+}
+
+function isOptionalNumber(value: unknown): boolean {
+  return value === undefined || typeof value === "number";
+}
+
+function isOptionalStringArray(value: unknown): boolean {
+  return value === undefined || (Array.isArray(value) && value.every((item) => typeof item === "string"));
 }
