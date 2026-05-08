@@ -1,1 +1,2 @@
-bash /Users/maleick/.config/opencode/.autoship/hooks/opencode/runner.sh
+RUNNER="$HOME/.config/opencode/.autoship/hooks/opencode/runner.sh"
+bash "$RUNNER"
