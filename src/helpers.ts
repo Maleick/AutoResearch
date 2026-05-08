@@ -91,6 +91,15 @@ export function normalizeMode(value: string | undefined | null): string {
   return normalized;
 }
 
+export function normalizeOperatingMode(value: string | undefined | null): "converge" | "continuous" | "supervised" {
+  if (!value) return "continuous";
+  const normalized = value.trim().toLowerCase();
+  if (normalized !== "converge" && normalized !== "continuous" && normalized !== "supervised") {
+    throw new AutoresearchError("Unsupported operating mode: " + value + ". Valid: converge, continuous, supervised");
+  }
+  return normalized as "converge" | "continuous" | "supervised";
+}
+
 export function normalizeResultStatus(value: string | undefined | null, fieldName: string): string {
   if (!value) throw new AutoresearchError("Missing " + fieldName);
   const normalized = value.trim().toLowerCase();
@@ -210,6 +219,10 @@ export function parseRunState(value: unknown): RunState {
     if (!(key in obj)) {
       throw new AutoresearchError(`Invalid state: missing required field "${key}"`);
     }
+  }
+
+  if (!("operating_mode" in obj)) {
+    obj.operating_mode = "continuous";
   }
 
   if (typeof obj.metric !== "object" || obj.metric === null) {
