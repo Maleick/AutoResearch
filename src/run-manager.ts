@@ -106,8 +106,7 @@ export async function appendIteration(
     verify_status: verifyStatus,
     guard_status: guardStatus,
   };
-  ensureParent(scoreHistoryPath);
-  appendFileSync(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "utf-8");
+  await appendTextFileNoFollow(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "score history file");
 
   const newState: RunState = {
     ...state,
@@ -151,6 +150,46 @@ export async function appendIteration(
 
   atomicWriteJson(statePath, newState);
   return newState;
+}
+
+async function appendTextFileNoFollow(filePath: string, content: string, description: string): Promise<void> {
+  ensureParent(filePath);
+
+  try {
+    const pathStats = await lstat(filePath);
+    if (pathStats.isSymbolicLink()) {
+      throw new AutoresearchError(`Refusing to append to symlinked ${description}: ${filePath}`);
+    }
+    if (!pathStats.isFile()) {
+      throw new AutoresearchError(`Refusing to append to non-regular ${description}: ${filePath}`);
+    }
+  } catch (err) {
+    if (err instanceof AutoresearchError) throw err;
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") throw err;
+  }
+
+  let handle;
+  try {
+    const noFollow = typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
+    handle = await open(filePath, constants.O_WRONLY | constants.O_CREAT | constants.O_APPEND | noFollow, 0o600);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ELOOP") {
+      throw new AutoresearchError(`Refusing to append to symlinked ${description}: ${filePath}`);
+    }
+    throw err;
+  }
+
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile()) {
+      throw new AutoresearchError(`Refusing to append to non-regular ${description}: ${filePath}`);
+    }
+    await handle.writeFile(content, "utf-8");
+  } finally {
+    await handle.close();
+  }
 }
 
 export function makeStatePayload(
