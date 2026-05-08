@@ -24,6 +24,7 @@ const allowedFiles = new Set([
   "AGENTS.md",
   "VERSION",
   "INSTALL.md",
+  "CHANGELOG.md",
   ".opencode/INSTALL.md",
   "plugins/autoresearch.ts",
   "docs/ARCHITECTURE.md",
