@@ -126,14 +126,10 @@ describe("parseScoreOutput", () => {
     });
 
     it("should throw on non-finite max field (after valid JSON parse)", () => {
-      // First test that invalid JSON is caught
-      expect(() => mod.parseScoreOutput('{"score": 5, "max": NaN}')).toThrow("Invalid JSON in score output");
-      expect(() => mod.parseScoreOutput('{"score": 5, "max": Infinity}')).toThrow("Invalid JSON in score output");
-      expect(() => mod.parseScoreOutput('{"score": 5, "max": -Infinity}')).toThrow("Invalid JSON in score output");
-      
-      // Then test that valid JSON with numbers that become non-positive after parsing is caught
-      // We can't directly test NaN/Infinity in JSON since they're invalid JSON
-      // But we can test that our isFinite check works by simulating the validation
+      // JSON numeric literals like 1e999 are valid JSON, but overflow to Infinity after parsing.
+      // This exercises the real post-parse non-finite validation branch.
+      expect(() => mod.parseScoreOutput('{"score": 5, "max": 1e999}')).toThrow("Score output must contain a positive numeric 'max' field");
+      expect(() => mod.parseScoreOutput('{"score": 5, "max": -1e999}')).toThrow("Score output must contain a positive numeric 'max' field");
     });
 
     it("should throw on non-positive max field", () => {
