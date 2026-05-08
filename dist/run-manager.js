@@ -1,4 +1,4 @@
-import { utcNow, ensureParent, atomicWriteJson, readJsonFile, parseRunState, resolvePath, normalizeDirection, parseDurationSeconds, normalizeLabels, missingRequiredLabels, AutoresearchError, } from "./helpers.js";
+import { utcNow, ensureParent, atomicWriteJson, readJsonFile, parseRunState, resolvePath, normalizeDirection, normalizeOperatingMode, parseDurationSeconds, normalizeLabels, missingRequiredLabels, AutoresearchError, } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy } from "./subagent-pool.js";
 import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
@@ -107,6 +107,7 @@ export function makeStatePayload(config, resultsPath, statePath) {
         updated_at: now,
         status: "initialized",
         mode: config.mode,
+        operating_mode: normalizeOperatingMode(config.operating_mode),
         goal: config.goal,
         scope: config.scope ?? "current repository",
         metric: {
@@ -275,6 +276,7 @@ export async function buildSupervisorSnapshot(repo, resultsPathValue, statePathV
         run_id: state.run_id,
         status: state.status,
         mode: state.mode,
+        operating_mode: state.operating_mode,
         goal: state.goal,
         metric: state.metric,
         stats: state.stats,
