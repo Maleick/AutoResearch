@@ -12,7 +12,7 @@ import {
   missingRequiredLabels,
   AutoresearchError,
 } from "./helpers.js";
-import { RESULTS_DEFAULT, STATE_DEFAULT } from "./constants.js";
+import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy } from "./subagent-pool.js";
 import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
 import { lstat, open } from "fs/promises";
@@ -60,6 +60,7 @@ export async function appendIteration(
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
+  const scoreHistoryPath = resolvePath(repo, undefined, SCORE_HISTORY_DEFAULT);
   const state = parseRunState(readJsonFile(statePath));
 
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
@@ -89,6 +90,20 @@ export async function appendIteration(
   ].join("\t") + "\n";
 
   appendFileSync(resultsPath, resultRow, "utf-8");
+
+  const scoreRecord = {
+    timestamp: now,
+    iteration: currentIteration,
+    run_id: state.run_id,
+    decision,
+    metric_value: metricValue ?? null,
+    metric_name: state.metric.name,
+    metric_direction: state.metric.direction,
+    verify_status: verifyStatus,
+    guard_status: guardStatus,
+  };
+  ensureParent(scoreHistoryPath);
+  appendFileSync(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "utf-8");
 
   const newState: RunState = {
     ...state,

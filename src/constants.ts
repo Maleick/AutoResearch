@@ -6,3 +6,4 @@ export const RESULTS_DEFAULT = "autoresearch-results.tsv";
 export const STATE_DEFAULT = ".autoresearch/state.json";
 export const LAUNCH_DEFAULT = ".autoresearch/launch.json";
 export const MEMORY_DEFAULT = "autoresearch-memory.md";
+export const SCORE_HISTORY_DEFAULT = ".autoresearch/score-history.jsonl";

@@ -6,4 +6,5 @@ export declare const RESULTS_DEFAULT = "autoresearch-results.tsv";
 export declare const STATE_DEFAULT = ".autoresearch/state.json";
 export declare const LAUNCH_DEFAULT = ".autoresearch/launch.json";
 export declare const MEMORY_DEFAULT = "autoresearch-memory.md";
+export declare const SCORE_HISTORY_DEFAULT = ".autoresearch/score-history.jsonl";
 //# sourceMappingURL=constants.d.ts.map

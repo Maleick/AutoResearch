@@ -16,6 +16,7 @@ const usage = (): void => {
   console.error("  status     Print run status");
   console.error("  explain    Human-readable run state");
   console.error("  history    Show recent iteration log");
+  console.error("  scores     Show score trend history");
   console.error("  config     Show runtime configuration");
   console.error("  summary    Aggregate stats across runs");
   console.error("  suggest    Suggest next goal from memory");
@@ -378,6 +379,49 @@ const main = async (): Promise<number> => {
           }
         }
         console.log(`\nShowing ${Math.min(limit, records.length)} of ${lines.length - 1} records.`);
+        break;
+      }
+      case "scores": {
+        const { resolvePath } = await import("./helpers.js");
+        const { SCORE_HISTORY_DEFAULT } = await import("./constants.js");
+        const scoreHistoryPath = resolvePath(grouped.repo as string | undefined, grouped["score-history-path"] as string | undefined, SCORE_HISTORY_DEFAULT);
+        if (!existsSync(scoreHistoryPath)) {
+          console.log("No score history found.");
+          break;
+        }
+        const content = readFileSync(scoreHistoryPath, "utf-8");
+        const lines = content.trim().split("\n").filter(Boolean);
+        if (lines.length === 0) {
+          console.log("No score records yet.");
+          break;
+        }
+        const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
+        const records = lines.slice(-limit);
+        if (useJson) {
+          const parsed = records.map((r: string) => {
+            try {
+              return JSON.parse(r);
+            } catch {
+              return null;
+            }
+          }).filter(Boolean);
+          printJson({ count: parsed.length, scores: parsed });
+          break;
+        }
+        console.log("Score History (latest " + Math.min(limit, records.length) + "):");
+        const recordsOrdered = records.slice().reverse();
+        for (const r of recordsOrdered) {
+          try {
+            const rec = JSON.parse(r);
+            const trend = rec.metric_direction === "higher" 
+              ? (rec.metric_value && rec.metric_value > 0 ? "↑" : "↓")
+              : (rec.metric_value && rec.metric_value > 0 ? "↓" : "↑");
+            console.log(`  #${rec.iteration}  ${trend}  ${rec.metric_value ?? "—"}  (${rec.decision})  ${rec.verify_status}`);
+          } catch {
+            console.log(`  [parse error]`);
+          }
+        }
+        console.log(`\n${records.length} total score records.`);
         break;
       }
       case "config": {
