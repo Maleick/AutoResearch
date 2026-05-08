@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, appendFileSync, writeFileSync } from "fs";
-import { utcNow, ensureParent, resolvePath, } from "./helpers.js";
+import { utcNow, ensureParent, resolvePath, AutoresearchError, } from "./helpers.js";
 import { MEMORY_DEFAULT, MEMORY_AUDIT_DEFAULT, MEMORY_CONSOLIDATION_THRESHOLD, MEMORY_EXPIRY_DAYS, } from "./constants.js";
 function generateId() {
     return `mem-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -12,6 +12,9 @@ export function createInitialMemoryState() {
     };
 }
 export function createMemoryStateWithThreshold(threshold) {
+    if (!Number.isInteger(threshold) || threshold < 1) {
+        throw new AutoresearchError(`Invalid consolidation threshold: ${threshold} (must be a positive integer >= 1)`);
+    }
     return {
         pending_items: [],
         consolidated_items: [],
@@ -34,9 +37,11 @@ export function addPendingMemoryItem(state, pattern, description, provenance) {
     const existingIndex = state.pending_items.findIndex((p) => p.pattern === pattern);
     if (existingIndex >= 0) {
         const updated = [...state.pending_items];
+        const existing = updated[existingIndex];
         updated[existingIndex] = {
-            ...updated[existingIndex],
-            verification_count: updated[existingIndex].verification_count + 1,
+            ...existing,
+            description: existing.description === "" && description !== "" ? description : existing.description,
+            verification_count: existing.verification_count + 1,
             last_verified: utcNow(),
             provenance,
         };
@@ -111,7 +116,13 @@ export function consolidateReadyItems(state, auditLogPath) {
     }
     const newConsolidated = toPromote.map(createMemoryItem);
     const now = utcNow();
+    const existingActivePatterns = new Set(state.consolidated_items
+        .filter((item) => item.status === "active")
+        .map((item) => item.pattern));
     for (const item of toPromote) {
+        if (existingActivePatterns.has(item.pattern)) {
+            continue;
+        }
         const entry = {
             timestamp: now,
             action: "promoted",
@@ -130,7 +141,10 @@ export function consolidateReadyItems(state, auditLogPath) {
         state: {
             ...state,
             pending_items: remaining,
-            consolidated_items: [...state.consolidated_items, ...newConsolidated],
+            consolidated_items: [
+                ...state.consolidated_items,
+                ...newConsolidated.filter((item) => !existingActivePatterns.has(item.pattern)),
+            ],
             last_consolidated: now,
         },
         auditEntries,
@@ -215,11 +229,23 @@ export function readAuditLog(path) {
         return [];
     }
     const content = readFileSync(path, "utf-8");
-    return content
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => JSON.parse(line));
+    if (!content.trim()) {
+        return [];
+    }
+    const entries = [];
+    const lines = content.split("\n");
+    lines.forEach((line) => {
+        if (!line.trim()) {
+            return;
+        }
+        try {
+            entries.push(JSON.parse(line));
+        }
+        catch {
+            return;
+        }
+    });
+    return entries;
 }
 export function getActivePatterns(state) {
     return state.consolidated_items

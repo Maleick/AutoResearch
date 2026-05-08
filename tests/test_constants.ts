@@ -31,6 +31,11 @@ describe("Constants", () => {
     expect(STATE_DEFAULT).toBe(".autoresearch/state.json");
   });
 
+  it("has correct score history default", async () => {
+    const { SCORE_HISTORY_DEFAULT } = await import(resolve(REPO_ROOT, "dist/constants.js"));
+    expect(SCORE_HISTORY_DEFAULT).toBe(".autoresearch/score-history.jsonl");
+  });
+
   it("has correct launch default", async () => {
     const { LAUNCH_DEFAULT } = await import(resolve(REPO_ROOT, "dist/constants.js"));
     expect(LAUNCH_DEFAULT).toBe(".autoresearch/launch.json");
@@ -54,6 +59,7 @@ describe("Constants", () => {
     expect(constants.PRODUCT_BRAND).toBeDefined();
     expect(constants.RESULTS_DEFAULT).toBeDefined();
     expect(constants.STATE_DEFAULT).toBeDefined();
+    expect(constants.SCORE_HISTORY_DEFAULT).toBeDefined();
     expect(constants.LAUNCH_DEFAULT).toBeDefined();
     expect(constants.MEMORY_DEFAULT).toBeDefined();
   });

@@ -106,6 +106,71 @@ describe("run-manager", () => {
       const state = await appendIteration(tmpDir, undefined, undefined, "discard", "15", undefined, "fail", "pass", "", "third", [], "");
       expect(state.stats.total_iterations).toBe(3);
     });
+
+    it("writes score history to the default jsonl artifact", async () => {
+      const { initializeRun, appendIteration } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      await appendIteration(tmpDir, undefined, undefined, "keep", "42", undefined, "pass", "pass", "test hypothesis", "test change", ["progress"], "note");
+
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      expect(existsSync(scoreHistoryPath)).toBe(true);
+
+      const scoreHistory = readFileSync(scoreHistoryPath, "utf-8").trim().split("\n").map((line) => JSON.parse(line));
+      expect(scoreHistory).toHaveLength(1);
+      expect(scoreHistory[0]).toMatchObject({
+        iteration: 1,
+        decision: "keep",
+        metric_value: "42",
+        metric_name: "defects",
+        metric_direction: "lower",
+        verify_status: "pass",
+        guard_status: "pass",
+      });
+    });
+
+    it("writes score history to a custom path when provided", async () => {
+      const { initializeRun, appendIteration } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+      };
+      const customScoreHistoryPath = resolve(tmpDir, "artifacts", "scores.jsonl");
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      await appendIteration(
+        tmpDir,
+        undefined,
+        undefined,
+        "discard",
+        "12",
+        undefined,
+        "fail",
+        "pass",
+        "",
+        "custom path",
+        [],
+        "",
+        undefined,
+        customScoreHistoryPath,
+      );
+
+      expect(existsSync(customScoreHistoryPath)).toBe(true);
+      const scoreHistory = readFileSync(customScoreHistoryPath, "utf-8").trim().split("\n").map((line) => JSON.parse(line));
+      expect(scoreHistory[0]).toMatchObject({
+        iteration: 1,
+        decision: "discard",
+        metric_value: "12",
+      });
+    });
   });
 
   describe("completeRun", () => {
