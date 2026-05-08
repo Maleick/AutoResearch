@@ -33,6 +33,7 @@ const usage = () => {
     console.error("  --outcome-direction Direction for outcome metric");
     console.error("  --instrument-metric Measurement quality/risk metric (surfaced separately)");
     console.error("  --instrument-direction Direction for instrument metric");
+    console.error("  --instrument-value  Recorded value for the instrument metric");
     console.error("  --verify        Mechanical verification command");
     console.error("  --guard         Guard command for regression catch");
     console.error("  --mode          foreground or background");
@@ -225,8 +226,8 @@ const main = async () => {
                 const { initializeRun } = await import("./run-manager.js");
                 const config = {
                     goal: grouped.goal,
-                    metric: grouped.metric,
-                    direction: grouped.direction || "lower",
+                    metric: (grouped.metric || grouped["outcome-metric"]),
+                    direction: (grouped.direction || grouped["outcome-direction"]) || "lower",
                     verify: grouped.verify,
                     mode: grouped.mode || "foreground",
                     scope: grouped.scope,
@@ -456,8 +457,8 @@ const main = async () => {
                 const errors = [];
                 if (!grouped.goal)
                     errors.push("Missing required: --goal");
-                if (!grouped.metric)
-                    errors.push("Missing required: --metric");
+                if (!grouped.metric && !grouped["outcome-metric"])
+                    errors.push("Missing required: --metric or --outcome-metric");
                 try {
                     if (grouped.direction)
                         normalizeDirection(grouped.direction);
@@ -481,7 +482,7 @@ const main = async () => {
                 if (errors.length === 0) {
                     console.log("✓ Configuration is valid");
                     console.log(`  Goal: ${grouped.goal}`);
-                    console.log(`  Metric: ${grouped.metric} (${grouped.direction || "lower"})`);
+                    console.log(`  Metric: ${grouped.metric || grouped["outcome-metric"]} (${grouped.direction || grouped["outcome-direction"] || "lower"})`);
                     console.log(`  Verify: ${grouped.verify}`);
                     console.log(`  Mode: ${grouped.mode || "foreground"}`);
                 }
@@ -658,8 +659,8 @@ const main = async () => {
                 const { LAUNCH_DEFAULT } = await import("./constants.js");
                 const config = {
                     goal: grouped.goal,
-                    metric: grouped.metric,
-                    direction: grouped.direction || "lower",
+                    metric: (grouped.metric || grouped["outcome-metric"]),
+                    direction: (grouped.direction || grouped["outcome-direction"]) || "lower",
                     verify: grouped.verify,
                     mode: "background",
                     scope: grouped.scope,

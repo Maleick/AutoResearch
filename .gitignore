@@ -11,6 +11,12 @@ docs/specs/
 
 # AutoShip runtime state
 .autoship/
+worker.pid
+worker.command
+started_at
+role
+model
+AUTOSHIP_PROMPT.md
 
 # Autoresearch runtime artifacts
 .autoresearch/

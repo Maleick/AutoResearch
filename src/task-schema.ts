@@ -99,5 +99,11 @@ export function validateTaskContext(context: unknown): context is TaskContext {
   const metric = obj.metric as Record<string, unknown>;
   if (typeof metric.name !== "string") return false;
   if (!["lower", "higher"].includes(metric.direction as string)) return false;
+  if (obj.instrument_metric !== undefined) {
+    if (typeof obj.instrument_metric !== "object" || obj.instrument_metric === null) return false;
+    const iMetric = obj.instrument_metric as Record<string, unknown>;
+    if (typeof iMetric.name !== "string") return false;
+    if (!["lower", "higher"].includes(iMetric.direction as string)) return false;
+  }
   return true;
 }

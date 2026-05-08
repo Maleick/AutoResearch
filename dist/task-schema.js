@@ -40,6 +40,15 @@ export function validateTaskContext(context) {
         return false;
     if (!["lower", "higher"].includes(metric.direction))
         return false;
+    if (obj.instrument_metric !== undefined) {
+        if (typeof obj.instrument_metric !== "object" || obj.instrument_metric === null)
+            return false;
+        const iMetric = obj.instrument_metric;
+        if (typeof iMetric.name !== "string")
+            return false;
+        if (!["lower", "higher"].includes(iMetric.direction))
+            return false;
+    }
     return true;
 }
 //# sourceMappingURL=task-schema.js.map

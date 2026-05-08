@@ -239,8 +239,8 @@ const main = async (): Promise<number> => {
         const { initializeRun } = await import("./run-manager.js");
         const config = {
           goal: grouped.goal as string,
-          metric: grouped.metric as string,
-          direction: grouped.direction as string || "lower",
+          metric: (grouped.metric || grouped["outcome-metric"]) as string,
+          direction: (grouped.direction || grouped["outcome-direction"]) as string || "lower",
           verify: grouped.verify as string,
           mode: grouped.mode as string || "foreground",
           scope: grouped.scope as string | undefined,
@@ -477,7 +477,7 @@ const main = async (): Promise<number> => {
         const errors: string[] = [];
         
         if (!grouped.goal) errors.push("Missing required: --goal");
-        if (!grouped.metric) errors.push("Missing required: --metric");
+        if (!grouped.metric && !grouped["outcome-metric"]) errors.push("Missing required: --metric or --outcome-metric");
         
         try {
           if (grouped.direction) normalizeDirection(grouped.direction as string);
@@ -501,7 +501,7 @@ const main = async (): Promise<number> => {
         if (errors.length === 0) {
           console.log("✓ Configuration is valid");
           console.log(`  Goal: ${grouped.goal}`);
-          console.log(`  Metric: ${grouped.metric} (${grouped.direction || "lower"})`);
+          console.log(`  Metric: ${grouped.metric || grouped["outcome-metric"]} (${grouped.direction || grouped["outcome-direction"] || "lower"})`);
           console.log(`  Verify: ${grouped.verify}`);
           console.log(`  Mode: ${grouped.mode || "foreground"}`);
         } else {
@@ -682,8 +682,8 @@ const main = async (): Promise<number> => {
         const { LAUNCH_DEFAULT } = await import("./constants.js");
         const config = {
           goal: grouped.goal as string,
-          metric: grouped.metric as string,
-          direction: grouped.direction as string || "lower",
+          metric: (grouped.metric || grouped["outcome-metric"]) as string,
+          direction: (grouped.direction || grouped["outcome-direction"]) as string || "lower",
           verify: grouped.verify as string,
           mode: "background",
           scope: grouped.scope as string | undefined,

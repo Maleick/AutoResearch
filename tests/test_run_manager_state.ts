@@ -436,7 +436,7 @@ describe("appendIteration", () => {
       "state.json",
       "keep",
       "90",
-      undefined,
+      instrumentValue,
       "pass",
       "pass",
       "hyp",
@@ -444,7 +444,6 @@ describe("appendIteration", () => {
       ["test"],
       "note",
       undefined,
-      instrumentValue,
     );
     const content = readFileSync(resultsFile, "utf-8");
     const lines = content.trim().split("\n");

@@ -22,7 +22,7 @@ Using a single metric creates an incentive to "game" the system—optimizing the
 ## CLI Usage
 
 ```bash
-# Initialize with dual metrics
+# Initialize with dual metrics (--outcome-metric is used as the primary metric)
 autoresearch init \
   --goal "improve response time" \
   --outcome-metric "p95_latency_ms" \
