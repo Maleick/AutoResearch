@@ -950,7 +950,7 @@ const main = async (): Promise<number> => {
           break;
         }
         const memory = readFileSync(memoryPath, "utf-8");
-        const patterns = memory.match(/### Pattern: [^\n]+/g) ?? [];
+        const patterns = memory.match(/^### Pattern: [^\n]+/gm) ?? [];
         const suggestions = patterns.map(parseMemoryPatternHeading);
         if (useJson) {
           printJson({ patterns_found: suggestions.length, suggestions });
