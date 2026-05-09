@@ -1029,20 +1029,55 @@ describe("CLI Commands", () => {
     });
   });
 
-  describe("unknown command", () => {
-    it("exits with error for unknown command", () => {
-      expect(() => {
-        execSync(`node ${CLI} unknowncmd`, { encoding: "utf-8" });
-      }).toThrow();
-    });
-  });
+   describe("unknown command", () => {
+     it("exits with error for unknown command", () => {
+       expect(() => {
+         execSync(`node ${CLI} unknowncmd`, { encoding: "utf-8" });
+       }).toThrow();
+     });
+   });
 
-  describe("no args", () => {
-    it("shows usage when no args provided", () => {
-      const out = execSync(`node ${CLI} 2>&1`, { encoding: "utf-8" });
-      expect(out).toContain("Usage:");
+    describe("digest command", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-digest");
+      const tmpState = resolve(tmpDir, ".autoresearch", "state.json");
+
+      afterEach(() => {
+        try { rmSync(tmpDir, { recursive: true }); } catch {}
+      });
+
+      it("reports no active run when state file missing", () => {
+        const out = execSync(`node ${CLI} digest --repo ${tmpDir}`, { encoding: "utf-8" });
+        expect(out).toContain("Auto Research Digest");
+        expect(out).toContain("no_active_run");
+        expect(out).toContain("Run 'autoresearch init' to start a new run");
+      });
+
+      it("shows digest for initialized run", () => {
+        execSync(`node ${CLI} init --goal "test goal" --metric "test_metric" --direction lower --verify "echo 1" --repo ${tmpDir}`, { encoding: "utf-8" });
+        const out = execSync(`node ${CLI} digest --repo ${tmpDir}`, { encoding: "utf-8" });
+        expect(out).toContain("Auto Research Digest");
+        expect(out).toContain("test goal");
+        expect(out).toContain("test_metric (lower)");
+        expect(out).toContain("Run initialized - ready to start first iteration");
+      });
+
+      it("supports --json flag", () => {
+        execSync(`node ${CLI} init --goal "test goal" --metric "test_metric" --direction lower --verify "echo 1" --repo ${tmpDir}`, { encoding: "utf-8" });
+        const out = execSync(`node ${CLI} digest --repo ${tmpDir} --json`, { encoding: "utf-8" });
+        const json = JSON.parse(out);
+        expect(json.goal).toBe("test goal");
+        expect(json.metric?.name).toBe("test_metric");
+        expect(json.metric?.direction).toBe("lower");
+        expect(json.next_action).toBe("Run initialized - ready to start first iteration");
+      });
     });
-  });
+
+    describe("no args", () => {
+     it("shows usage when no args provided", () => {
+       const out = execSync(`node ${CLI} 2>&1`, { encoding: "utf-8" });
+       expect(out).toContain("Usage:");
+     });
+   });
 
   describe("version output", () => {
     it("includes version number", () => {

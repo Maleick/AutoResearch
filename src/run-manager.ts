@@ -580,3 +580,81 @@ export function parseResultRow(line: string): ResultRow | null {
     agent: parts[15],
   };
 }
+
+export async function buildRunDigest(
+  repo: string | undefined,
+  resultsPathValue: string | undefined,
+  statePathValue: string | undefined,
+): Promise<RunDigest> {
+  const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
+  const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
+  
+  if (!existsSync(statePath)) {
+    return {
+      run_id: undefined,
+      status: "no_active_run",
+      mode: undefined,
+      goal: undefined,
+      metric: undefined,
+      stats: undefined,
+      last_iteration: undefined,
+      next_action: "Run 'autoresearch init' to start a new run",
+      blockers: ["No active run state found"],
+      flags: {}
+    };
+  }
+
+  const state = parseRunState(readJsonFile(statePath));
+  // Count results rows but don't include in digest for lightweight summary
+  await countResultsRows(resultsPath);
+
+  // Determine next action based on state
+  let nextAction = "Continue with next iteration";
+  const blockers: string[] = [];
+
+  if (state.flags.stop_requested) {
+    nextAction = "Stop requested - run will halt after current iteration";
+  } else if (state.flags.needs_human) {
+    nextAction = "Human input required to continue";
+    blockers.push("Human input required");
+  } else if (state.deadline_at && new Date() >= new Date(state.deadline_at)) {
+    nextAction = "Duration elapsed - run should be stopped";
+    blockers.push("Duration elapsed");
+  } else if (state.iterations_cap != null && state.stats.total_iterations >= state.iterations_cap) {
+    nextAction = "Iteration cap reached - run should be stopped";
+    blockers.push("Iteration cap reached");
+  } else if (state.max_no_progress != null && state.stats.consecutive_discards >= state.max_no_progress) {
+    nextAction = "No progress limit reached - run should be stopped";
+    blockers.push("No progress limit reached");
+  } else if (state.status === "completed" || state.status === "stopped") {
+    nextAction = "Run is completed - no further action needed";
+  } else if (state.status === "initialized") {
+    nextAction = "Run initialized - ready to start first iteration";
+  }
+
+  return {
+    run_id: state.run_id,
+    status: state.status,
+    mode: state.mode,
+    goal: state.goal,
+    metric: state.metric,
+    stats: state.stats,
+    last_iteration: state.last_iteration,
+    next_action: nextAction,
+    blockers: blockers,
+    flags: { ...state.flags } as Record<string, unknown>,
+  };
+}
+
+interface RunDigest {
+  run_id: string | undefined;
+  status: string;
+  mode: string | undefined;
+  goal: string | undefined;
+  metric: import("./types.js").Metric | undefined;
+  stats: import("./types.js").RunStats | undefined;
+  last_iteration: import("./types.js").LastIteration | undefined;
+  next_action: string;
+  blockers: string[];
+  flags: Record<string, unknown>;
+}

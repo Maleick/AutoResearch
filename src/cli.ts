@@ -24,6 +24,7 @@ const usage = (): void => {
   console.error("  history    Show recent iteration log");
   console.error("  scores     Show score trend history");
   console.error("  score      Run the configured scorer and show normalized output");
+  console.error("  digest     Generate re-entry digest for operator handoff");
   console.error("  config     Show runtime configuration");
   console.error("  summary    Aggregate stats across runs");
   console.error("  suggest    Suggest next goal from memory");
@@ -1183,7 +1184,67 @@ const main = async (): Promise<number> => {
         printJson(state);
         break;
       }
-      case "doctor": {
+       case "digest": {
+         if (dryRun) {
+           console.log("[dry-run] Would generate run digest");
+           return 0;
+         }
+         const { buildRunDigest } = await import("./run-manager.js");
+         const digest = await buildRunDigest(
+           grouped.repo as string | undefined,
+           grouped["results-path"] as string | undefined,
+           grouped["state-path"] as string | undefined,
+         );
+         if (useJson) {
+           printJson(digest);
+         } else {
+           console.log(`# Auto Research Digest`);
+           console.log(`\n**Run ID:** ${formatMarkdownField(digest.run_id || "—")}`);
+            console.log(`**Status:** ${sanitizeForTerminal(digest.status || "—")}`);
+           console.log(`**Mode:** ${formatMarkdownField(digest.mode || "—")}`);
+           console.log(`**Goal:** ${formatMarkdownField(digest.goal || "—")}`);
+           if (digest.metric) {
+             const m = digest.metric;
+              console.log(`**Metric:** ${sanitizeForTerminal(m.name)} (${sanitizeForTerminal(m.direction)})`);
+             console.log(`  Best: ${formatMarkdownField(m.best || "—")} | Latest: ${formatMarkdownField(m.latest || "—")}`);
+           }
+           if (digest.stats) {
+             const s = digest.stats;
+             console.log(`\n## Stats`);
+             console.log(`- Iterations: ${formatMarkdownField(s.total_iterations || "—")}`);
+             console.log(`- Kept: ${formatMarkdownField(s.kept || "—")}`);
+             console.log(`- Discarded: ${formatMarkdownField(s.discarded || "—")}`);
+             console.log(`- Needs human: ${formatMarkdownField(s.needs_human || "—")}`);
+           }
+           if (digest.last_iteration) {
+             const li = digest.last_iteration;
+             console.log(`\n## Last Iteration`);
+             console.log(`- #${formatMarkdownField(li.iteration || "—")}: ${formatMarkdownField(li.decision || "—")} (${formatMarkdownField(li.metric_value || "—")})`);
+             if (li.change_summary) {
+               console.log(`- Change: ${formatMarkdownField(li.change_summary.substring(0, 100))}${li.change_summary.length > 100 ? "..." : ""}`);
+             }
+           }
+           console.log(`\n## Next Action`);
+            console.log(`${sanitizeForTerminal(digest.next_action || "No specific next action recommended")}`);
+           if (digest.blockers && digest.blockers.length > 0) {
+             console.log(`\n## Blockers`);
+             for (const blocker of digest.blockers) {
+               console.log(`- ${formatMarkdownField(blocker)}`);
+             }
+           } else {
+             console.log(`\n## Blockers`);
+             console.log(`None identified`);
+           }
+           if (digest.flags && Object.keys(digest.flags).length > 0) {
+             console.log(`\n## Flags`);
+             for (const [key, value] of Object.entries(digest.flags)) {
+               console.log(`- ${key}: ${formatMarkdownField(value)}`);
+             }
+           }
+         }
+         break;
+       }
+       case "doctor": {
         const { VERSION, PACKAGE_NAME, SKILL_NAME } = await import("./constants.js");
 
         const base = resolveRepo(grouped.repo as string | undefined);
