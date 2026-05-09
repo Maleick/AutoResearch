@@ -688,8 +688,8 @@ describe("CLI Commands", () => {
         ].join("\n"), "utf-8");
         const out = execSync(`node ${CLI} suggest --memory-path ${memoryPath} --json`, { encoding: "utf-8", cwd: REPO_ROOT });
         const json = JSON.parse(out) as { patterns_found: number; suggestions: string[] };
-        expect(json.patterns_found).toBe(1);
-        expect(json.suggestions).toEqual(["trusted pattern"]);
+        expect(json.data.patterns_found).toBe(1);
+        expect(json.data.suggestions).toEqual(["trusted pattern"]);
       } finally {
         try { rmSync(tmpDir, { recursive: true }); } catch {}
       }
