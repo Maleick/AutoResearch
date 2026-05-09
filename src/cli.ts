@@ -1828,7 +1828,7 @@ const main = async (): Promise<number> => {
         break;
       }
       case "leaderboard": {
-        const { generateLeaderboard, formatLeaderboardMarkdown } = await import("./leaderboard.js");
+        const { generateLeaderboard, formatLeaderboardMarkdown, formatLeaderboardText } = await import("./leaderboard.js");
         const { resolveRepo } = await import("./helpers.js");
         const repo = resolveRepo(grouped.repo as string | undefined);
         const leaderboard = generateLeaderboard(repo);
@@ -1846,20 +1846,7 @@ const main = async (): Promise<number> => {
         if (grouped.format === "markdown") {
           console.log(formatLeaderboardMarkdown(leaderboard));
         } else {
-          console.log("Auto Research Leaderboard");
-          console.log("=========================");
-          console.log("");
-          for (const entry of leaderboard.entries) {
-            console.log(`Run:      ${entry.run_id}`);
-            console.log(`Goal:     ${entry.goal}`);
-            console.log(`Metric:   ${entry.metric} (${entry.direction})`);
-            console.log(`Results:  ${entry.total_iterations} iterations (${entry.kept} kept, ${entry.discarded} discarded)`);
-            console.log(`Success:  ${entry.success_rate}`);
-            if (entry.best_value) console.log(`Best:     ${entry.best_value}`);
-            if (entry.runtime_seconds) console.log(`Runtime:  ${Math.round(entry.runtime_seconds / 60)}m`);
-            console.log("");
-          }
-          console.log(`Total: ${leaderboard.summary.total_runs} runs, ${leaderboard.summary.total_iterations} iterations, ${leaderboard.summary.overall_success_rate} success rate`);
+          console.log(formatLeaderboardText(leaderboard));
         }
         break;
       }
