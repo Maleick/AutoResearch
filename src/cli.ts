@@ -578,8 +578,6 @@ const main = async (): Promise<number> => {
 
         const inferRatio = (value: number, maxValue: number | null): number | null => {
           if (maxValue !== null && maxValue > 0) return value / maxValue;
-          if (value >= 0 && value <= 1) return value;
-          if (value >= 0 && value <= 100) return value / 100;
           return null;
         };
 
@@ -591,8 +589,8 @@ const main = async (): Promise<number> => {
         let label = (grouped.label as string | undefined) ?? "score";
         let valueText = "";
         let ratio: number | null = null;
-        let markdownDefault = ".autoresearch/score-badge.md";
-        let svgDefault = ".autoresearch/score-badge.svg";
+        let defaultMarkdownPath = ".autoresearch/score-badge.md";
+        let defaultSvgPath = ".autoresearch/score-badge.svg";
 
         if (badgeType === "score") {
           const scoreValue = parseNumber(latestRecord.score ?? latestRecord.metric_value);
@@ -626,12 +624,12 @@ const main = async (): Promise<number> => {
           valueText = componentMax !== null && componentMax > 0 ? `${componentValue}/${componentMax}` : String(componentValue);
           ratio = inferRatio(componentValue, componentMax);
           const slug = slugifyBadgeToken(componentName);
-          markdownDefault = `.autoresearch/score-component-${slug}.md`;
-          svgDefault = `.autoresearch/score-component-${slug}.svg`;
+          defaultMarkdownPath = `.autoresearch/score-component-${slug}.md`;
+          defaultSvgPath = `.autoresearch/score-component-${slug}.svg`;
         }
 
-        const markdownPath = resolvePath(grouped.repo as string | undefined, grouped["markdown-path"] as string | undefined, markdownDefault);
-        const svgPath = resolvePath(grouped.repo as string | undefined, grouped["svg-path"] as string | undefined, svgDefault);
+        const markdownPath = resolvePath(grouped.repo as string | undefined, grouped["markdown-path"] as string | undefined, defaultMarkdownPath);
+        const svgPath = resolvePath(grouped.repo as string | undefined, grouped["svg-path"] as string | undefined, defaultSvgPath);
         const svg = renderBadgeSvg(label, valueText, pickBadgeColor(ratio));
         const markdown = renderBadgeMarkdown(label, valueText, svgPath, markdownPath);
         ensureParent(svgPath);
