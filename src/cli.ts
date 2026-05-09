@@ -1849,6 +1849,40 @@ const main = async (): Promise<number> => {
         }
         break;
       }
+      case "worker": {
+        const { workerOnce } = await import("./worker.js");
+        const once = grouped["once"] === "true";
+
+        if (!once) {
+          console.error("worker requires --once flag");
+          console.error("Usage: autoresearch worker --once [--json] [--repo <path>]");
+          return 1;
+        }
+
+        const result = workerOnce(
+          grouped.repo as string | undefined,
+          grouped["state-path"] as string | undefined,
+          grouped["results-path"] as string | undefined,
+        );
+
+        if (useJson) {
+          printJsonEnvelope("worker", result);
+        } else {
+          if (result.ready) {
+            console.log(`✓ Ready for iteration ${result.iteration}`);
+            console.log(`  Run ID:  ${result.run_id}`);
+            console.log(`  Status:  ${result.status}`);
+            console.log(`  Goal:    ${result.goal}`);
+            if (result.metric) console.log(`  Metric:  ${result.metric}`);
+          } else {
+            console.log(`✗ Not ready: ${result.reason || "unknown"}`);
+            console.log(`  Run ID: ${result.run_id}`);
+            console.log(`  Iter:   ${result.iteration}`);
+          }
+        }
+
+        return result.ready ? 0 : 1;
+      }
       default: {
         console.error(`Unknown command: ${cmd}`);
         console.error("Run 'autoresearch --help' for usage.");
