@@ -1825,7 +1825,13 @@ const main = async (): Promise<number> => {
       }
     }
   } catch (exc) {
-    console.error((exc as Error).message);
+    const { categorizeError, formatStructuredError } = await import("./error-categories.js");
+    const structured = categorizeError(exc);
+    if (useJson) {
+      console.error(formatStructuredError(structured, true));
+    } else {
+      console.error(formatStructuredError(structured, false));
+    }
     return 2;
   }
   return 0;
