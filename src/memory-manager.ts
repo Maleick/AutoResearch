@@ -299,8 +299,15 @@ function quoteMemoryLabels(labels: unknown[]): string {
   return `[${labels.map((label) => quoteMemoryScalar(label)).join(",")}]`;
 }
 
+function escapeMemoryCommentText(value: unknown): string {
+  return sanitizeMemoryText(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function formatMemoryLabels(labels: unknown[]): string {
-  return labels.map((label) => sanitizeMemoryText(label)).join(", ");
+  return labels.map((label) => escapeMemoryCommentText(label)).join(", ");
 }
 
 export function writeMemoryFile(
@@ -326,7 +333,7 @@ export function writeMemoryFile(
 - Consolidated: ${quoteMemoryScalar(item.consolidated_at)}
 - Verifications: ${quoteMemoryScalar(item.verification_count)}
 
-<!-- legacy display: ### Pattern: ${sanitizeMemoryText(item.pattern)} | **Description:** ${sanitizeMemoryText(description)} | - Goal: ${sanitizeMemoryText(prov.goal)} | ${formatMemoryLabels(prov.labels)} | Run: \`${sanitizeMemoryText(prov.run_id)}\` -->
+<!-- legacy display: ### Pattern: ${escapeMemoryCommentText(item.pattern)} | **Description:** ${escapeMemoryCommentText(description)} | - Goal: ${escapeMemoryCommentText(prov.goal)} | ${formatMemoryLabels(prov.labels)} | Run: \`${escapeMemoryCommentText(prov.run_id)}\` -->
 
 `;
     })
