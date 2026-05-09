@@ -12,4 +12,3 @@ export const GOAL_DEFAULT = ".autoresearch/goal.md";
 export const MEMORY_CONSOLIDATION_THRESHOLD = 3;
 export const MAX_DRAFTS = 64;
 export const MEMORY_EXPIRY_DAYS = 30;
-export const GOAL_DEFAULT = "GOAL.md";
