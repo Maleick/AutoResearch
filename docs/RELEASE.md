@@ -1,25 +1,16 @@
 # Release Process
 
-This package uses npm publish for releases. GitHub Actions automates the full release pipeline.
+This package uses semantic-release to publish GitHub Releases and npm packages. Pull requests validate release readiness; merges to `main` publish automatically.
 
 ## Version Alignment
 
-`VERSION`, `package.json`, `package-lock.json`, `src/constants.ts`, and `.opencode-plugin/plugin.json` must all stay aligned. The `VERSION` file is the canonical source of truth.
+Semantic-release publishes from the checked-out merge commit but does not push release commits back to protected `main`. Keep version surfaces aligned in release-prep PRs when pinned install docs or runtime version constants need to change.
 
 ## Release Steps
 
-### 1. Update version
+### 1. Prepare a conventional commit
 
-```bash
-# Update VERSION file
-echo "3.3.3" > VERSION
-
-# Sync to package.json
-npm version 3.3.3 --no-git-tag-version
-
-# Sync to src/constants.ts
-# Update the VERSION export manually or use sed
-```
+Use a semantic-release compatible commit message such as `fix: restore release build` or `feat: add workflow mode`. Do not manually tag releases for the normal path.
 
 ### 2. Build and verify
 
@@ -31,40 +22,28 @@ npm run verify:pack
 npm test
 ```
 
-### 3. Update CHANGELOG
-
-Add a new section for the version in `CHANGELOG.md`:
-
-```markdown
-## [3.3.3] - YYYY-MM-DD
-
-### Added
-- Root install handoff
-- Public install verification notes
-
-### Changed
-- Installation docs
-- Package verification allowlist
-```
-
-### 4. Commit and tag
+### 3. Open and merge a pull request
 
 ```bash
 git add -A
-git commit -m "Release v3.3.3"
-git tag v3.3.3
-git push origin main v3.3.3
+git commit -m "fix: restore release build"
+git push -u origin <branch>
+gh pr create --fill
 ```
 
-### 5. Automated release
+After CI passes, merge the pull request into `main`. The merge to `main` triggers `release.yml`.
+
+### 4. Automated release
 
 GitHub Actions will:
 
 1. Build and type-check
 2. Verify package contents
 3. Run tests
-4. Create a GitHub Release with the CHANGELOG section
-5. Publish to npm with provenance through trusted publishing
+4. Run semantic-release on `main`
+5. Sync version files in the release workspace for packaging
+6. Create a GitHub Release
+7. Publish npm `latest` with provenance through trusted publishing
 
 ## Manual publish (fallback)
 

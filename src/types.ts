@@ -17,6 +17,7 @@ export interface RunConfig {
   operating_mode?: string;
   scope?: string;
   guard?: string;
+  scorer?: string;
   iterations?: number;
   max_no_progress?: number;
   duration?: string;
@@ -65,6 +66,7 @@ export interface RunFlags {
 export interface LastIteration {
   iteration: number;
   decision: string;
+  scorer_status?: string;
   metric_value?: string;
   instrument_value?: string;
   change_summary: string;
@@ -79,6 +81,7 @@ export interface LastIteration {
   branch?: string;
   stage?: string;
   agent?: string;
+  score_components?: Record<string, number>;
 }
 
 export type OperatingMode = "converge" | "continuous" | "supervised";
@@ -105,6 +108,7 @@ export interface RunState {
   instrument_metric?: Metric;
   verify: string;
   guard?: string;
+  scorer?: string;
   max_no_progress?: number;
   iterations_cap?: number;
   duration?: string;
@@ -210,4 +214,15 @@ export interface DraftPoolConfig {
   branch_selection_policy: "best" | "roulette" | "diverse";
   active_drafts: DraftBranch[];
   best_branch_id?: string;
+}
+
+export interface GoalDoc {
+  goal: string;
+  metric: string;
+  direction: string;
+  verify: string;
+  guard?: string;
+  constraints?: string;
+  file_map?: string;
+  stop_conditions?: string;
 }
