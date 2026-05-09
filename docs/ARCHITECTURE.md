@@ -109,6 +109,7 @@ flowchart TD
 | Artifact | Purpose |
 | --- | --- |
 | `.autoresearch/state.json` | Current run checkpoint |
+| `.autoresearch/goal.md` | First-class goal document (goal, metric, verify, guard, constraints, file\_map, stop\_conditions) |
 | `autoresearch-results.tsv` | Iteration log |
 | `.autoresearch/launch.json` | Background launch request |
 | `autoresearch-report.md` | End-of-run report |
@@ -153,6 +154,7 @@ flowchart TD
 | `autoresearch init` | Initialize a run |
 | `autoresearch wizard` | Generate setup summary |
 | `autoresearch status` | Print run status |
+| `autoresearch goal` | Show the goal document |
 | `autoresearch launch` | Launch background run |
 | `autoresearch stop` | Request stop |
 | `autoresearch resume` | Resume background run |

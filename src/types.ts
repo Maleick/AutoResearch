@@ -211,3 +211,14 @@ export interface DraftPoolConfig {
   active_drafts: DraftBranch[];
   best_branch_id?: string;
 }
+
+export interface GoalDoc {
+  goal: string;
+  metric: string;
+  direction: string;
+  verify: string;
+  guard?: string;
+  constraints?: string;
+  file_map?: string;
+  stop_conditions?: string;
+}
