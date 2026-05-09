@@ -772,6 +772,53 @@ describe("CLI Commands", () => {
       const state = JSON.parse(readFileSync(tmpState, "utf-8"));
       expect(state.draft_pool.branch_selection_policy).toBe("roulette");
     });
+
+    it("accepts branch policy overrides", () => {
+      execFileSync("node", [
+        CLI,
+        "init",
+        "--goal",
+        "test",
+        "--metric",
+        "m",
+        "--verify",
+        "echo",
+        "--num-drafts",
+        "3",
+        "--branch-policy-overrides",
+        '{"draft-0":"roulette","draft-2":"diverse"}',
+        "--repo",
+        tmpDir,
+      ], { encoding: "utf-8" });
+      const state = JSON.parse(readFileSync(tmpState, "utf-8"));
+      expect(state.draft_pool.active_drafts[0].policy_override).toBe("roulette");
+      expect(state.draft_pool.active_drafts[1].policy_override).toBeUndefined();
+      expect(state.draft_pool.active_drafts[2].policy_override).toBe("diverse");
+    });
+
+    it("rejects prototype-poisoning keys in branch policy overrides", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"__proto__":"best"}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/not a valid draft ID/);
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"constructor":"best"}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/not a valid draft ID/);
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"prototype":"best"}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/not a valid draft ID/);
+    });
+
+    it("rejects empty-string values in branch policy overrides", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"draft-0":""}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/must not be empty/);
+    });
+
+    it("rejects whitespace-only values in branch policy overrides", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"draft-0":"   "}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/must not be empty/);
+    });
   });
 
   describe("validate command", () => {

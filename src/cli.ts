@@ -79,6 +79,7 @@ const usage = (): void => {
   console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
   console.error(`  --num-drafts    Number of parallel drafts (default: 1, max: ${MAX_DRAFTS})`);
   console.error("  --branch-policy Branch selection policy: best, roulette, diverse");
+  console.error('  --branch-policy-overrides JSON object mapping draft IDs to policies (e.g. {"draft-0":"diverse"})');
   console.error("  --max-debug-depth   Max debug experiment depth before stop");
   console.error("  --branch-failure-budget  Per-branch failure budget before stop");
   console.error("  --json          Output raw JSON (default: human-readable)");
@@ -311,6 +312,44 @@ const normalizeBranchPolicy = (value: string | undefined): BranchPolicy => {
   throw new Error(`Invalid branch policy: ${value}. Expected one of: ${BRANCH_POLICIES.join(", ")}`);
 };
 
+const PROTO_POISON_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+const normalizeOverrideBranchPolicy = (branchId: string, value: string): BranchPolicy => {
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    throw new Error(`Invalid branch policy override for ${branchId}: value must not be empty`);
+  }
+  if ((BRANCH_POLICIES as readonly string[]).includes(trimmed)) return trimmed as BranchPolicy;
+  throw new Error(`Invalid branch policy override for ${branchId}: "${trimmed}" is not one of: ${BRANCH_POLICIES.join(", ")}`);
+};
+
+const parseBranchPolicyOverrides = (value: string | undefined): Record<string, BranchPolicy> | undefined => {
+  if (value == null || value === "") return undefined;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Invalid branch policy overrides: expected a JSON object mapping draft IDs to branch policies");
+  }
+
+  if (parsed == null || Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error("Invalid branch policy overrides: expected a JSON object mapping draft IDs to branch policies");
+  }
+
+  const overrides = Object.create(null) as Record<string, BranchPolicy>;
+  for (const [branchId, branchPolicy] of Object.entries(parsed)) {
+    if (PROTO_POISON_KEYS.has(branchId)) {
+      throw new Error(`Invalid branch policy override key: "${branchId}" is not a valid draft ID`);
+    }
+    if (typeof branchPolicy !== "string") {
+      throw new Error(`Invalid branch policy override for ${branchId}: expected a string policy`);
+    }
+    overrides[branchId] = normalizeOverrideBranchPolicy(branchId, branchPolicy);
+  }
+  return overrides;
+};
+
 const main = async (): Promise<number> => {
   const args = process.argv.slice(2);
 
@@ -404,6 +443,7 @@ const main = async (): Promise<number> => {
           baseline: grouped.baseline as string | undefined,
           num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts", { max: MAX_DRAFTS }) ?? 1,
           branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
+          branch_policy_overrides: parseBranchPolicyOverrides(grouped["branch-policy-overrides"] as string | undefined),
           outcome_metric: grouped["outcome-metric"] as string | undefined,
           outcome_direction: grouped["outcome-direction"] as string | undefined,
           instrument_metric: grouped["instrument-metric"] as string | undefined,
@@ -1257,7 +1297,7 @@ const main = async (): Promise<number> => {
       case "completion": {
         const shell = grouped.shell as string || "bash";
         const commands = ["init", "goal", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
-        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell", "--goal-path", "--template"];
+        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--branch-policy-overrides", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell", "--goal-path", "--template"];
         
         if (shell === "bash" || shell === "zsh") {
           console.log(`# Auto Research CLI completion for ${shell}`);
@@ -1311,6 +1351,7 @@ const main = async (): Promise<number> => {
           baseline: grouped.baseline as string | undefined,
           num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts", { max: MAX_DRAFTS }) ?? 1,
           branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
+          branch_policy_overrides: parseBranchPolicyOverrides(grouped["branch-policy-overrides"] as string | undefined),
           outcome_metric: grouped["outcome-metric"] as string | undefined,
           outcome_direction: grouped["outcome-direction"] as string | undefined,
           instrument_metric: grouped["instrument-metric"] as string | undefined,

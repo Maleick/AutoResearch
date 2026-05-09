@@ -164,22 +164,19 @@ describe("buildDraftPoolPlan", () => {
   });
 
   it("applies per-branch policy overrides", () => {
-    const pool = mod.buildDraftPoolPlan({
-      num_drafts: 3,
-      branch_selection_policy: "best",
-    });
-    const ids = pool.active_drafts.map((d: any) => d.branch_id);
-    expect(ids.length).toBe(3);
-    const overrides: Record<string, any> = {};
-    overrides[ids[0]] = "roulette";
-    overrides[ids[2]] = "diverse";
+    mod.resetBranchIdCounter();
     const poolWithOverrides = mod.buildDraftPoolPlan({
       num_drafts: 3,
       branch_selection_policy: "best",
-      branch_policy_overrides: overrides,
+      branch_policy_overrides: {
+        "draft-0": "roulette",
+        "draft-2": "diverse",
+      },
     });
-    const withOverride = poolWithOverrides.active_drafts.filter((d: any) => d.policy_override !== undefined);
-    expect(withOverride.length).toBeGreaterThanOrEqual(0);
+
+    expect(poolWithOverrides.active_drafts[0].policy_override).toBe("roulette");
+    expect(poolWithOverrides.active_drafts[1].policy_override).toBeUndefined();
+    expect(poolWithOverrides.active_drafts[2].policy_override).toBe("diverse");
   });
 
   it("does not mutate overrides when drafting", () => {
@@ -267,7 +264,17 @@ describe("selectNextBranch", () => {
     expect(next).toBe("draft-3");
   });
 
-  it("uses per-branch override when poolPolicy provided", () => {
+  it("uses selected branch policy override for selection", () => {
+    const drafts = [
+      { branch_id: "draft-1", iteration: 1, metric_value: "5", status: "completed", policy_override: "diverse" },
+      { branch_id: "draft-2", iteration: 2, metric_value: "10", status: "completed" },
+      { branch_id: "draft-3", iteration: 3, metric_value: "20", status: "completed" },
+    ];
+    const next = mod.selectNextBranch(drafts, "best", "lower");
+    expect(next).toBe("draft-3");
+  });
+
+  it("uses poolPolicy when no selected branch override exists", () => {
     const drafts = [
       { branch_id: "draft-1", iteration: 1, metric_value: "10", status: "completed" },
       { branch_id: "draft-2", iteration: 2, metric_value: "5", status: "completed" },
