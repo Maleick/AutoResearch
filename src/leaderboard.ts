@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "fs";
-import { resolve, dirname } from "path";
+import { resolve } from "path";
 
 export interface LeaderboardEntry {
   run_id: string;

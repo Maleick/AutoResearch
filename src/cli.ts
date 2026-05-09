@@ -1048,6 +1048,40 @@ const main = async (): Promise<number> => {
           }
         }
         
+        // Milestone Progress
+        console.log(`\n## Milestone Progress`);
+        if (state.stats) {
+          const s = state.stats;
+          const total = s.total_iterations;
+          const successRate = total > 0 ? ((s.kept / total) * 100).toFixed(1) : "0";
+          console.log(`- **Progress:** ${s.kept} kept / ${total} total iterations (${successRate}% success rate)`);
+          
+          if (state.iterations_cap) {
+            const progressPct = ((total / state.iterations_cap) * 100).toFixed(1);
+            console.log(`- **Cap:** ${total} / ${state.iterations_cap} iterations (${progressPct}% of cap)`);
+          }
+          
+          if (state.duration_seconds) {
+            const elapsedMin = Math.round(state.duration_seconds / 60);
+            console.log(`- **Elapsed:** ${elapsedMin} minutes`);
+          }
+          
+          // Next candidate
+          if (state.last_iteration && state.last_iteration.decision === "keep") {
+            console.log(`- **Next candidate:** Iteration ${state.last_iteration.iteration} (kept)`);
+          } else if (s.best_iteration) {
+            console.log(`- **Best candidate:** Iteration ${s.best_iteration}`);
+          }
+        }
+        
+        // Artifact pointers
+        console.log(`\n## Artifacts`);
+        console.log(`- State: \`${state.artifact_paths?.state || ".autoresearch/state.json"}\``);
+        console.log(`- Results: \`${state.artifact_paths?.results || "autoresearch-results.tsv"}\``);
+        if (grouped.repo) {
+          console.log(`- Repository: ${formatMarkdownField(grouped.repo as string)}`);
+        }
+        
         // Failed branches information
         if (state.draft_pool && state.draft_pool.active_drafts) {
           const failedBranches = state.draft_pool.active_drafts.filter(draft => draft.status === "discarded");
