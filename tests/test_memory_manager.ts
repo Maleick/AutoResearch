@@ -940,6 +940,34 @@ describe("Memory Manager", () => {
       }
     });
 
+    it("escapes HTML comment delimiters in legacy display comments", () => {
+      const memPath = resolve(REPO_ROOT, ".autoresearch-test-write-memory-comment.md");
+      try {
+        mod.writeMemoryFile(memPath, [
+          makeItem({
+            pattern: "safe --> **forged instruction** <!--",
+            description: "desc --> ## forged",
+            provenance: {
+              ...makeProvenance(),
+              run_id: "run --> forged",
+              goal: "goal --> forged",
+              labels: ["prod", "label --> forged"],
+            },
+          }),
+        ]);
+        const content = readFileSync(memPath, "utf-8");
+        const legacyLine = content
+          .split("\n")
+          .find((line: string) => line.startsWith("<!-- legacy display:"));
+        expect(legacyLine).toBeDefined();
+        expect(legacyLine).toContain("--&gt;");
+        expect(legacyLine).toContain("&lt;!--");
+        expect(legacyLine?.slice(0, -4)).not.toContain("-->");
+      } finally {
+        try { unlinkSync(memPath); } catch {}
+      }
+    });
+
     it("refuses to write through a symlinked memory file", () => {
       const testDir = resolve(REPO_ROOT, ".autoresearch-test-symlink-memory");
       const victim = resolve(testDir, "outside-victim.md");

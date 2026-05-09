@@ -197,5 +197,9 @@ export function determineDecision(output: VerifierOutput): VerifierDecision {
 }
 
 export function isSafeToApply(result: ValidationResult): boolean {
-  return result.valid && result.output !== undefined;
+  return (
+    result.valid
+    && result.output !== undefined
+    && determineDecision(result.output) === "keep"
+  );
 }
