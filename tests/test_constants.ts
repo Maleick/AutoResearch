@@ -46,6 +46,11 @@ describe("Constants", () => {
     expect(MEMORY_DEFAULT).toBe("autoresearch-memory.md");
   });
 
+  it("has correct goal default", async () => {
+    const { GOAL_DEFAULT } = await import(resolve(REPO_ROOT, "dist/constants.js"));
+    expect(GOAL_DEFAULT).toBe(".autoresearch/goal.md");
+  });
+
   it("has correct product brand", async () => {
     const { PRODUCT_BRAND } = await import(resolve(REPO_ROOT, "dist/constants.js"));
     expect(PRODUCT_BRAND).toBe("Auto Research");
@@ -62,6 +67,7 @@ describe("Constants", () => {
     expect(constants.SCORE_HISTORY_DEFAULT).toBeDefined();
     expect(constants.LAUNCH_DEFAULT).toBeDefined();
     expect(constants.MEMORY_DEFAULT).toBeDefined();
+    expect(constants.GOAL_DEFAULT).toBeDefined();
   });
 
   it("version matches package.json", async () => {

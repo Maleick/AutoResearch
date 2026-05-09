@@ -11,9 +11,10 @@ import {
   parseDurationSeconds,
   normalizeLabels,
   missingRequiredLabels,
+  writeGoalDoc,
   AutoresearchError,
 } from "./helpers.js";
-import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT } from "./constants.js";
+import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT, GOAL_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
 import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
 import { lstat, open } from "fs/promises";
@@ -26,15 +27,17 @@ export async function initializeRun(
   statePathValue: string | undefined,
   config: RunConfig,
   freshStart: boolean,
+  goalPathValue?: string,
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
+  const goalPath = resolvePath(repo, goalPathValue, GOAL_DEFAULT);
 
   if (existsSync(statePath) && !freshStart) {
     throw new AutoresearchError(`${statePath} already exists. Use --fresh-start to archive.`);
   }
 
-  const header = "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n";
+  const header = "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\tid\tparent_id\tbranch\tstage\tagent\n";
   ensureParent(resultsPath);
   if (!existsSync(resultsPath)) {
     writeFileSync(resultsPath, header, "utf-8");
@@ -42,6 +45,18 @@ export async function initializeRun(
 
   const state = makeStatePayload(config, resultsPath, statePath);
   atomicWriteJson(statePath, state);
+
+  writeGoalDoc(goalPath, {
+    goal: config.goal,
+    metric: config.outcome_metric ?? config.metric,
+    direction: config.outcome_direction ?? config.direction ?? "lower",
+    verify: config.verify ?? "",
+    guard: config.guard,
+    constraints: undefined,
+    file_map: config.scope || undefined,
+    stop_conditions: config.stop_condition,
+  });
+
   return state;
 }
 
@@ -60,6 +75,7 @@ export async function appendIteration(
   note: string | undefined,
   iteration: number | undefined,
   scoreHistoryPathValue?: string,
+  lineage?: { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string },
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
@@ -68,6 +84,10 @@ export async function appendIteration(
 
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
   const now = utcNow();
+  const scorerStatus = normalizeScorerStatus(scorerStatusValue);
+  const effectiveDecision = scorerStatus === "scorer-broken" && (decision === "keep" || decision === "discard")
+    ? "needs_human"
+    : decision;
   const labelList = normalizeLabels(labels ?? []);
   const labelReqs = state.label_requirements ?? { keep: [], stop: [] };
   const requiredKeep = normalizeLabels(labelReqs.keep ?? []);
@@ -75,13 +95,24 @@ export async function appendIteration(
   const missingKeep = missingRequiredLabels(labelList, requiredKeep);
   const missingStop = missingRequiredLabels(labelList, requiredStop);
 
-  if (decision === "keep" && missingKeep.length > 0) {
+  if (effectiveDecision === "keep" && missingKeep.length > 0) {
     throw new AutoresearchError(`Keep requires labels: ${missingKeep.join(", ")}`);
   }
+
+  const lineageId = lineage?.id ?? `${state.run_id}-iter-${currentIteration}`;
+  const lineageParentId = lineage?.parent_id ?? (currentIteration > 1 ? `${state.run_id}-iter-${currentIteration - 1}` : "");
+  const lineageBranch = lineage?.branch ?? state.draft_pool?.best_branch_id ?? "main";
+  const lineageStage = lineage?.stage ?? "experiment";
+  const lineageAgent = lineage?.agent ?? "orchestrator";
 
   const resultRow = [
     now,
     String(currentIteration),
+    lineageId,
+    lineageParentId,
+    lineageBranch,
+    lineageStage,
+    lineageAgent,
     decision,
     metricValue ?? "",
     instrumentValue ?? "",
@@ -95,17 +126,26 @@ export async function appendIteration(
 
   appendFileSync(resultsPath, resultRow, "utf-8");
 
-  const scoreRecord = {
+  const scoreRecord: Record<string, unknown> = {
     timestamp: now,
     iteration: currentIteration,
     run_id: state.run_id,
-    decision,
+    decision: effectiveDecision,
+    scorer_status: scorerStatus,
     metric_value: metricValue ?? null,
     metric_name: state.metric.name,
     metric_direction: state.metric.direction,
     verify_status: verifyStatus,
     guard_status: guardStatus,
+    id: lineageId,
+    parent_id: lineageParentId,
+    branch: lineageBranch,
+    stage: lineageStage,
+    agent: lineageAgent,
   };
+  if (scoreComponents != null) {
+    scoreRecord.score_components = scoreComponents;
+  }
   await appendTextFileNoFollow(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "score history file");
 
   const newState: RunState = {
@@ -118,17 +158,17 @@ export async function appendIteration(
     },
     flags: {
       ...state.flags,
-      stop_ready: decision === "keep" && missingStop.length === 0,
+      stop_ready: effectiveDecision === "keep" && missingStop.length === 0,
     },
   };
 
-  if (decision === "keep") {
+  if (effectiveDecision === "keep") {
     newState.stats.kept = newState.stats.kept + 1;
     newState.stats.consecutive_discards = 0;
-  } else if (decision === "discard") {
+  } else if (effectiveDecision === "discard") {
     newState.stats.discarded = newState.stats.discarded + 1;
     newState.stats.consecutive_discards = newState.stats.consecutive_discards + 1;
-  } else if (decision === "needs_human") {
+  } else if (effectiveDecision === "needs_human") {
     newState.stats.needs_human = newState.stats.needs_human + 1;
     newState.flags.needs_human = true;
     newState.stats.consecutive_discards = 0;
@@ -136,7 +176,8 @@ export async function appendIteration(
 
   newState.last_iteration = {
     iteration: currentIteration,
-    decision,
+    decision: effectiveDecision,
+    scorer_status: scorerStatus,
     metric_value: metricValue,
     instrument_value: instrumentValue,
     change_summary: changeSummary,
@@ -146,6 +187,11 @@ export async function appendIteration(
     stop_labels_satisfied: missingStop.length === 0,
     missing_keep_labels: missingKeep,
     missing_stop_labels: missingStop,
+    id: lineageId,
+    parent_id: lineageParentId,
+    branch: lineageBranch,
+    stage: lineageStage,
+    agent: lineageAgent,
   };
 
   atomicWriteJson(statePath, newState);
@@ -226,9 +272,10 @@ export function makeStatePayload(
       })
     : undefined;
 
+  const runId = config.run_tag ?? `run-${Date.now().toString(36)}`;
   return {
     schema_version: 1,
-    run_id: config.run_tag ?? `run-${Date.now().toString(36)}`,
+    run_id: runId,
     created_at: now,
     updated_at: now,
     status: "initialized",
@@ -252,6 +299,7 @@ export function makeStatePayload(
     } : undefined,
     verify: config.verify,
     guard: config.guard,
+    scorer: config.scorer,
     max_no_progress: config.max_no_progress,
     iterations_cap: config.iterations,
     duration: config.duration,
@@ -283,6 +331,13 @@ export function makeStatePayload(
     subagent_pool: subagentPool,
     continuation_policy: continuationPolicy,
     draft_pool: draftPool,
+    lineage: {
+      id: `exp-${runId}`,
+      parent_id: null,
+      branch: "main",
+      stage: "experiment",
+      agent: "orchestrator",
+    },
   };
 }
 
@@ -437,5 +492,73 @@ export async function buildSupervisorSnapshot(
     subagent_pool: state.subagent_pool,
     continuation_policy: state.continuation_policy,
     draft_pool: state.draft_pool,
+  };
+}
+
+export interface ResultRow {
+  timestamp: string;
+  iteration: number;
+  id: string;
+  parent_id: string;
+  branch: string;
+  stage: string;
+  agent: string;
+  decision: string;
+  metric_value: string;
+  instrument_value: string;
+  verify_status: string;
+  guard_status: string;
+  hypothesis: string;
+  change_summary: string;
+  labels: string;
+  note: string;
+}
+
+export function parseResultRow(line: string): ResultRow | null {
+  if (!line.trim()) return null;
+  const parts = line.split("\t");
+
+  if (parts.length < 11) return null;
+
+if (parts.length === 11) {
+    return {
+      timestamp: parts[0],
+      iteration: parseInt(parts[1], 10),
+      decision: parts[2],
+      metric_value: parts[3],
+      instrument_value: parts[4],
+      verify_status: parts[5],
+      guard_status: parts[6],
+      hypothesis: parts[7],
+      change_summary: parts[8],
+      labels: parts[9],
+      note: parts[10],
+      id: "",
+      parent_id: "",
+      branch: "main",
+      stage: "",
+      agent: "",
+    };
+  }
+
+  if (parts.length < 16) return null;
+
+  return {
+    timestamp: parts[0],
+    iteration: parseInt(parts[1], 10),
+    id: parts[2],
+    parent_id: parts[3],
+    branch: parts[4],
+    stage: parts[5],
+    agent: parts[6],
+    decision: parts[7],
+    metric_value: parts[8],
+    instrument_value: parts[9],
+    verify_status: parts[10],
+    guard_status: parts[11],
+    hypothesis: parts[12],
+    change_summary: parts[13],
+    labels: parts[14],
+    note: parts[15],
   };
 }
