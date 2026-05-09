@@ -111,7 +111,13 @@ const parseArgs = (args: string[]): Record<string, string> => {
   const result: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith("--")) {
-      const key = args[i].slice(2);
+      const longArg = args[i];
+      const equalsIndex = longArg.indexOf("=");
+      if (equalsIndex > 2) {
+        result[longArg.slice(2, equalsIndex)] = longArg.slice(equalsIndex + 1);
+        continue;
+      }
+      const key = longArg.slice(2);
       if (i + 1 < args.length && !args[i + 1].startsWith("--") && !args[i + 1].startsWith("-")) {
         result[key] = args[++i];
       } else {
@@ -839,7 +845,7 @@ const main = async (): Promise<number> => {
               run_id: { type: "string", description: "Unique run identifier" },
               created_at: { type: "string", format: "date-time", description: "Run creation timestamp" },
               updated_at: { type: "string", format: "date-time", description: "Last update timestamp" },
-              status: { type: "string", enum: ["running", "stopped", "completed", "needs_human"], description: "Run status" },
+              status: { type: "string", enum: ["initialized", "running", "stopping", "stopped", "completed", "needs_human"], description: "Run status" },
               mode: { type: "string", enum: ["foreground", "background"], description: "Execution mode" },
               operating_mode: { type: "string", enum: ["converge", "continuous", "supervised"], description: "Operating mode" },
               goal: { type: "string", description: "Run goal description" },
@@ -1912,6 +1918,40 @@ const main = async (): Promise<number> => {
           console.log(formatLeaderboardText(leaderboard));
         }
         break;
+      }
+      case "worker": {
+        const { workerOnce } = await import("./worker.js");
+        const once = grouped["once"] === "true";
+
+        if (!once) {
+          console.error("worker requires --once flag");
+          console.error("Usage: autoresearch worker --once [--json] [--repo <path>]");
+          return 1;
+        }
+
+        const result = workerOnce(
+          grouped.repo as string | undefined,
+          grouped["state-path"] as string | undefined,
+          grouped["results-path"] as string | undefined,
+        );
+
+        if (useJson) {
+          printJsonEnvelope("worker", result);
+        } else {
+          if (result.ready) {
+            console.log(`✓ Ready for iteration ${result.iteration}`);
+            console.log(`  Run ID:  ${result.run_id}`);
+            console.log(`  Status:  ${result.status}`);
+            console.log(`  Goal:    ${result.goal}`);
+            if (result.metric) console.log(`  Metric:  ${result.metric}`);
+          } else {
+            console.log(`✗ Not ready: ${result.reason || "unknown"}`);
+            console.log(`  Run ID: ${result.run_id}`);
+            console.log(`  Iter:   ${result.iteration}`);
+          }
+        }
+
+        return result.ready ? 0 : 1;
       }
       default: {
         console.error(`Unknown command: ${cmd}`);
