@@ -284,12 +284,14 @@ describe("CLI Commands", () => {
     it("outputs full schemas in JSON mode", () => {
       const out = execSync(`node ${CLI} contract --json`, { encoding: "utf-8", cwd: REPO_ROOT });
       const json = JSON.parse(out);
-      expect(json.schema_version).toBe("1.0.0");
-      expect(json.state).toBeDefined();
-      expect(json.state.required).toContain("run_id");
-      expect(json.result_row).toBeDefined();
-      expect(json.goal_doc).toBeDefined();
-      expect(json.goal_doc.required).toContain("goal");
+      const schemas = json.data ?? json;
+      expect(schemas.schema_version).toBe("1.0.0");
+      expect(schemas.state).toBeDefined();
+      expect(schemas.state.required).toContain("run_id");
+      expect(schemas.state.properties.status.enum).toEqual(["initialized", "running", "stopping", "stopped", "completed", "needs_human"]);
+      expect(schemas.result_row).toBeDefined();
+      expect(schemas.goal_doc).toBeDefined();
+      expect(schemas.goal_doc.required).toContain("goal");
     });
   });
 
