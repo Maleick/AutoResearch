@@ -17,6 +17,7 @@ export interface StructuredError {
 
 export const ERROR_CODES: Record<ErrorKind, Record<string, string>> = {
   validation: {
+    INVALID_INPUT: "Input value is invalid",
     INVALID_GOAL: "Goal must be a non-empty string",
     INVALID_METRIC: "Metric must be a non-empty string",
     INVALID_DIRECTION: "Direction must be 'lower' or 'higher'",
@@ -61,12 +62,13 @@ export const ERROR_CODES: Record<ErrorKind, Record<string, string>> = {
 
 export function categorizeError(error: Error): StructuredError {
   const message = error.message;
+  const normalizedMessage = message.toLowerCase();
 
   // Validation errors
   if (message.includes("Missing required") || message.includes("Invalid")) {
     const code = Object.keys(ERROR_CODES.validation).find((k) =>
-      message.toLowerCase().includes(k.toLowerCase().replace(/_/g, " ")),
-    ) || "INVALID_CONFIG";
+      normalizedMessage.includes(k.toLowerCase().replace(/_/g, " ")),
+    ) || "INVALID_INPUT";
 
     return {
       kind: "validation",
@@ -107,10 +109,10 @@ export function categorizeError(error: Error): StructuredError {
   }
 
   // Execution errors
-  if (message.includes("failed") || message.includes("timeout") || message.includes("Timed out")) {
+  if (message.includes("failed") || normalizedMessage.includes("timeout") || normalizedMessage.includes("timed out")) {
     return {
       kind: "execution",
-      code: message.includes("timeout") ? "TIMEOUT" : "VERIFY_FAILED",
+      code: normalizedMessage.includes("timeout") || normalizedMessage.includes("timed out") ? "TIMEOUT" : "VERIFY_FAILED",
       message,
       recoverable: true,
     };

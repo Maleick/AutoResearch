@@ -91,4 +91,31 @@ describe("Leaderboard", () => {
     expect(md).toContain("60.0%");
     expect(md).toContain("10m");
   });
+
+  it("selects best value using numeric comparison and metric direction", () => {
+    const runDir = resolve(tmpDir, ".autoresearch", "run-higher-1");
+    mkdirSync(runDir, { recursive: true });
+
+    writeFileSync(
+      resolve(runDir, "state.json"),
+      JSON.stringify({
+        run_id: "run-higher-1",
+        goal: "Increase throughput",
+        metric: { name: "throughput", direction: "higher" },
+        created_at: "2026-05-01T10:00:00Z",
+        updated_at: "2026-05-01T11:00:00Z",
+      }),
+    );
+
+    writeFileSync(
+      resolve(runDir, "results.tsv"),
+      "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n" +
+      "2026-05-01T10:05:00Z\t1\tkeep\t8\t\tok\tok\t\tBaseline\t\t\n" +
+      "2026-05-01T10:10:00Z\t2\tkeep\t10\t\tok\tok\t\tImproved\t\t\n",
+    );
+
+    const lb = generateLeaderboard(tmpDir);
+    expect(lb.entries).toHaveLength(1);
+    expect(lb.entries[0].best_value).toBe("10");
+  });
 });

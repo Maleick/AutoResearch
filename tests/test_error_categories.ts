@@ -6,6 +6,7 @@ describe("Error Categories", () => {
       const error = new Error("Missing required: --goal");
       const structured = categorizeError(error);
       expect(structured.kind).toBe("validation");
+      expect(structured.code).toBe("INVALID_INPUT");
       expect(structured.recoverable).toBe(true);
     });
 
@@ -29,6 +30,13 @@ describe("Error Categories", () => {
       const structured = categorizeError(error);
       expect(structured.kind).toBe("execution");
       expect(structured.recoverable).toBe(true);
+    });
+
+    it("categorizes timeout errors consistently", () => {
+      const error = new Error("Timed out while running verify command");
+      const structured = categorizeError(error);
+      expect(structured.kind).toBe("execution");
+      expect(structured.code).toBe("TIMEOUT");
     });
 
     it("defaults to unknown for unrecognized errors", () => {
@@ -70,6 +78,7 @@ describe("Error Categories", () => {
 
   describe("ERROR_CODES", () => {
     it("has validation error codes", () => {
+      expect(ERROR_CODES.validation.INVALID_INPUT).toBeDefined();
       expect(ERROR_CODES.validation.INVALID_GOAL).toBeDefined();
       expect(ERROR_CODES.validation.INVALID_DIRECTION).toBeDefined();
     });

@@ -110,7 +110,13 @@ const parseArgs = (args: string[]): Record<string, string> => {
   const result: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith("--")) {
-      const key = args[i].slice(2);
+      const longArg = args[i];
+      const equalsIndex = longArg.indexOf("=");
+      if (equalsIndex > 2) {
+        result[longArg.slice(2, equalsIndex)] = longArg.slice(equalsIndex + 1);
+        continue;
+      }
+      const key = longArg.slice(2);
       if (i + 1 < args.length && !args[i + 1].startsWith("--") && !args[i + 1].startsWith("-")) {
         result[key] = args[++i];
       } else {
@@ -767,7 +773,7 @@ const main = async (): Promise<number> => {
           description: "Auto Research runtime contract schemas",
           state: {
             type: "object",
-            required: ["schema_version", "run_id", "created_at", "updated_at", "status", "mode", "operating_mode", "goal", "scope", "metric", "verify", "label_requirements", "artifact_paths", "stats", "flags"],
+            required: ["schema_version", "run_id", "created_at", "updated_at", "status", "mode", "goal", "scope", "metric", "verify", "label_requirements", "artifact_paths", "stats", "flags"],
             properties: {
               schema_version: { type: "number", description: "State schema version" },
               run_id: { type: "string", description: "Unique run identifier" },
@@ -893,7 +899,7 @@ const main = async (): Promise<number> => {
         console.log("==============================");
         console.log("");
         console.log("State Schema:");
-        console.log(`  Version:    ${schemas.state.properties.schema_version.type}`);
+        console.log(`  Version:    ${schemas.schema_version}`);
         console.log(`  Required:   ${schemas.state.required.join(", ")}`);
         console.log("");
         console.log("Result Row Schema:");
@@ -1789,7 +1795,7 @@ const main = async (): Promise<number> => {
         const { planCompaction, executeCompaction } = await import("./compaction.js");
         const { resolveRepo } = await import("./helpers.js");
         const repo = resolveRepo(grouped.repo as string | undefined);
-        const preserveCount = parseInt(grouped["preserve-iterations"] as string || "5", 10);
+        const preserveCount = parsePositiveInt(grouped["preserve-iterations"] as string | undefined, "preserve-iterations") ?? 5;
 
         if (dryRun) {
           console.log("[dry-run] Would compact .autoresearch history");
@@ -1822,7 +1828,7 @@ const main = async (): Promise<number> => {
 
         // Warning before destructive operation
         console.error("\nWARNING: This will archive old run data. Recent runs will be preserved.");
-        console.error("Use --dry-run to preview. Use --preserve-iterations=N to adjust retention.");
+        console.error("Use --dry-run to preview. Use --preserve-iterations N (or --preserve-iterations=N) to adjust retention.");
         console.error("");
 
         const result = executeCompaction(repo, plan, false);

@@ -1,5 +1,5 @@
 import { planCompaction, executeCompaction } from "../src/compaction.js";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
+import { mkdirSync, writeFileSync, rmSync, existsSync, utimesSync } from "fs";
 import { resolve } from "path";
 
 const REPO_ROOT = process.cwd();
@@ -59,5 +59,38 @@ describe("Compaction", () => {
     const result = executeCompaction(tmpDir, plan, true);
     expect(result.success).toBe(true);
     expect(result.archived.length).toBe(0); // dry-run doesn't actually archive
+  });
+
+  it("preserves active worker/newest logs and archives older logs", () => {
+    const logsDir = resolve(tmpDir, ".autoresearch", "logs");
+    mkdirSync(logsDir, { recursive: true });
+    const workerLog = resolve(logsDir, "worker.log");
+    const oldLog = resolve(logsDir, "old.log");
+    const recentLog = resolve(logsDir, "recent.log");
+    writeFileSync(workerLog, "worker");
+    writeFileSync(oldLog, "old");
+    writeFileSync(recentLog, "recent");
+    utimesSync(oldLog, new Date("2026-01-01T00:00:00Z"), new Date("2026-01-01T00:00:00Z"));
+    utimesSync(workerLog, new Date("2026-01-02T00:00:00Z"), new Date("2026-01-02T00:00:00Z"));
+    utimesSync(recentLog, new Date("2026-01-03T00:00:00Z"), new Date("2026-01-03T00:00:00Z"));
+
+    const plan = planCompaction(tmpDir, 5);
+    expect(plan.filesToPreserve).toContain(workerLog);
+    expect(plan.filesToPreserve).toContain(recentLog);
+    expect(plan.filesToArchive).toContain(oldLog);
+    expect(plan.filesToArchive).not.toContain(workerLog);
+    expect(plan.filesToArchive).not.toContain(recentLog);
+  });
+
+  it("tracks reclaimed space for archived directories", () => {
+    const runDir = resolve(tmpDir, ".autoresearch", "run-old-1");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(resolve(runDir, "results.tsv"), "1234567890");
+
+    const plan = planCompaction(tmpDir, 0);
+    const result = executeCompaction(tmpDir, plan, false);
+    expect(result.success).toBe(true);
+    expect(result.spaceReclaimed).toBeGreaterThanOrEqual(10);
+    expect(existsSync(runDir)).toBe(false);
   });
 });

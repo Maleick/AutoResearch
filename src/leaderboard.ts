@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
+import { parseMetricValue } from "./metric-comparator.js";
 
 export interface LeaderboardEntry {
   run_id: string;
@@ -26,7 +27,10 @@ export interface Leaderboard {
   };
 }
 
-function parseResultsFile(resultsPath: string): { kept: number; discarded: number; bestValue: string | null; latestValue: string | null } {
+function parseResultsFile(
+  resultsPath: string,
+  direction: "lower" | "higher",
+): { kept: number; discarded: number; bestValue: string | null; latestValue: string | null } {
   if (!existsSync(resultsPath)) {
     return { kept: 0, discarded: 0, bestValue: null, latestValue: null };
   }
@@ -47,6 +51,7 @@ function parseResultsFile(resultsPath: string): { kept: number; discarded: numbe
   let kept = 0;
   let discarded = 0;
   let bestValue: string | null = null;
+  let bestNumericValue: number | null = null;
   let latestValue: string | null = null;
 
   for (let i = 1; i < lines.length; i++) {
@@ -61,7 +66,18 @@ function parseResultsFile(resultsPath: string): { kept: number; discarded: numbe
 
     if (metricValue) {
       latestValue = metricValue;
-      if (bestValue === null || metricValue < bestValue) {
+      const parsed = parseMetricValue(metricValue);
+      if (parsed === null) {
+        if (bestValue === null) {
+          bestValue = metricValue;
+        }
+        continue;
+      }
+      if (
+        bestNumericValue === null ||
+        (direction === "lower" ? parsed < bestNumericValue : parsed > bestNumericValue)
+      ) {
+        bestNumericValue = parsed;
         bestValue = metricValue;
       }
     }
@@ -106,14 +122,15 @@ export function generateLeaderboard(repoPath: string): Leaderboard {
 
     try {
       const state = JSON.parse(readFileSync(statePath, "utf-8"));
-      const results = parseResultsFile(resultsPath);
+      const direction = state.metric?.direction === "higher" ? "higher" : "lower";
+      const results = parseResultsFile(resultsPath, direction);
       const runtime = calculateRuntime(state);
 
       entries.push({
         run_id: state.run_id || dir.name,
         goal: state.goal || "Unknown",
         metric: state.metric?.name || "Unknown",
-        direction: state.metric?.direction || "lower",
+        direction,
         total_iterations: results.kept + results.discarded,
         kept: results.kept,
         discarded: results.discarded,

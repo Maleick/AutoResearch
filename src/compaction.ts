@@ -31,7 +31,6 @@ export function planCompaction(
   const autoresearchDir = resolve(repoPath, ".autoresearch");
   const plan: CompactionPlan = {
     filesToArchive: [],
-    filesToRemove: [],
     filesToPreserve: [],
     estimatedSpaceReclaimed: 0,
   };
@@ -80,12 +79,30 @@ export function planCompaction(
     }
   });
 
-  // Old log files
+  // Archive older log files while preserving active logs
   const logsDir = resolve(autoresearchDir, "logs");
   if (existsSync(logsDir)) {
-    const logFiles = readdirSync(logsDir).filter((f) => f.endsWith(".log"));
+    const logFiles = readdirSync(logsDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".log"))
+      .map((entry) => entry.name);
+    let newestLogFile: string | null = null;
+    let newestLogMtime = -Infinity;
+    for (const logFile of logFiles) {
+      const logPath = join(logsDir, logFile);
+      const mtime = statSync(logPath).mtimeMs;
+      if (mtime > newestLogMtime) {
+        newestLogMtime = mtime;
+        newestLogFile = logFile;
+      }
+    }
     logFiles.forEach((logFile) => {
       const logPath = join(logsDir, logFile);
+      if (logFile === "worker.log" || logFile === newestLogFile) {
+        if (!plan.filesToPreserve.includes(logPath)) {
+          plan.filesToPreserve.push(logPath);
+        }
+        return;
+      }
       const size = getFileSize(logPath);
       plan.filesToArchive.push(logPath);
       plan.estimatedSpaceReclaimed += size;
@@ -151,7 +168,7 @@ export function executeCompaction(
       result.archived.push(`${filePath} (would archive to ${archivePath})`);
     } else {
       try {
-        const size = getFileSize(filePath);
+        const size = statSync(filePath).isDirectory() ? getDirectorySize(filePath) : getFileSize(filePath);
         renameSync(filePath, archivePath);
         result.archived.push(filePath);
         result.spaceReclaimed += size;
