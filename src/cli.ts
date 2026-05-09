@@ -9,6 +9,24 @@ import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTer
 const VERSION_FLAGS = ["--version", "-v"];
 const HELP_FLAGS = ["--help", "-h", "help"];
 const BRANCH_POLICIES = ["best", "roulette", "diverse"] as const;
+
+type SkipReason = "version_flag" | "help_flag" | "env_opt_out" | "ci_environment" | null;
+
+const shouldSkipUpdateCheck = (args: string[]): { skip: boolean; reason: SkipReason } => {
+  if (args.length > 0 && VERSION_FLAGS.includes(args[0])) {
+    return { skip: true, reason: "version_flag" };
+  }
+  if (args.length > 0 && HELP_FLAGS.includes(args[0])) {
+    return { skip: true, reason: "help_flag" };
+  }
+  if (process.env.AUTORESEARCH_NO_UPDATE === "1") {
+    return { skip: true, reason: "env_opt_out" };
+  }
+  if (process.env.CI === "true" || process.env.CI === "1") {
+    return { skip: true, reason: "ci_environment" };
+  }
+  return { skip: false, reason: null };
+};
 type BranchPolicy = typeof BRANCH_POLICIES[number];
 
 const usage = (): void => {
@@ -1277,6 +1295,7 @@ const main = async (): Promise<number> => {
         const installedInfo = installedPath ? getInstalledPackageInfo(PACKAGE_NAME) : null;
         const updateCache = readUpdateCache();
 
+        const { skip: updateSkipped, reason: skipReason } = shouldSkipUpdateCheck(process.argv.slice(2));
         const updateStatus = {
           cache_exists: updateCache !== null,
           last_check: updateCache?.last_check || null,
@@ -1284,6 +1303,8 @@ const main = async (): Promise<number> => {
           latest_version: updateCache?.latest_version || null,
           update_available: updateCache?.update_available || false,
           update_disabled: process.env.AUTORESEARCH_NO_UPDATE === "1",
+          skipped: updateSkipped,
+          skip_reason: skipReason,
         };
 
         if (useJson) {
@@ -1322,7 +1343,9 @@ const main = async (): Promise<number> => {
         console.log("");
 
         console.log("Update:");
-        if (updateCache) {
+        if (updateSkipped) {
+          console.log(`  Skipped:    yes (${skipReason})`);
+        } else if (updateCache) {
           console.log(`  Last check: ${updateCache.last_check}`);
           console.log(`  Current:    ${updateCache.current_version}`);
           console.log(`  Latest:     ${updateCache.latest_version}`);

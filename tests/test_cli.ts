@@ -223,6 +223,18 @@ describe("CLI Commands", () => {
         rmSync(tmpDir, { recursive: true, force: true });
       }
     });
+
+    it("reports update skip reason in doctor output", () => {
+      const out = execSync(`node ${CLI} doctor`, { encoding: "utf-8", cwd: REPO_ROOT, env: { ...process.env, AUTORESEARCH_NO_UPDATE: "1" } });
+      expect(out).toContain("Skipped:    yes (env_opt_out)");
+    });
+
+    it("reports CI skip reason in doctor --json output", () => {
+      const out = execSync(`node ${CLI} doctor --json`, { encoding: "utf-8", cwd: REPO_ROOT, env: { ...process.env, CI: "true" } });
+      const json = JSON.parse(out);
+      expect(json.update.skipped).toBe(true);
+      expect(json.update.skip_reason).toBe("ci_environment");
+    });
   });
 
   describe("wizard command", () => {
