@@ -25,11 +25,14 @@ const plugin = JSON.parse(await readText(pluginPath));
 plugin.version = version;
 await writeText(pluginPath, `${JSON.stringify(plugin, null, 2)}\n`);
 
-const readmePath = "../README.md";
-const readme = await readText(readmePath);
-await writeText(
-  readmePath,
-  readme
+const updateVersionReferences = (content) =>
+  content
     .replace(/version-v\d+\.\d+\.\d+-/g, `version-v${version}-`)
-    .replace(/alt="v\d+\.\d+\.\d+"/g, `alt="v${version}"`),
-);
+    .replace(/alt="v\d+\.\d+\.\d+"/g, `alt="v${version}"`)
+    .replace(/immutable `v\d+\.\d+\.\d+`/g, `immutable \`v${version}\``)
+    .replace(/refs\/tags\/v\d+\.\d+\.\d+\/INSTALL\.md/g, `refs/tags/v${version}/INSTALL.md`);
+
+for (const docsPath of ["../README.md", "../INSTALL.md", "../wiki/Installation.md"]) {
+  const docs = await readText(docsPath);
+  await writeText(docsPath, updateVersionReferences(docs));
+}
