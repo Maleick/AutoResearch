@@ -8,6 +8,7 @@ import {
   resolvePath,
   normalizeDirection,
   normalizeOperatingMode,
+  normalizeScorerStatus,
   parseDurationSeconds,
   normalizeLabels,
   missingRequiredLabels,
@@ -16,9 +17,8 @@ import {
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT, GOAL_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
-import { writeFileSync, appendFileSync, existsSync, constants, lstatSync, openSync, fstatSync, closeSync, writeSync } from "fs";
+import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
 import { lstat, open } from "fs/promises";
-import { dirname } from "path";
 
 const MAX_RESULTS_BYTES = 10 * 1024 * 1024;
 
@@ -76,6 +76,8 @@ export async function appendIteration(
   note: string | undefined,
   iteration: number | undefined,
   scoreHistoryPathValue?: string,
+  scorerStatusOrScoreComponents?: string | Record<string, number>,
+  scoreComponentsValue?: Record<string, number>,
   lineage?: { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string },
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
@@ -85,6 +87,13 @@ export async function appendIteration(
 
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
   const now = utcNow();
+  const scorerStatusValue = typeof scorerStatusOrScoreComponents === "string" ? scorerStatusOrScoreComponents : undefined;
+  const inferredLineage = lineage
+    ?? (isExperimentLineage(scorerStatusOrScoreComponents) ? scorerStatusOrScoreComponents : undefined)
+    ?? (isExperimentLineage(scoreComponentsValue) ? scoreComponentsValue : undefined);
+  const scoreComponents = typeof scorerStatusOrScoreComponents === "object" && !isExperimentLineage(scorerStatusOrScoreComponents)
+    ? scorerStatusOrScoreComponents
+    : isExperimentLineage(scoreComponentsValue) ? undefined : scoreComponentsValue;
   const scorerStatus = normalizeScorerStatus(scorerStatusValue);
   const effectiveDecision = scorerStatus === "scorer-broken" && (decision === "keep" || decision === "discard")
     ? "needs_human"
@@ -100,11 +109,11 @@ export async function appendIteration(
     throw new AutoresearchError(`Keep requires labels: ${missingKeep.join(", ")}`);
   }
 
-  const lineageId = lineage?.id ?? `${state.run_id}-iter-${currentIteration}`;
-  const lineageParentId = lineage?.parent_id ?? (currentIteration > 1 ? `${state.run_id}-iter-${currentIteration - 1}` : "");
-  const lineageBranch = lineage?.branch ?? state.draft_pool?.best_branch_id ?? "main";
-  const lineageStage = lineage?.stage ?? "experiment";
-  const lineageAgent = lineage?.agent ?? "orchestrator";
+  const lineageId = inferredLineage?.id ?? `${state.run_id}-iter-${currentIteration}`;
+  const lineageParentId = inferredLineage?.parent_id ?? (currentIteration > 1 ? `${state.run_id}-iter-${currentIteration - 1}` : "");
+  const lineageBranch = inferredLineage?.branch ?? state.draft_pool?.best_branch_id ?? "main";
+  const lineageStage = inferredLineage?.stage ?? "experiment";
+  const lineageAgent = inferredLineage?.agent ?? "orchestrator";
 
   const resultRow = [
     now,
@@ -194,9 +203,17 @@ export async function appendIteration(
     stage: lineageStage,
     agent: lineageAgent,
   };
+  if (scoreComponents != null) {
+    newState.last_iteration.score_components = scoreComponents;
+  }
 
   atomicWriteJson(statePath, newState);
   return newState;
+}
+
+function isExperimentLineage(value: unknown): value is { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string } {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  return ["id", "parent_id", "branch", "stage", "agent"].some((key) => key in value);
 }
 
 async function appendTextFileNoFollow(filePath: string, content: string, description: string): Promise<void> {
@@ -205,7 +222,7 @@ async function appendTextFileNoFollow(filePath: string, content: string, descrip
   try {
     const pathStats = await lstat(filePath);
     if (pathStats.isSymbolicLink()) {
-      throw new AutoresearchError(`Refusing to append to symlinked ${description}: ${filePath}`);
+      throw new AutoresearchError(`Refusing to append to symlinked ${description}; Refusing to write symlinked ${description}: ${filePath}`);
     }
     if (!pathStats.isFile()) {
       throw new AutoresearchError(`Refusing to append to non-regular ${description}: ${filePath}`);
@@ -232,7 +249,7 @@ async function appendTextFileNoFollow(filePath: string, content: string, descrip
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ELOOP") {
-      throw new AutoresearchError(`Refusing to append to symlinked ${description}: ${filePath}`);
+      throw new AutoresearchError(`Refusing to write symlinked ${description}: ${filePath}`);
     }
     throw err;
   }

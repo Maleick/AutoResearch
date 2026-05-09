@@ -280,6 +280,7 @@ describe("CLI: goal command", () => {
 
     it("does not follow a symlinked default GOAL.md", () => {
       mkdirSync(tmpDir, { recursive: true });
+      mkdirSync(resolve(tmpDir, ".autoresearch"), { recursive: true });
       const outsidePath = tmpDir + "-victim";
       writeFileSync(outsidePath, "original content\n", "utf-8");
       symlinkSync(outsidePath, goalPath);

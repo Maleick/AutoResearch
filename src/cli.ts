@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync, writeFileSync } from "fs";
+import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { execSync } from "child_process";
 import { MAX_DRAFTS } from "./constants.js";
@@ -486,9 +486,11 @@ const main = async (): Promise<number> => {
         for (const r of records) {
           const cols = r.split("\t");
           if (cols.length >= 4) {
-            const emoji = cols[2] === "keep" ? "✓" : cols[2] === "discard" ? "✗" : "⚠";
-            const changeSummary = tsvField(headers, cols, "change_summary", 7);
-            console.log(`${emoji}  #${formatDisplayValue(cols[1])}  ${formatDisplayValue(cols[2])}  (${formatMetricValue(cols[3])})  ${formatDisplayValue(changeSummary.substring(0, 60))}`);
+            const decision = tsvField(headers, cols, "decision", 2);
+            const metricValue = tsvField(headers, cols, "metric_value", 3);
+            const emoji = decision === "keep" ? "✓" : decision === "discard" ? "✗" : "⚠";
+            const changeSummary = tsvField(headers, cols, "change_summary", 8);
+            console.log(`${emoji}  #${formatDisplayValue(cols[1])}  ${formatDisplayValue(decision)}  (${formatMetricValue(metricValue)})  ${formatDisplayValue(changeSummary.substring(0, 60))}`);
           }
         }
         console.log(`\nShowing ${Math.min(limit, records.length)} of ${lines.length - 1} records.`);
@@ -866,8 +868,10 @@ const main = async (): Promise<number> => {
           for (const r of results) {
             const cols = r.split("\t");
             if (cols.length >= 4) {
-              const changeSummary = tsvField(resultHeaders, cols, "change_summary", 7);
-              console.log(`- ${formatMarkdownField(cols[1])}: ${formatMarkdownField(cols[2])} (${formatMarkdownField(cols[3])}) — ${formatMarkdownField(changeSummary).substring(0, 60)}`);
+              const decision = tsvField(resultHeaders, cols, "decision", 2);
+              const metricValue = tsvField(resultHeaders, cols, "metric_value", 3);
+              const changeSummary = tsvField(resultHeaders, cols, "change_summary", 8);
+              console.log(`- ${formatMarkdownField(cols[1])}: ${formatMarkdownField(decision)} (${formatMarkdownField(metricValue)}) — ${formatMarkdownField(changeSummary).substring(0, 60)}`);
             }
           }
         }
@@ -1113,10 +1117,11 @@ const main = async (): Promise<number> => {
           grouped.hypothesis as string | undefined,
           grouped["change-summary"] as string,
           grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined,
-            grouped.note as string | undefined,
-            iteration,
-            undefined,
-            scorerStatus,
+          grouped.note as string | undefined,
+          iteration,
+          undefined,
+          scorerStatus,
+          scoreComponents,
           );
         printJson(state);
         break;
@@ -1220,30 +1225,9 @@ const main = async (): Promise<number> => {
         break;
       }
       case "goal": {
-        const subCmd = cmdArgs[0];
-        if (subCmd?.startsWith("--")) {
-          const { resolvePath, readGoalDoc } = await import("./helpers.js");
-          const { GOAL_DEFAULT } = await import("./constants.js");
-          const goalPath = resolvePath(grouped.repo as string | undefined, grouped["goal-path"] as string | undefined, GOAL_DEFAULT);
-          if (!existsSync(goalPath)) {
-            console.log("No goal document found. Run 'autoresearch init' first.");
-            break;
-          }
-          const doc = readGoalDoc(goalPath);
-          if (useJson) {
-            printJson(doc);
-            break;
-          }
-          console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
-          console.log(`Metric:           ${formatDisplayValue(doc.metric)} (${formatDisplayValue(doc.direction)})`);
-          console.log(`Verify:           ${formatDisplayValue(doc.verify)}`);
-          if (doc.guard) console.log(`Guard:            ${formatDisplayValue(doc.guard)}`);
-          if (doc.file_map) console.log(`File map:         ${formatDisplayValue(doc.file_map)}`);
-          if (doc.constraints) console.log(`Constraints:      ${formatDisplayValue(doc.constraints)}`);
-          if (doc.stop_conditions) console.log(`Stop conditions:  ${formatDisplayValue(doc.stop_conditions)}`);
-          break;
-        }
-        if (!subCmd || subCmd === "help" || HELP_FLAGS.includes(subCmd)) {
+        const rawSubCmd = cmdArgs[0];
+        const subCmd = rawSubCmd && !rawSubCmd.startsWith("-") ? rawSubCmd : undefined;
+        if ((!subCmd && cmdArgs.length === 0) || subCmd === "help" || (subCmd && HELP_FLAGS.includes(subCmd))) {
           console.error("Usage: autoresearch goal <subcommand> [options]");
           console.error("");
           console.error("Subcommands:");
@@ -1269,6 +1253,28 @@ const main = async (): Promise<number> => {
           console.error("  autoresearch goal init --template performance");
           console.error("  autoresearch goal init  # interactive wizard");
           return 0;
+        }
+        if (!subCmd) {
+          const { GOAL_DEFAULT } = await import("./constants.js");
+          const { resolvePath } = await import("./helpers.js");
+          const goalPath = resolvePath(grouped.repo as string | undefined, grouped["goal-path"] as string | undefined, GOAL_DEFAULT);
+          if (!existsSync(goalPath)) {
+            console.log("No goal document found. Run 'autoresearch init' first.");
+            break;
+          }
+          const doc = readGoalDoc(goalPath);
+          if (useJson) {
+            printJson(doc);
+            break;
+          }
+          console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
+          console.log(`Metric:           ${formatDisplayValue(doc.metric)} (${formatDisplayValue(doc.direction)})`);
+          console.log(`Verify:           ${formatDisplayValue(doc.verify)}`);
+          if (doc.guard) console.log(`Guard:            ${formatDisplayValue(doc.guard)}`);
+          if (doc.file_map) console.log(`File map:         ${formatDisplayValue(doc.file_map)}`);
+          if (doc.constraints) console.log(`Constraints:      ${formatDisplayValue(doc.constraints)}`);
+          if (doc.stop_conditions) console.log(`Stop conditions:  ${formatDisplayValue(doc.stop_conditions)}`);
+          break;
         }
         if (subCmd !== "init") {
           console.error(`Unknown goal subcommand: ${subCmd}`);

@@ -1,4 +1,4 @@
-import { resolve } from "path";
+import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { execFileSync, execSync } from "child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
@@ -17,6 +17,7 @@ const restoreFile = (path: string, original: string | undefined): void => {
   if (original === undefined) {
     try { rmSync(path); } catch {}
   } else {
+    mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, original, "utf-8");
   }
 };
@@ -105,6 +106,10 @@ describe("CLI Commands", () => {
     const tmpState = resolve(tmpDir, ".autoresearch", "state.json");
     const tmpResults = resolve(tmpDir, "autoresearch-results.tsv");
     const tmpLaunch = resolve(tmpDir, ".autoresearch", "launch.json");
+
+    beforeEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
 
     afterEach(() => {
       try { rmSync(tmpDir, { recursive: true }); } catch {}

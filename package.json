@@ -1,6 +1,6 @@
 {
   "name": "opencode-autoresearch",
-  "version": "3.6.0",
+  "version": "3.6.1",
   "description": "Autonomous recursive self-improvement engine for OpenCode and Hermes Agent. Subagent-first iteration loop with mechanical verification.",
   "author": {
     "name": "Maleick",
@@ -65,7 +65,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "audit": "npm audit --audit-level=moderate",
-    "test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.json",
+    "test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.json --runInBand",
     "verify:pack": "bash hooks/verify-package.sh",
     "prepack": "node scripts/sync-version.mjs && tsc"
   },
