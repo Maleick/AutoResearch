@@ -847,7 +847,7 @@ describe("CLI Commands", () => {
 
     beforeEach(() => {
       try { rmSync(tmpDir, { recursive: true }); } catch {}
-      execSync(`node ${CLI} init --goal "test" --metric "errors" --direction lower --verify "echo ok" --repo ${tmpDir}`, { encoding: "utf-8" });
+      execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "errors", "--direction", "lower", "--verify", "echo ok", "--repo", tmpDir], { encoding: "utf-8" });
     });
 
     afterEach(() => {
@@ -856,8 +856,9 @@ describe("CLI Commands", () => {
 
     it("stores score_components in score history and state", () => {
       const components = JSON.stringify({ accuracy: 0.8, coverage: 0.6 });
-      const stateJson = execSync(
-        `node ${CLI} record --decision keep --metric-value 5 --verify-status pass --change-summary "test" --score-components '${components}' --repo ${tmpDir}`,
+      const stateJson = execFileSync(
+        "node",
+        [CLI, "record", "--decision", "keep", "--metric-value", "5", "--verify-status", "pass", "--change-summary", "test", "--score-components", components, "--repo", tmpDir],
         { encoding: "utf-8" },
       );
       const state = JSON.parse(stateJson);
@@ -869,8 +870,9 @@ describe("CLI Commands", () => {
 
     it("shows score-components in dry-run output", () => {
       const components = JSON.stringify({ accuracy: 0.9 });
-      const out = execSync(
-        `node ${CLI} record --decision keep --metric-value 5 --verify-status pass --change-summary "test" --score-components '${components}' --dry-run --repo ${tmpDir}`,
+      const out = execFileSync(
+        "node",
+        [CLI, "record", "--decision", "keep", "--metric-value", "5", "--verify-status", "pass", "--change-summary", "test", "--score-components", components, "--dry-run", "--repo", tmpDir],
         { encoding: "utf-8" },
       );
       expect(out).toContain("score_components");
