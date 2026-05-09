@@ -1,0 +1,7 @@
+iteration	decision	metric_value	instrument_value	change_summary	labels	timestamp
+1	keep	0.90	0.0	Basic theme context with CSS variables - initial implementation	feature_working	2026-05-15T09:22:14.000Z
+2	discard	0.87	0.0	Styled-components dynamic theme provider - adds 2.3kb runtime		2026-05-15T10:05:33.000Z
+3	discard	0.88	0.0	Emotion CSS-in-JS approach - similar runtime overhead		2026-05-15T10:48:22.000Z
+4	keep	0.91	0.0	Context + CSS modules hybrid - reduced runtime impact	feature_working,performance_maintained	2026-05-15T11:32:45.000Z
+5	keep	0.92	0.0	Native CSS custom properties - zero runtime JS overhead	feature_working,performance_maintained,goal_reached	2026-05-15T12:18:09.000Z
+6	keep	0.92	0.0	CSS custom properties approach - zero runtime JS, perfect score maintained	feature_working,performance_maintained,goal_reached	2026-05-15T16:45:33.000Z

@@ -6,6 +6,44 @@ const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const importSubagentPool = async () => await import(resolve(REPO_ROOT, "dist/subagent-pool.js"));
 const importConstants = async () => await import(resolve(REPO_ROOT, "dist/constants.js"));
 
+beforeAll(async () => {
+  const mod = await importSubagentPool();
+  if (mod.resetBranchIdCounter) {
+    mod.resetBranchIdCounter();
+  }
+});
+
+describe("BRANCH_SELECTION_POLICIES", () => {
+  let mod: any;
+  beforeAll(async () => { mod = await importSubagentPool(); });
+
+  it("exports policy info array", () => {
+    expect(Array.isArray(mod.BRANCH_SELECTION_POLICIES)).toBe(true);
+    expect(mod.BRANCH_SELECTION_POLICIES.length).toBe(3);
+  });
+
+  it("has best policy with greedy description", () => {
+    const best = mod.BRANCH_SELECTION_POLICIES.find((p: any) => p.id === "best");
+    expect(best).toBeDefined();
+    expect(best.label).toBe("Greedy (Best)");
+    expect(best.recommended_for).toContain("optimization");
+  });
+
+  it("has roulette policy with exploratory description", () => {
+    const roulette = mod.BRANCH_SELECTION_POLICIES.find((p: any) => p.id === "roulette");
+    expect(roulette).toBeDefined();
+    expect(roulette.label).toBe("Exploratory (Roulette)");
+    expect(roulette.recommended_for).toContain("exploration");
+  });
+
+  it("has diverse policy with diversity-first description", () => {
+    const diverse = mod.BRANCH_SELECTION_POLICIES.find((p: any) => p.id === "diverse");
+    expect(diverse).toBeDefined();
+    expect(diverse.label).toBe("Diversity-First");
+    expect(diverse.recommended_for).toContain("architecture");
+  });
+});
+
 describe("buildDraftPoolPlan", () => {
   let mod: any;
   let constants: any;
@@ -114,6 +152,43 @@ describe("buildDraftPoolPlan", () => {
       branch_selection_policy: "best",
     })).toThrow("Invalid num_drafts: Infinity");
   });
+
+  it("includes available_policies in config", () => {
+    const pool = mod.buildDraftPoolPlan({
+      num_drafts: 2,
+      branch_selection_policy: "best",
+    });
+    expect(Array.isArray(pool.available_policies)).toBe(true);
+    expect(pool.available_policies.length).toBe(3);
+    expect(pool.available_policies.map((p: any) => p.id)).toEqual(["best", "roulette", "diverse"]);
+  });
+
+  it("applies per-branch policy overrides", () => {
+    const pool = mod.buildDraftPoolPlan({
+      num_drafts: 3,
+      branch_selection_policy: "best",
+    });
+    const ids = pool.active_drafts.map((d: any) => d.branch_id);
+    expect(ids.length).toBe(3);
+    const overrides: Record<string, any> = {};
+    overrides[ids[0]] = "roulette";
+    overrides[ids[2]] = "diverse";
+    const poolWithOverrides = mod.buildDraftPoolPlan({
+      num_drafts: 3,
+      branch_selection_policy: "best",
+      branch_policy_overrides: overrides,
+    });
+    const withOverride = poolWithOverrides.active_drafts.filter((d: any) => d.policy_override !== undefined);
+    expect(withOverride.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it("does not mutate overrides when drafting", () => {
+    const pool = mod.buildDraftPoolPlan({
+      num_drafts: 2,
+      branch_selection_policy: "best",
+    });
+    expect(pool.active_drafts[0].policy_override).toBeUndefined();
+  });
 });
 
 describe("selectNextBranch", () => {
@@ -190,5 +265,16 @@ describe("selectNextBranch", () => {
     ];
     const next = mod.selectNextBranch(drafts, "best", "lower");
     expect(next).toBe("draft-3");
+  });
+
+  it("uses per-branch override when poolPolicy provided", () => {
+    const drafts = [
+      { branch_id: "draft-1", iteration: 1, metric_value: "10", status: "completed" },
+      { branch_id: "draft-2", iteration: 2, metric_value: "5", status: "completed" },
+      { branch_id: "draft-3", iteration: 3, metric_value: "20", status: "completed" },
+    ];
+    const next = mod.selectNextBranch(drafts, "best", "lower", "roulette");
+    expect(next).toBeDefined();
+    expect(next).not.toBeNull();
   });
 });

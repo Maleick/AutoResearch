@@ -1,3 +1,9 @@
+# [3.6.1](https://github.com/Maleick/AutoResearch/compare/v3.6.0...v3.6.1) (2026-05-09)
+
+### Bug Fixes
+
+* sync version files and documentation for v3.6.1 release
+
 # [3.6.0](https://github.com/Maleick/AutoResearch/compare/v3.5.0...v3.6.0) (2026-05-07)
 
 
