@@ -126,8 +126,23 @@ export type {
 
 export {
   parseScoreOutput,
+  rankComponents,
 } from "./score-parser.js";
 
 export type {
   ScoreOutput,
+  ComponentDelta,
+  ComponentRanking,
 } from "./score-parser.js";
+
+export {
+  parseVerifierOutput,
+  determineDecision,
+  isSafeToApply,
+} from "./verifier-parser.js";
+
+export type {
+  VerifierOutput,
+  VerifierDecision,
+  ValidationResult,
+} from "./verifier-parser.js";
