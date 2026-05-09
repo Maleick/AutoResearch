@@ -1348,7 +1348,11 @@ const main = async (): Promise<number> => {
           scorerStatus,
           scoreComponents,
           );
-        printJsonEnvelope("record", state);
+        if (useJson) {
+          printJsonEnvelope("record", state);
+        } else {
+          printJson(state);
+        }
         break;
       }
        case "digest": {
