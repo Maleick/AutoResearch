@@ -1,7 +1,7 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
 import { execFileSync, execSync } from "child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const CLI = resolve(REPO_ROOT, "dist/cli.js");
@@ -849,6 +849,21 @@ describe("CLI Commands", () => {
       writeFileSync(scoreHistoryPath, JSON.stringify({ timestamp: "2026-05-08T10:00:00Z", iteration: 1, run_id: "run-1", decision: "keep", metric_value: "10", metric_name: "errors", metric_direction: "lower", verify_status: "pass", guard_status: "pass" }) + "\n", "utf-8");
       const out = execFileSync("node", [CLI, "scores", "--top-components", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("No component data found");
+    });
+
+    it("refuses to read top-components score history symlinks", () => {
+      const targetPath = resolve(tmpDir, "outside-score-history.jsonl");
+      writeFileSync(targetPath, JSON.stringify({ score_components: { accuracy: 1 } }) + "\n", "utf-8");
+      rmSync(scoreHistoryPath);
+      symlinkSync(targetPath, scoreHistoryPath);
+
+      expect(() => execFileSync("node", [CLI, "scores", "--top-components", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT })).toThrow(/Refusing to read score history symlink/);
+    });
+
+    it("refuses to read oversized top-components score history", () => {
+      writeFileSync(scoreHistoryPath, " ".repeat((10 * 1024 * 1024) + 1), "utf-8");
+
+      expect(() => execFileSync("node", [CLI, "scores", "--top-components", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT })).toThrow(/Score history is too large to read safely/);
     });
   });
 

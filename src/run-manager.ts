@@ -12,13 +12,13 @@ import {
   normalizeLabels,
   missingRequiredLabels,
   writeGoalDoc,
+  normalizeScorerStatus,
   AutoresearchError,
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT, GOAL_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
-import { writeFileSync, appendFileSync, existsSync, constants, lstatSync, openSync, fstatSync, closeSync, writeSync } from "fs";
+import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
 import { lstat, open } from "fs/promises";
-import { dirname } from "path";
 
 const MAX_RESULTS_BYTES = 10 * 1024 * 1024;
 
@@ -76,6 +76,8 @@ export async function appendIteration(
   note: string | undefined,
   iteration: number | undefined,
   scoreHistoryPathValue?: string,
+  scorerStatusValue?: string | Record<string, number>,
+  scoreComponentsValue?: Record<string, number>,
   lineage?: { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string },
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
@@ -85,7 +87,10 @@ export async function appendIteration(
 
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
   const now = utcNow();
-  const scorerStatus = normalizeScorerStatus(scorerStatusValue);
+  const scoreComponents = typeof scorerStatusValue === "object"
+    ? scorerStatusValue
+    : scoreComponentsValue;
+  const scorerStatus = normalizeScorerStatus(typeof scorerStatusValue === "string" ? scorerStatusValue : undefined);
   const effectiveDecision = scorerStatus === "scorer-broken" && (decision === "keep" || decision === "discard")
     ? "needs_human"
     : decision;
@@ -109,11 +114,6 @@ export async function appendIteration(
   const resultRow = [
     now,
     String(currentIteration),
-    lineageId,
-    lineageParentId,
-    lineageBranch,
-    lineageStage,
-    lineageAgent,
     decision,
     metricValue ?? "",
     instrumentValue ?? "",
@@ -123,6 +123,11 @@ export async function appendIteration(
     changeSummary,
     labelList.join(","),
     note ?? "",
+    lineageId,
+    lineageParentId,
+    lineageBranch,
+    lineageStage,
+    lineageAgent,
   ].join("\t") + "\n";
 
   appendFileSync(resultsPath, resultRow, "utf-8");
@@ -193,6 +198,7 @@ export async function appendIteration(
     branch: lineageBranch,
     stage: lineageStage,
     agent: lineageAgent,
+    score_components: scoreComponents,
   };
 
   atomicWriteJson(statePath, newState);

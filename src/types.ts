@@ -81,6 +81,7 @@ export interface LastIteration {
   branch?: string;
   stage?: string;
   agent?: string;
+  score_components?: Record<string, number>;
 }
 
 export type OperatingMode = "converge" | "continuous" | "supervised";

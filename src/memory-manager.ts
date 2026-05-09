@@ -329,7 +329,8 @@ export function getAuditLogPath(
   return resolvePathWithinRepo(repo, auditPathValue, MEMORY_AUDIT_DEFAULT);
 }
 
-function sanitizeMemoryText(value: unknown): string {
+
+export function sanitizeMemoryText(value: unknown): string {
   return String(value)
     .replace(/`/g, "'")
     .replace(/[\r\n\t]/g, (char) => {
