@@ -159,6 +159,15 @@ export function normalizeResultStatus(value: string | undefined | null, fieldNam
   return normalized;
 }
 
+export function normalizeScorerStatus(value: string | undefined | null): string {
+  if (!value) return "ok";
+  const normalized = value.trim().toLowerCase();
+  if (!["ok", "ok-low-score", "scorer-broken"].includes(normalized)) {
+    throw new AutoresearchError("Unsupported scorer_status: " + value);
+  }
+  return normalized;
+}
+
 export interface PositiveIntOptions {
   max?: number;
 }

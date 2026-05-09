@@ -231,6 +231,8 @@ cat .autoresearch/state.json | jq .
 | `autoresearch status` | Print run status |
 | `autoresearch explain` | Human-readable run state |
 | `autoresearch history` | Show recent iteration log |
+| `autoresearch scores` | Show score trend history |
+| `autoresearch badge` | Generate score/component badge markdown + SVG |
 | `autoresearch config` | Show runtime configuration |
 | `autoresearch report` | Generate markdown report |
 | `autoresearch summary` | Aggregate stats across runs |
