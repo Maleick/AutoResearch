@@ -25,11 +25,31 @@ const plugin = JSON.parse(await readText(pluginPath));
 plugin.version = version;
 await writeText(pluginPath, `${JSON.stringify(plugin, null, 2)}\n`);
 
+const syncInstallTag = (content) =>
+  content
+    .replace(/`v\d+\.\d+\.\d+`/g, `\`v${version}\``)
+    .replace(/refs\/tags\/v\d+\.\d+\.\d+\/INSTALL\.md/g, `refs/tags/v${version}/INSTALL.md`);
+
 const readmePath = "../README.md";
 const readme = await readText(readmePath);
 await writeText(
   readmePath,
   readme
     .replace(/version-v\d+\.\d+\.\d+-/g, `version-v${version}-`)
-    .replace(/alt="v\d+\.\d+\.\d+"/g, `alt="v${version}"`),
+    .replace(/alt="v\d+\.\d+\.\d+"/g, `alt="v${version}"`)
+    .replace(/refs\/tags\/v\d+\.\d+\.\d+\/INSTALL\.md/g, `refs/tags/v${version}/INSTALL.md`)
+    .replace(/`v\d+\.\d+\.\d+`/g, `\`v${version}\``),
 );
+
+const installPath = "../INSTALL.md";
+const install = await readText(installPath);
+await writeText(
+  installPath,
+  install
+    .replace(/refs\/tags\/v\d+\.\d+\.\d+\/INSTALL\.md/g, `refs/tags/v${version}/INSTALL.md`)
+    .replace(/`v\d+\.\d+\.\d+`/g, `\`v${version}\``),
+);
+
+const installPath = "../INSTALL.md";
+const install = await readText(installPath);
+await writeText(installPath, syncInstallTag(install));

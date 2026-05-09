@@ -515,6 +515,25 @@ describe("run-manager", () => {
       expect(snapshot2.budget_exhausted).toBe(true);
     });
 
+    it("stops completed runs with unexhausted branch-failure-budget", async () => {
+      const { initializeRun, completeRun, buildSupervisorSnapshot } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "debug critical bug",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+        branch_failure_budget: 2,
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      await completeRun(tmpDir, undefined);
+
+      const snapshot = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
+      expect(snapshot.decision).toBe("stop");
+      expect(snapshot.reason).toBe("state_completed");
+      expect(snapshot.budget_exhausted).toBe(false);
+    });
+
     it("initializes debug stats to zero", async () => {
       const { initializeRun, buildSupervisorSnapshot } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
       const config = {
