@@ -302,7 +302,10 @@ describe("CLI Commands", () => {
     it("supports --json flag", () => {
       const out = execSync(`node ${CLI} explain --json`, { encoding: "utf-8", cwd: REPO_ROOT });
       const json = JSON.parse(out);
-      expect(json.status).toBeDefined();
+      expect(json.ok).toBe(true);
+      expect(json.command).toBe("explain");
+      expect(json.data).toBeDefined();
+      expect(json.data.status).toBeDefined();
     });
   });
 
@@ -947,11 +950,14 @@ describe("CLI Commands", () => {
     it("outputs JSON with --json flag", () => {
       const out = execSync(`node ${CLI} status --json`, { encoding: "utf-8", cwd: REPO_ROOT });
       const json = JSON.parse(out);
-      expect(json.status).toBe("running");
-      expect(json.goal).toBe("test fixture goal");
-      expect(json.metric).toBeDefined();
-      expect(json.stats).toBeDefined();
-      expect(json.stats.total_iterations).toBe(1);
+      expect(json.ok).toBe(true);
+      expect(json.command).toBe("status");
+      expect(json.data).toBeDefined();
+      expect(json.data.status).toBe("running");
+      expect(json.data.goal).toBe("test fixture goal");
+      expect(json.data.metric).toBeDefined();
+      expect(json.data.stats).toBeDefined();
+      expect(json.data.stats.total_iterations).toBe(1);
     });
 
     it("reports error when no state exists", () => {
@@ -1057,7 +1063,10 @@ describe("CLI Commands", () => {
       const out = execSync(`node ${CLI} status --json --repo ${tmpDir}`, { encoding: "utf-8" });
       expect(out).not.toContain("\u001b");
       expect(out).toContain("\\u001b");
-      expect(JSON.parse(out).goal).toContain("\u001b");
+      const json = JSON.parse(out);
+      expect(json.ok).toBe(true);
+      expect(json.data).toBeDefined();
+      expect(json.data.goal).toContain("\u001b");
     });
   });
 
