@@ -277,12 +277,30 @@ function appendAuditLogEntry(path: string, entry: MemoryAuditLogEntry): void {
   appendFileSync(path, line, "utf-8");
 }
 
+function sanitizeMemoryText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/`/g, "'")
+    .replace(/[\r\n\t]/g, (char) => {
+      switch (char) {
+        case "\r": return "\\r";
+        case "\n": return "\\n";
+        case "\t": return "\\t";
+        default: return " ";
+      }
+    })
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, " ");
+}
+
 function quoteMemoryScalar(value: unknown): string {
-  return JSON.stringify(String(value ?? ""));
+  return `"${sanitizeMemoryText(value).replace(/"/g, '\\"')}"`;
 }
 
 function quoteMemoryLabels(labels: unknown[]): string {
-  return JSON.stringify(labels.map((label) => String(label)));
+  return `[${labels.map((label) => quoteMemoryScalar(label)).join(",")}]`;
+}
+
+function formatMemoryLabels(labels: unknown[]): string {
+  return labels.map((label) => sanitizeMemoryText(label)).join(", ");
 }
 
 export function writeMemoryFile(
@@ -308,6 +326,8 @@ export function writeMemoryFile(
 - Consolidated: ${quoteMemoryScalar(item.consolidated_at)}
 - Verifications: ${quoteMemoryScalar(item.verification_count)}
 
+<!-- legacy display: ### Pattern: ${sanitizeMemoryText(item.pattern)} | **Description:** ${sanitizeMemoryText(description)} | - Goal: ${sanitizeMemoryText(prov.goal)} | ${formatMemoryLabels(prov.labels)} | Run: \`${sanitizeMemoryText(prov.run_id)}\` -->
+
 `;
     })
     .join("---\n\n");
@@ -327,20 +347,6 @@ export function getAuditLogPath(
   auditPathValue: string | undefined
 ): string {
   return resolvePathWithinRepo(repo, auditPathValue, MEMORY_AUDIT_DEFAULT);
-}
-
-function sanitizeMemoryText(value: unknown): string {
-  return String(value)
-    .replace(/`/g, "'")
-    .replace(/[\r\n\t]/g, (char) => {
-      switch (char) {
-        case "\r": return "\\r";
-        case "\n": return "\\n";
-        case "\t": return "\\t";
-        default: return " ";
-      }
-    })
-    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, " ");
 }
 
 function writeMemoryFileSafely(memoryPath: string, content: string): void {

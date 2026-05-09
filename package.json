@@ -65,7 +65,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "audit": "npm audit --audit-level=moderate",
-    "test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.json",
+    "test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.json --runInBand",
     "verify:pack": "bash hooks/verify-package.sh",
     "prepack": "node scripts/sync-version.mjs && tsc"
   },
