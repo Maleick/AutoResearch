@@ -892,7 +892,7 @@ const main = async (): Promise<number> => {
         console.log("==============================");
         console.log("");
         console.log("State Schema:");
-        console.log(`  Version:    ${schemas.state.properties.schema_version.type}`);
+        console.log(`  Type:       ${schemas.state.properties.schema_version.type}`);
         console.log(`  Required:   ${schemas.state.required.join(", ")}`);
         console.log("");
         console.log("Result Row Schema:");
