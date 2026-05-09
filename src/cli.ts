@@ -3,7 +3,7 @@ import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, rea
 import { resolve } from "path";
 import { execSync } from "child_process";
 import { MAX_DRAFTS } from "./constants.js";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo } from "./helpers.js";
+import { printJson, printJsonEnvelope, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo } from "./helpers.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
@@ -210,6 +210,41 @@ const formatTimestamp = (ts: string): string => {
   }
 };
 
+const MAX_SCORE_HISTORY_BYTES = 10 * 1024 * 1024;
+
+const assertRegularBoundedFile = (filePath: string): void => {
+  const linkStats = lstatSync(filePath);
+  if (linkStats.isSymbolicLink()) {
+    throw new Error(`Refusing to read score history symlink: ${filePath}`);
+  }
+  if (!linkStats.isFile()) {
+    throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
+  }
+  if (linkStats.size > MAX_SCORE_HISTORY_BYTES) {
+    throw new Error(`Score history is too large to read safely (${linkStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
+  }
+};
+
+const readScoreHistoryFile = (filePath: string): string => {
+  assertRegularBoundedFile(filePath);
+  if (typeof fsConstants.O_NOFOLLOW !== "number") {
+    throw new Error(`Refusing to read score history because this platform does not support O_NOFOLLOW: ${filePath}`);
+  }
+  const fd = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  try {
+    const fileStats = fstatSync(fd);
+    if (!fileStats.isFile()) {
+      throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
+    }
+    if (fileStats.size > MAX_SCORE_HISTORY_BYTES) {
+      throw new Error(`Score history is too large to read safely (${fileStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
+    }
+    return readFileSync(fd, "utf-8");
+  } finally {
+    closeSync(fd);
+  }
+};
+
 const readTailLines = (filePath: string, limit: number): string[] => {
   if (limit <= 0) return [];
 
@@ -383,7 +418,11 @@ const main = async (): Promise<number> => {
           config,
           grouped["fresh-start"] === "true",
         );
-        printJson(state);
+        if (useJson) {
+          printJsonEnvelope("init", state);
+        } else {
+          printJson(state);
+        }
         break;
       }
       case "status": {
@@ -394,7 +433,7 @@ const main = async (): Promise<number> => {
           grouped["state-path"] as string | undefined,
         );
         if (useJson) {
-          printJson(snapshot);
+          printJsonEnvelope("status", snapshot);
         } else {
           const s = snapshot;
           const stats = s.stats;
@@ -442,7 +481,7 @@ const main = async (): Promise<number> => {
         const flags = s.flags;
 
         if (useJson) {
-          printJson(snapshot);
+          printJsonEnvelope("explain", snapshot);
           break;
         }
 
@@ -507,7 +546,7 @@ const main = async (): Promise<number> => {
             }
             return obj;
           });
-          printJson({ count: records.length, records: parsed });
+          printJsonEnvelope("history", { count: records.length, records: parsed });
           break;
         }
         for (const r of records) {
@@ -534,7 +573,7 @@ const main = async (): Promise<number> => {
         const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
         const showTopComponents = grouped["top-components"] === "true";
         if (showTopComponents) {
-          const allLines = readFileSync(scoreHistoryPath, "utf-8")
+          const allLines = readScoreHistoryFile(scoreHistoryPath)
             .split("\n")
             .map((l: string) => l.trim())
             .filter(Boolean);
@@ -548,7 +587,7 @@ const main = async (): Promise<number> => {
           const { rankComponents } = await import("./score-parser.js");
           const ranking = rankComponents(allParsed);
           if (useJson) {
-            printJson({ count: allParsed.length, scores: allParsed.slice(-limit), ranking });
+            printJsonEnvelope("scores", { count: allParsed.length, scores: allParsed.slice(-limit), ranking });
             break;
           }
           console.log("Component Rankings:");
@@ -583,7 +622,7 @@ const main = async (): Promise<number> => {
               return null;
             }
           }).filter(Boolean);
-          printJson({ count: parsed.length, scores: parsed });
+          printJsonEnvelope("scores", { count: parsed.length, scores: parsed });
           break;
         }
         console.log("Score History (latest " + Math.min(limit, records.length) + "):");
@@ -658,21 +697,12 @@ const main = async (): Promise<number> => {
         break;
       }
       case "score": {
-        const { resolvePath, readJsonFile, AutoresearchError: AErr } = await import("./helpers.js");
-        const { STATE_DEFAULT } = await import("./constants.js");
+        const { AutoresearchError: AErr } = await import("./helpers.js");
         const { parseScoreOutput } = await import("./score-parser.js");
 
-        // Resolve scorer: --scorer flag takes priority, else use state.scorer
-        let scorerCmd = grouped.scorer as string | undefined;
+        const scorerCmd = grouped.scorer as string | undefined;
         if (!scorerCmd) {
-          const statePath = resolvePath(grouped.repo as string | undefined, grouped["state-path"] as string | undefined, STATE_DEFAULT);
-          if (existsSync(statePath)) {
-            const state = parseRunState(readJsonFile(statePath));
-            scorerCmd = state.scorer;
-          }
-        }
-        if (!scorerCmd) {
-          throw new AErr("No scorer configured. Provide --scorer <cmd> or configure a scorer via autoresearch init --scorer <cmd>.");
+          throw new AErr("No scorer provided. Pass --scorer <cmd> to run a scorer explicitly.");
         }
 
         const repoBase = resolveRepo(grouped.repo as string | undefined);
@@ -691,7 +721,7 @@ const main = async (): Promise<number> => {
         const percent = (normalized * 100).toFixed(1) + "%";
 
         if (useJson) {
-          printJson({
+          printJsonEnvelope("score", {
             score: scored.score,
             max: scored.max,
             normalized,
@@ -728,7 +758,7 @@ const main = async (): Promise<number> => {
         }
         const state = parseRunState(readJsonFile(statePath));
         if (useJson) {
-          printJson({
+          printJsonEnvelope("config", {
             goal: state.goal,
             mode: state.mode,
             metric: state.metric,
@@ -772,7 +802,7 @@ const main = async (): Promise<number> => {
               run_id: { type: "string", description: "Unique run identifier" },
               created_at: { type: "string", format: "date-time", description: "Run creation timestamp" },
               updated_at: { type: "string", format: "date-time", description: "Last update timestamp" },
-              status: { type: "string", enum: ["initialized", "running", "stopping", "stopped", "completed", "needs_human"], description: "Run status" },
+              status: { type: "string", enum: ["running", "stopped", "completed", "needs_human"], description: "Run status" },
               mode: { type: "string", enum: ["foreground", "background"], description: "Execution mode" },
               operating_mode: { type: "string", enum: ["converge", "continuous", "supervised"], description: "Operating mode" },
               goal: { type: "string", description: "Run goal description" },
@@ -884,7 +914,7 @@ const main = async (): Promise<number> => {
         };
 
         if (useJson) {
-          printJson(schemas);
+          printJsonEnvelope("contract", schemas);
           break;
         }
 
@@ -892,7 +922,7 @@ const main = async (): Promise<number> => {
         console.log("==============================");
         console.log("");
         console.log("State Schema:");
-        console.log(`  Type:       ${schemas.state.properties.schema_version.type}`);
+        console.log(`  Version:    ${schemas.state.properties.schema_version.type}`);
         console.log(`  Required:   ${schemas.state.required.join(", ")}`);
         console.log("");
         console.log("Result Row Schema:");
@@ -929,7 +959,7 @@ const main = async (): Promise<number> => {
         }
 
         if (useJson) {
-          printJson({
+          printJsonEnvelope("summary", {
             total_records: records.length,
             total_kept: totalKept,
             total_discarded: totalDiscarded,
@@ -970,7 +1000,7 @@ const main = async (): Promise<number> => {
         if (!grouped.verify) errors.push("Missing required: --verify");
         
         if (useJson) {
-          printJson({ valid: errors.length === 0, errors });
+          printJsonEnvelope("validate", { valid: errors.length === 0, errors });
           return errors.length > 0 ? 1 : 0;
         }
         
@@ -1011,7 +1041,7 @@ const main = async (): Promise<number> => {
         }
         
         if (useJson) {
-          printJson({ state, results_count: results.length });
+          printJsonEnvelope("report", { state, results_count: results.length });
           break;
         }
         
@@ -1155,7 +1185,7 @@ const main = async (): Promise<number> => {
         const patterns = memory.match(/### Pattern: [^\n]+/g) ?? [];
         const suggestions = patterns.map(parseMemoryPatternHeading);
         if (useJson) {
-          printJson({ patterns_found: suggestions.length, suggestions });
+          printJsonEnvelope("suggest", { patterns_found: suggestions.length, suggestions });
           break;
         }
         console.log("Memory Patterns — candidate next goals:");
@@ -1302,7 +1332,7 @@ const main = async (): Promise<number> => {
           grouped["fresh-start"] === "true",
         );
         writeFileSync(launchPath, JSON.stringify({ run_id: state.run_id, goal: state.goal, mode: "background" }, null, 2) + "\n", "utf-8");
-        printJson({ status: "launched", run_id: state.run_id, launch_path: launchPath });
+        printJsonEnvelope("launch", { status: "launched", run_id: state.run_id, launch_path: launchPath });
         break;
       }
       case "complete": {
@@ -1312,7 +1342,7 @@ const main = async (): Promise<number> => {
         }
         const { completeRun } = await import("./run-manager.js");
         const state = await completeRun(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
-        printJson({ status: "completed", run_id: state.run_id });
+        printJsonEnvelope("complete", { status: "completed", run_id: state.run_id });
         break;
       }
       case "stop": {
@@ -1322,7 +1352,7 @@ const main = async (): Promise<number> => {
         }
         const { setStopRequested } = await import("./run-manager.js");
         const state = await setStopRequested(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
-        printJson({ status: "stop_requested", run_id: state.run_id });
+        printJsonEnvelope("stop", { status: "stop_requested", run_id: state.run_id });
         break;
       }
       case "resume": {
@@ -1332,7 +1362,7 @@ const main = async (): Promise<number> => {
         }
         const { resumeBackgroundRun } = await import("./run-manager.js");
         const state = await resumeBackgroundRun(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
-        printJson({ status: "resumed", run_id: state.run_id });
+        printJsonEnvelope("resume", { status: "resumed", run_id: state.run_id });
         break;
       }
       case "record": {
@@ -1406,7 +1436,7 @@ const main = async (): Promise<number> => {
            grouped["state-path"] as string | undefined,
          );
          if (useJson) {
-           printJson(digest);
+           printJsonEnvelope("digest", digest);
          } else {
            console.log(`# Auto Research Digest`);
            console.log(`\n**Run ID:** ${formatMarkdownField(digest.run_id || "—")}`);
@@ -1759,7 +1789,7 @@ const main = async (): Promise<number> => {
         const leaderboard = generateLeaderboard(repo);
 
         if (useJson) {
-          printJson(leaderboard);
+          printJsonEnvelope("leaderboard", leaderboard);
           break;
         }
 

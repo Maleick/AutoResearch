@@ -117,7 +117,7 @@ export function generateLeaderboard(repoPath: string): Leaderboard {
         total_iterations: results.kept + results.discarded,
         kept: results.kept,
         discarded: results.discarded,
-        success_rate: results.kept + results.discarded > 0
+        success_rate: entries.length > 0
           ? `${((results.kept / (results.kept + results.discarded)) * 100).toFixed(1)}%`
           : "0%",
         best_value: results.bestValue,

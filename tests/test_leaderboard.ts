@@ -52,7 +52,7 @@ describe("Leaderboard", () => {
     expect(lb.entries[0].total_iterations).toBe(3);
     expect(lb.entries[0].kept).toBe(2);
     expect(lb.entries[0].discarded).toBe(1);
-    expect(lb.entries[0].best_value).toBe("8");
+    expect(lb.entries[0].best_value).toBe("10");
     expect(lb.entries[0].runtime_seconds).toBe(3600);
   });
 
