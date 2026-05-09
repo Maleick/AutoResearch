@@ -39,7 +39,7 @@ export function ensureParent(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true });
 }
 
-function atomicWriteText(filePath: string, content: string): void {
+export function atomicWriteText(filePath: string, content: string): void {
   ensureParent(filePath);
   const tmp = filePath + ".tmp." + Date.now();
   writeFileSync(tmp, content, "utf-8");

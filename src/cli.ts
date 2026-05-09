@@ -2,7 +2,7 @@
 import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { MAX_DRAFTS } from "./constants.js";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc } from "./helpers.js";
+import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, atomicWriteText } from "./helpers.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
@@ -434,28 +434,6 @@ const main = async (): Promise<number> => {
         if (flags?.needs_human) console.log("   ⚠  Needs human review");
         if (flags?.stop_requested) console.log("   ⏹  Stop was requested");
         if (flags?.background_active) console.log("   📡  Background active — `autoresearch status` to check");
-        break;
-      }
-      case "goal": {
-        const { resolvePath } = await import("./helpers.js");
-        const { GOAL_DEFAULT } = await import("./constants.js");
-        const goalPath = resolvePath(grouped.repo as string | undefined, grouped["goal-path"] as string | undefined, GOAL_DEFAULT);
-        if (!existsSync(goalPath)) {
-          console.log("No goal document found. Run 'autoresearch init' first.");
-          break;
-        }
-        const doc = readGoalDoc(goalPath);
-        if (useJson) {
-          printJson(doc);
-          break;
-        }
-        console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
-        console.log(`Metric:           ${formatDisplayValue(doc.metric)} (${formatDisplayValue(doc.direction)})`);
-        console.log(`Verify:           ${formatDisplayValue(doc.verify)}`);
-        if (doc.guard) console.log(`Guard:            ${formatDisplayValue(doc.guard)}`);
-        if (doc.file_map) console.log(`File map:         ${formatDisplayValue(doc.file_map)}`);
-        if (doc.constraints) console.log(`Constraints:      ${formatDisplayValue(doc.constraints)}`);
-        if (doc.stop_conditions) console.log(`Stop conditions:  ${formatDisplayValue(doc.stop_conditions)}`);
         break;
       }
       case "history": {
@@ -1077,6 +1055,28 @@ const main = async (): Promise<number> => {
       }
       case "goal": {
         const subCmd = cmdArgs[0];
+        if (subCmd?.startsWith("--")) {
+          const { resolvePath, readGoalDoc } = await import("./helpers.js");
+          const { GOAL_DEFAULT } = await import("./constants.js");
+          const goalPath = resolvePath(grouped.repo as string | undefined, grouped["goal-path"] as string | undefined, GOAL_DEFAULT);
+          if (!existsSync(goalPath)) {
+            console.log("No goal document found. Run 'autoresearch init' first.");
+            break;
+          }
+          const doc = readGoalDoc(goalPath);
+          if (useJson) {
+            printJson(doc);
+            break;
+          }
+          console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
+          console.log(`Metric:           ${formatDisplayValue(doc.metric)} (${formatDisplayValue(doc.direction)})`);
+          console.log(`Verify:           ${formatDisplayValue(doc.verify)}`);
+          if (doc.guard) console.log(`Guard:            ${formatDisplayValue(doc.guard)}`);
+          if (doc.file_map) console.log(`File map:         ${formatDisplayValue(doc.file_map)}`);
+          if (doc.constraints) console.log(`Constraints:      ${formatDisplayValue(doc.constraints)}`);
+          if (doc.stop_conditions) console.log(`Stop conditions:  ${formatDisplayValue(doc.stop_conditions)}`);
+          break;
+        }
         if (!subCmd || subCmd === "help" || HELP_FLAGS.includes(subCmd)) {
           console.error("Usage: autoresearch goal <subcommand> [options]");
           console.error("");
@@ -1094,7 +1094,7 @@ const main = async (): Promise<number> => {
           console.error("  --iterations    Iteration cap");
           console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
           console.error("  --template      Preset template: performance, quality, coverage, custom");
-          console.error("  --goal-path     Output file path (default: GOAL.md)");
+          console.error("  --goal-path     Output file path (default: .autoresearch/goal.md)");
           console.error("  --dry-run       Preview without writing the file");
           console.error("  --json          Output result as JSON");
           console.error("");
@@ -1122,7 +1122,7 @@ const main = async (): Promise<number> => {
         const { GOAL_TEMPLATES, getGoalTemplate, buildGoalDocument, buildGoalInitResult } = await import("./goal-init.js");
         const { GOAL_DEFAULT } = await import("./constants.js");
         const { resolvePath } = await import("./helpers.js");
-        const { writeFileSync, existsSync: goalExistsSync } = await import("fs");
+        const { existsSync: goalExistsSync } = await import("fs");
 
         const templateId = (goalGrouped.template as string | undefined) ?? "custom";
         if (!GOAL_TEMPLATES.find((t) => t.id === templateId)) {
@@ -1219,7 +1219,7 @@ const main = async (): Promise<number> => {
           if (useGoalJson) {
             printJson({ ...result, dry_run: true });
           } else {
-            console.log("[dry-run] Would write GOAL.md to: " + goalPath);
+            console.log("[dry-run] Would write goal document to: " + goalPath);
             console.log("");
             console.log(document);
           }
@@ -1231,7 +1231,7 @@ const main = async (): Promise<number> => {
           if (verbose) console.error(`[verbose] Overwriting existing ${goalPath}`);
         }
 
-        writeFileSync(goalPath, document, "utf-8");
+        atomicWriteText(goalPath, document + "\n");
 
         if (useGoalJson) {
           printJson(result);

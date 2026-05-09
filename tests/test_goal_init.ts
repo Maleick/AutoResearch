@@ -1,7 +1,7 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
 import { execFileSync, spawnSync } from "child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const CLI = resolve(REPO_ROOT, "dist/cli.js");
@@ -169,7 +169,7 @@ describe("goal-init module", () => {
 
 describe("CLI: goal command", () => {
   const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-goal-init");
-  const goalPath = resolve(tmpDir, "GOAL.md");
+  const goalPath = resolve(tmpDir, ".autoresearch", "goal.md");
 
   afterEach(() => {
     try { rmSync(tmpDir, { recursive: true }); } catch {}
@@ -194,7 +194,7 @@ describe("CLI: goal command", () => {
   });
 
   describe("goal init non-interactive", () => {
-    it("creates GOAL.md from flags", () => {
+    it("creates default goal document under .autoresearch from flags", () => {
       mkdirSync(tmpDir, { recursive: true });
       runCLI(["goal", "init", "--goal", "reduce errors", "--metric", "failures", "--direction", "lower", "--verify", "npm test", "--repo", tmpDir]);
       expect(existsSync(goalPath)).toBe(true);
@@ -274,6 +274,19 @@ describe("CLI: goal command", () => {
       runCLI(["goal", "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--goal-path", customPath]);
       expect(existsSync(customPath)).toBe(true);
       rmSync(customPath, { force: true });
+    });
+
+    it("does not follow a root GOAL.md symlink when using the default path", () => {
+      mkdirSync(tmpDir, { recursive: true });
+      const outsidePath = resolve(tmpDir, "..", "outside-goal-target.md");
+      rmSync(outsidePath, { force: true });
+      symlinkSync(outsidePath, resolve(tmpDir, "GOAL.md"));
+
+      runCLI(["goal", "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--repo", tmpDir]);
+
+      expect(existsSync(outsidePath)).toBe(false);
+      expect(existsSync(goalPath)).toBe(true);
+      rmSync(outsidePath, { force: true });
     });
 
     it("includes guard in GOAL.md when provided", () => {
