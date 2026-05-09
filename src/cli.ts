@@ -383,7 +383,11 @@ const main = async (): Promise<number> => {
           config,
           grouped["fresh-start"] === "true",
         );
-        printJson(state);
+        if (useJson) {
+          printJsonEnvelope("init", state);
+        } else {
+          printJson(state);
+        }
         break;
       }
       case "status": {
@@ -394,7 +398,7 @@ const main = async (): Promise<number> => {
           grouped["state-path"] as string | undefined,
         );
         if (useJson) {
-          printJson(snapshot);
+          printJsonEnvelope("status", snapshot);
         } else {
           const s = snapshot;
           const stats = s.stats;
@@ -442,7 +446,7 @@ const main = async (): Promise<number> => {
         const flags = s.flags;
 
         if (useJson) {
-          printJson(snapshot);
+          printJsonEnvelope("explain", snapshot);
           break;
         }
 
