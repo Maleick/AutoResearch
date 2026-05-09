@@ -12,8 +12,31 @@ export class AutoresearchError extends Error {
   }
 }
 
+export interface JsonEnvelope {
+  ok: boolean;
+  command: string;
+  timestamp: string;
+  data?: unknown;
+  error?: {
+    kind: string;
+    code: string;
+    message: string;
+  };
+}
+
 export function printJson(payload: unknown): void {
   console.log(JSON.stringify(payload, null, 2));
+}
+
+export function printJsonEnvelope(command: string, data: unknown, ok = true, error?: JsonEnvelope["error"]): void {
+  const envelope: JsonEnvelope = {
+    ok,
+    command,
+    timestamp: new Date().toISOString(),
+    ...(ok ? { data } : {}),
+    ...(error ? { error } : {}),
+  };
+  console.log(JSON.stringify(envelope, null, 2));
 }
 
 export function sanitizeForTerminal(value: unknown): string {
