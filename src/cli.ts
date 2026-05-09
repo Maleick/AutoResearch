@@ -110,7 +110,13 @@ const parseArgs = (args: string[]): Record<string, string> => {
   const result: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith("--")) {
-      const key = args[i].slice(2);
+      const longArg = args[i];
+      const equalsIndex = longArg.indexOf("=");
+      if (equalsIndex > 2) {
+        result[longArg.slice(2, equalsIndex)] = longArg.slice(equalsIndex + 1);
+        continue;
+      }
+      const key = longArg.slice(2);
       if (i + 1 < args.length && !args[i + 1].startsWith("--") && !args[i + 1].startsWith("-")) {
         result[key] = args[++i];
       } else {
