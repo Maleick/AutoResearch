@@ -3,7 +3,7 @@ import { closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, 
 import { resolve } from "path";
 import { execSync } from "child_process";
 import { MAX_DRAFTS } from "./constants.js";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo } from "./helpers.js";
+import { printJson, printJsonEnvelope, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo } from "./helpers.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
@@ -52,6 +52,7 @@ const usage = (): void => {
   console.error("  stop       Request a background run stop");
   console.error("  resume     Resume a background run");
   console.error("  record     Record an experiment result");
+  console.error("  queue      Manage background task queue");
   console.error("  leaderboard Show local leaderboard across runs");
   console.error("  doctor     Verify package installation and version");
   console.error("  help       Show this help");
@@ -1823,6 +1824,75 @@ const main = async (): Promise<number> => {
           if (result.template !== "custom") console.log(`  Template: ${result.template}`);
           console.log("");
           console.log(`Run 'autoresearch init --goal "..." --metric "..." --verify "..."' to start a run.`);
+        }
+        break;
+      }
+      case "queue": {
+        const subCmd = cmdArgs[0] || "list";
+
+        if (subCmd === "help") {
+          console.error("Usage: autoresearch queue <subcommand> [options]");
+          console.error("");
+          console.error("Subcommands:");
+          console.error("  list     List tasks in the queue (default)");
+          console.error("  enqueue  Enqueue a new task");
+          console.error("  clean    Remove completed and failed tasks");
+          break;
+        }
+
+        if (subCmd === "enqueue") {
+          if (!grouped.goal || !grouped.metric || !grouped.verify) {
+            console.error("--goal, --metric, and --verify are required for enqueue");
+            return 1;
+          }
+          const { enqueueTasks } = await import("./task-queue.js");
+          const tasks = await enqueueTasks(
+            grouped.repo as string | undefined,
+            [{ goal: grouped.goal as string, metric: grouped.metric as string, verify: grouped.verify as string }],
+          );
+          if (useJson) {
+            printJson({ enqueued: tasks });
+          } else {
+            for (const t of tasks) {
+              console.log(`Enqueued: ${t.id} - ${t.goal}`);
+            }
+          }
+          break;
+        }
+
+        if (subCmd === "clean") {
+          const { listTasks, writeManifest, resolveQueuePath } = await import("./task-queue.js");
+          const queuePath = resolveQueuePath(grouped.repo as string | undefined);
+          const manifest = await listTasks(grouped.repo as string | undefined);
+          const before = manifest.tasks.length;
+          manifest.tasks = manifest.tasks.filter((t) => t.status === "pending" || t.status === "leased");
+          manifest.updated_at = new Date().toISOString();
+          const removed = before - manifest.tasks.length;
+          await writeManifest(queuePath, manifest);
+
+          if (useJson) {
+            printJson({ removed });
+          } else {
+            console.log(`Cleaned ${removed} completed/failed tasks. ${manifest.tasks.length} remain.`);
+          }
+          break;
+        }
+
+        const { listTasks } = await import("./task-queue.js");
+        const manifest = await listTasks(grouped.repo as string | undefined);
+
+        if (useJson) {
+          printJson(manifest);
+        } else {
+          if (manifest.tasks.length === 0) {
+            console.log("No tasks in queue.");
+          } else {
+            console.log(`Task Queue (${manifest.tasks.length} tasks):`);
+            for (const task of manifest.tasks) {
+              const icon = task.status === "completed" ? "v" : task.status === "failed" ? "x" : task.status === "leased" ? ">" : "*";
+              console.log(`  ${icon} ${task.id}  [${task.status}]  ${task.goal}`);
+            }
+          }
         }
         break;
       }
