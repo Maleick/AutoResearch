@@ -795,6 +795,24 @@ describe("CLI Commands", () => {
       expect(state.draft_pool.active_drafts[1].policy_override).toBeUndefined();
       expect(state.draft_pool.active_drafts[2].policy_override).toBe("diverse");
     });
+
+    it("rejects prototype-poisoning keys in branch policy overrides", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"__proto__":"best"}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/not a valid draft ID/);
+    });
+
+    it("rejects empty-string values in branch policy overrides", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"draft-0":""}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/must not be empty/);
+    });
+
+    it("rejects whitespace-only values in branch policy overrides", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"draft-0":"   "}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/must not be empty/);
+    });
   });
 
   describe("validate command", () => {

@@ -312,6 +312,16 @@ const normalizeBranchPolicy = (value: string | undefined): BranchPolicy => {
   throw new Error(`Invalid branch policy: ${value}. Expected one of: ${BRANCH_POLICIES.join(", ")}`);
 };
 
+const PROTO_POISON_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+const normalizeOverrideBranchPolicy = (branchId: string, value: string): BranchPolicy => {
+  if (value.trim() === "") {
+    throw new Error(`Invalid branch policy override for ${branchId}: value must not be empty`);
+  }
+  if ((BRANCH_POLICIES as readonly string[]).includes(value)) return value as BranchPolicy;
+  throw new Error(`Invalid branch policy override for ${branchId}: "${value}" is not one of: ${BRANCH_POLICIES.join(", ")}`);
+};
+
 const parseBranchPolicyOverrides = (value: string | undefined): Record<string, BranchPolicy> | undefined => {
   if (value == null || value === "") return undefined;
 
@@ -326,12 +336,15 @@ const parseBranchPolicyOverrides = (value: string | undefined): Record<string, B
     throw new Error("Invalid branch policy overrides: expected a JSON object mapping draft IDs to branch policies");
   }
 
-  const overrides: Record<string, BranchPolicy> = {};
+  const overrides = Object.create(null) as Record<string, BranchPolicy>;
   for (const [branchId, branchPolicy] of Object.entries(parsed)) {
+    if (PROTO_POISON_KEYS.has(branchId)) {
+      throw new Error(`Invalid branch policy override key: "${branchId}" is not a valid draft ID`);
+    }
     if (typeof branchPolicy !== "string") {
       throw new Error(`Invalid branch policy override for ${branchId}: expected a string policy`);
     }
-    overrides[branchId] = normalizeBranchPolicy(branchPolicy);
+    overrides[branchId] = normalizeOverrideBranchPolicy(branchId, branchPolicy);
   }
   return overrides;
 };
