@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { execFileSync, execSync, spawnSync } from "child_process";
+import { execFileSync, spawnSync } from "child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
@@ -290,12 +290,12 @@ describe("CLI: goal command", () => {
 
     it("reads config from piped stdin JSON", () => {
       mkdirSync(tmpDir, { recursive: true });
-      // Use execSync for the pipe test (stdin piping requires shell)
-      const out = execSync(
-        `echo '{"goal":"stdin goal","metric":"errs","direction":"lower","verify":"npm test"}' | "${NODE}" "${CLI}" goal init --repo "${tmpDir}" --json`,
-        { encoding: "utf-8" },
-      );
-      const json = JSON.parse(out);
+      const stdinPayload = '{"goal":"stdin goal","metric":"errs","direction":"lower","verify":"npm test"}';
+      const result = spawnSync(NODE, [CLI, "goal", "init", "--repo", tmpDir, "--json"], {
+        encoding: "utf-8",
+        input: stdinPayload,
+      });
+      const json = JSON.parse(result.stdout);
       expect(json.goal).toBe("stdin goal");
       expect(json.metric).toBe("errs");
       rmSync(goalPath, { force: true });
