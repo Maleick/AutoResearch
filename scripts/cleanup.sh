@@ -16,10 +16,12 @@ if [[ -d "$REPO_ROOT/experiments" ]]; then
 fi
 
 # Clean temporary research artifacts
-find "$REPO_ROOT/tmp" -maxdepth 1 -type f -mtime +3 2>/dev/null | while read -r f; do
-  rm -f "$f"
-  echo "removed old temp: $(basename "$f")"
-done
+if [[ -d "$REPO_ROOT/tmp" ]]; then
+  find "$REPO_ROOT/tmp" -maxdepth 1 -type f -mtime +3 2>/dev/null | while read -r f; do
+    rm -f "$f"
+    echo "removed old temp: $(basename "$f")"
+  done
+fi
 
 # Clean node_modules/.cache if present
 if [[ -d "$REPO_ROOT/node_modules/.cache" ]]; then
