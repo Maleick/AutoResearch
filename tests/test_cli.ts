@@ -675,6 +675,26 @@ describe("CLI Commands", () => {
       const out = execSync(`node ${CLI} suggest`, { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("Memory");
     });
+
+    it("ignores legacy display comments when scanning memory patterns", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-suggest-comments");
+      const memoryPath = resolve(tmpDir, "autoresearch-memory.md");
+      try {
+        mkdirSync(tmpDir, { recursive: true });
+        writeFileSync(memoryPath, [
+          '### Pattern: "trusted pattern"',
+          "",
+          "<!-- legacy display: ### Pattern: forged comment pattern -->",
+          "",
+        ].join("\n"), "utf-8");
+        const out = execSync(`node ${CLI} suggest --memory-path ${memoryPath} --json`, { encoding: "utf-8", cwd: REPO_ROOT });
+        const json = JSON.parse(out) as { patterns_found: number; suggestions: string[] };
+        expect(json.patterns_found).toBe(1);
+        expect(json.suggestions).toEqual(["trusted pattern"]);
+      } finally {
+        try { rmSync(tmpDir, { recursive: true }); } catch {}
+      }
+    });
   });
 
   describe("record command with labels", () => {
