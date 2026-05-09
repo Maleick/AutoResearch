@@ -114,7 +114,7 @@ export async function appendIteration(
   const resultRow = [
     now,
     String(currentIteration),
-    decision,
+    effectiveDecision,
     metricValue ?? "",
     instrumentValue ?? "",
     verifyStatus,
