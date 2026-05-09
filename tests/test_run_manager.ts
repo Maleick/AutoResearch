@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { mkdirSync, rmSync, existsSync, readFileSync } from "fs";
+import { mkdirSync, rmSync, existsSync, readFileSync, symlinkSync, writeFileSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
@@ -127,11 +127,48 @@ describe("run-manager", () => {
       expect(scoreHistory[0]).toMatchObject({
         iteration: 1,
         decision: "keep",
+        scorer_status: "ok",
         metric_value: "42",
         metric_name: "defects",
         metric_direction: "lower",
         verify_status: "pass",
         guard_status: "pass",
+      });
+    });
+
+    it("records scorer-broken and avoids automatic discard decisions", async () => {
+      const { initializeRun, appendIteration } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      await appendIteration(
+        tmpDir,
+        undefined,
+        undefined,
+        "discard",
+        "42",
+        undefined,
+        "pass",
+        "pass",
+        "test hypothesis",
+        "score script failed",
+        [],
+        "",
+        undefined,
+        undefined,
+        "scorer-broken",
+      );
+
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      const scoreHistory = readFileSync(scoreHistoryPath, "utf-8").trim().split("\n").map((line) => JSON.parse(line));
+      expect(scoreHistory[0]).toMatchObject({
+        decision: "needs_human",
+        scorer_status: "scorer-broken",
       });
     });
 
@@ -170,6 +207,81 @@ describe("run-manager", () => {
         decision: "discard",
         metric_value: "12",
       });
+    });
+
+    it("rejects a symlinked score history artifact", async () => {
+      const { initializeRun, appendIteration } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      const targetPath = resolve(tmpDir, "outside-target");
+      writeFileSync(targetPath, "original", "utf-8");
+      symlinkSync(targetPath, scoreHistoryPath);
+
+      await expect(appendIteration(tmpDir, undefined, undefined, "keep", "42", undefined, "pass", "pass", "", "change", [], ""))
+        .rejects.toThrow("Refusing to append to symlinked score history file");
+      expect(readFileSync(targetPath, "utf-8")).toBe("original");
+    });
+
+    it("stores score_components in score history and last_iteration when provided", async () => {
+      const { initializeRun, appendIteration } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      const components = { accuracy: 0.8, coverage: 0.6 };
+      const state = await appendIteration(
+        tmpDir, undefined, undefined,
+        "keep", "5", undefined,
+        "pass", "pass",
+        "", "with components",
+        [], "",
+        undefined, undefined,
+        components,
+      );
+
+      // Components in last_iteration
+      expect(state.last_iteration?.score_components).toEqual(components);
+
+      // Components in score history JSONL
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      const records = readFileSync(scoreHistoryPath, "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+      expect(records[0].score_components).toEqual(components);
+    });
+
+    it("omits score_components from score history when not provided", async () => {
+      const { initializeRun, appendIteration } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      const state = await appendIteration(
+        tmpDir, undefined, undefined,
+        "keep", "5", undefined,
+        "pass", "pass",
+        "", "no components",
+        [], "",
+      );
+
+      expect(state.last_iteration?.score_components).toBeUndefined();
+
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      const records = readFileSync(scoreHistoryPath, "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+      expect(records[0]).not.toHaveProperty("score_components");
     });
   });
 
