@@ -10,6 +10,11 @@ import {
   normalizeOperatingMode,
   normalizeScorerStatus,
   parseDurationSeconds,
+  normalizeLabels,
+  missingRequiredLabels,
+  writeGoalDoc,
+  AutoresearchError,
+} from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT, GOAL_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
 import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
