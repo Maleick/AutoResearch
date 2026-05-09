@@ -4,10 +4,10 @@ Auto Research supports **OpenCode** and **Hermes Agent** runtimes.
 
 ## OpenCode Install
 
-Paste this one-line install prompt into your agent. This URL is pinned to the immutable `v3.6.0` release instructions:
+Paste this one-line install prompt into your agent. This URL is pinned to the immutable `v3.13.1` release instructions:
 
 ```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.6.0/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.13.1/INSTALL.md
 ```
 
 ### Recommended: OpenCode Plugin Install
