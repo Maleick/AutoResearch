@@ -302,8 +302,8 @@ describe("CLI Commands", () => {
     it("supports --json flag", () => {
       const out = execSync(`node ${CLI} explain --json`, { encoding: "utf-8", cwd: REPO_ROOT });
       const json = JSON.parse(out);
-      expect(json.status).toBeDefined();
-      expect(json.run_id).toBeDefined();
+      expect(json.data.status).toBeDefined();
+      expect(json.data.run_id).toBeDefined();
     });
   });
 
@@ -1031,11 +1031,11 @@ describe("CLI Commands", () => {
     it("outputs JSON with --json flag", () => {
       const out = execSync(`node ${CLI} status --json`, { encoding: "utf-8", cwd: REPO_ROOT });
       const json = JSON.parse(out);
-      expect(json.status).toBe("running");
-      expect(json.goal).toBe("test fixture goal");
-      expect(json.metric).toBeDefined();
-      expect(json.stats).toBeDefined();
-      expect(json.stats.total_iterations).toBe(1);
+      expect(json.data.status).toBe("running");
+      expect(json.data.goal).toBe("test fixture goal");
+      expect(json.data.metric).toBeDefined();
+      expect(json.data.stats).toBeDefined();
+      expect(json.data.stats.total_iterations).toBe(1);
     });
 
     it("reports error when no state exists", () => {
@@ -1142,7 +1142,7 @@ describe("CLI Commands", () => {
       expect(out).not.toContain("\u001b");
       expect(out).toContain("\\u001b");
       const json = JSON.parse(out);
-      expect(json.goal).toContain("\u001b");
+      expect(json.data.goal).toContain("\u001b");
     });
   });
 
@@ -1349,6 +1349,65 @@ describe("CLI Commands", () => {
       const report = execSync(`node ${CLI} report --repo ${tmpDir}`, { encoding: "utf-8" });
       expect(report).toContain("visible change summary");
       expect(report).not.toContain("hidden hypothesis");
+    });
+  });
+
+  describe("task queue", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-queue");
+
+    beforeEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    afterEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    it("lists empty queue", () => {
+      const out = execSync(`node ${CLI} queue --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(out).toContain("No tasks in queue");
+    });
+
+    it("enqueues a task", () => {
+      const out = execSync(`node ${CLI} queue enqueue --goal "test-goal" --metric "m" --verify "cmd" --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(out).toContain("Enqueued:");
+      expect(out).toContain("test-goal");
+    });
+
+    it("lists enqueued tasks", () => {
+      execSync(`node ${CLI} queue enqueue --goal "goal-a" --metric "m" --verify "cmd" --repo ${tmpDir}`, { encoding: "utf-8" });
+      const out = execSync(`node ${CLI} queue --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(out).toContain("goal-a");
+      expect(out).toContain("pending");
+    });
+
+    it("cleans completed/failed tasks", () => {
+      execSync(`node ${CLI} queue enqueue --goal "keep" --metric "m" --verify "cmd" --repo ${tmpDir}`, { encoding: "utf-8" });
+      execSync(`node ${CLI} queue enqueue --goal "discard" --metric "m2" --verify "cmd2" --repo ${tmpDir}`, { encoding: "utf-8" });
+      const queuePath = resolve(tmpDir, ".autoresearch/task-queue.json");
+      const manifest = JSON.parse(readFileSync(queuePath, "utf-8"));
+      manifest.tasks[0].status = "completed";
+      manifest.tasks[1].status = "failed";
+      writeFileSync(queuePath, JSON.stringify(manifest, null, 2));
+      const out = execSync(`node ${CLI} queue clean --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(out).toContain("Cleaned 2");
+      expect(out).toContain("0 remain");
+    });
+
+    it("supports --json flag", () => {
+      execSync(`node ${CLI} queue enqueue --goal "json-task" --metric "m" --verify "cmd" --repo ${tmpDir}`, { encoding: "utf-8" });
+      const out = execSync(`node ${CLI} queue --json --repo ${tmpDir}`, { encoding: "utf-8" });
+      const json = JSON.parse(out);
+      expect(Array.isArray(json.tasks)).toBe(true);
+      expect(json.tasks.length).toBe(1);
+    });
+
+    it("enqueues multiple tasks", () => {
+      execSync(`node ${CLI} queue enqueue --goal "t1" --metric "m" --verify "cmd" --repo ${tmpDir}`, { encoding: "utf-8" });
+      execSync(`node ${CLI} queue enqueue --goal "t2" --metric "m" --verify "cmd" --repo ${tmpDir}`, { encoding: "utf-8" });
+      const out = execSync(`node ${CLI} queue --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(out).toContain("t1");
+      expect(out).toContain("t2");
     });
   });
 });
