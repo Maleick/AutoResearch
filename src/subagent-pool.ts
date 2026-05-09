@@ -203,27 +203,14 @@ export function buildDraftPoolPlan(input: DraftPoolConfigInput): DraftPoolConfig
   };
 }
 
-export function selectNextBranch(
+function applyBranchSelectionPolicy(
   activeDrafts: DraftBranch[],
+  completedDrafts: DraftBranch[],
+  pendingBranchId: string | undefined,
   policy: BranchSelectionPolicy,
   direction: "lower" | "higher",
-  poolPolicy?: BranchSelectionPolicy,
 ): string | undefined {
-  const completedDrafts = activeDrafts.filter((d) => d.status === "completed");
-  const pendingBranchId = activeDrafts.find((d) => d.status === "pending")?.branch_id;
-  if (completedDrafts.length === 0) {
-    return pendingBranchId;
-  }
-
-  const effectivePolicy = poolPolicy ?? policy;
-  const sortDirection =
-    direction === "lower" || direction === "higher"
-      ? direction
-      : (() => {
-          throw new Error(`Invalid branch selection direction: ${String(direction)}`);
-        })();
-
-  switch (effectivePolicy) {
+  switch (policy) {
     case "best": {
       const scoredDrafts = completedDrafts
         .map((draft) => ({
@@ -235,7 +222,7 @@ export function selectNextBranch(
         return selectFallbackBranch(pendingBranchId, completedDrafts, activeDrafts);
       }
       const sorted = [...scoredDrafts].sort((a, b) =>
-        sortDirection === "lower" ? a.parsed_metric - b.parsed_metric : b.parsed_metric - a.parsed_metric);
+        direction === "lower" ? a.parsed_metric - b.parsed_metric : b.parsed_metric - a.parsed_metric);
       return sorted[0]?.branch_id;
     }
     case "roulette": {
@@ -250,4 +237,45 @@ export function selectNextBranch(
     default:
       return activeDrafts[0]?.branch_id;
   }
+}
+
+export function selectNextBranch(
+  activeDrafts: DraftBranch[],
+  policy: BranchSelectionPolicy,
+  direction: "lower" | "higher",
+  poolPolicy?: BranchSelectionPolicy,
+): string | undefined {
+  const completedDrafts = activeDrafts.filter((d) => d.status === "completed");
+  const pendingBranchId = activeDrafts.find((d) => d.status === "pending")?.branch_id;
+  if (completedDrafts.length === 0) {
+    return pendingBranchId;
+  }
+
+  const sortDirection =
+    direction === "lower" || direction === "higher"
+      ? direction
+      : (() => {
+          throw new Error(`Invalid branch selection direction: ${String(direction)}`);
+        })();
+
+  const effectivePolicy = poolPolicy ?? policy;
+  const selectedBranchId = applyBranchSelectionPolicy(
+    activeDrafts,
+    completedDrafts,
+    pendingBranchId,
+    effectivePolicy,
+    sortDirection,
+  );
+  const selectedDraft = activeDrafts.find((draft) => draft.branch_id === selectedBranchId);
+  if (selectedDraft?.policy_override != null && selectedDraft.policy_override !== effectivePolicy) {
+    return applyBranchSelectionPolicy(
+      activeDrafts,
+      completedDrafts,
+      pendingBranchId,
+      selectedDraft.policy_override,
+      sortDirection,
+    );
+  }
+
+  return selectedBranchId;
 }

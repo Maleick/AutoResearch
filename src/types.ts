@@ -28,7 +28,8 @@ export interface RunConfig {
   stop_condition?: string;
   baseline?: string;
   num_drafts?: number;
-  branch_selection_policy?: "best" | "roulette" | "diverse";
+  branch_selection_policy?: BranchSelectionPolicy;
+  branch_policy_overrides?: Record<string, BranchSelectionPolicy>;
   outcome_metric?: string;
   outcome_direction?: string;
   instrument_metric?: string;
