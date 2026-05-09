@@ -78,6 +78,56 @@ npx opencode-autoresearch doctor
 
 Use the plugin-array install for normal OpenCode usage.
 
+### Pinned Installation (Reproducible)
+
+For reproducible installs in CI or production environments, pin to a specific version:
+
+**Plugin array (pinned):**
+```json
+{
+  "plugin": ["opencode-autoresearch@3.13.1"]
+}
+```
+
+**npm global (pinned):**
+```bash
+npm install -g opencode-autoresearch@3.13.1
+```
+
+**npm global (with lockfile):**
+```bash
+npm install -g opencode-autoresearch@3.13.1
+npm shrinkwrap  # Creates npm-shrinkwrap.json for reproducibility
+```
+
+**Verify package integrity:**
+```bash
+npm view opencode-autoresearch@3.13.1 dist.shasum
+npm pack opencode-autoresearch@3.13.1 --dry-run
+```
+
+### Upgrade and Rollback
+
+**Upgrade to latest:**
+```bash
+# Plugin array: update version in opencode.json, then restart OpenCode
+# npm global:
+npm install -g opencode-autoresearch@latest
+autoresearch doctor
+```
+
+**Rollback to previous version:**
+```bash
+npm install -g opencode-autoresearch@3.12.0
+autoresearch doctor
+```
+
+**View available versions:**
+```bash
+npm view opencode-autoresearch versions --json
+npm view opencode-autoresearch dist-tags
+```
+
 ---
 
 ## Hermes Agent Install

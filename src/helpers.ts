@@ -12,8 +12,31 @@ export class AutoresearchError extends Error {
   }
 }
 
+export interface JsonEnvelope {
+  ok: boolean;
+  command: string;
+  timestamp: string;
+  data?: unknown;
+  error?: {
+    kind: string;
+    code: string;
+    message: string;
+  };
+}
+
 export function printJson(payload: unknown): void {
   console.log(JSON.stringify(payload, null, 2));
+}
+
+export function printJsonEnvelope(command: string, data: unknown, ok = true, error?: JsonEnvelope["error"]): void {
+  const envelope: JsonEnvelope = {
+    ok,
+    command,
+    timestamp: new Date().toISOString(),
+    ...(ok ? { data } : {}),
+    ...(error ? { error } : {}),
+  };
+  console.log(JSON.stringify(envelope, null, 2));
 }
 
 export function sanitizeForTerminal(value: unknown): string {
@@ -316,6 +339,31 @@ export function parseRunState(value: unknown): RunState {
   const flags = obj.flags as Record<string, unknown>;
   if (typeof flags.stop_requested !== "boolean" || typeof flags.needs_human !== "boolean" || typeof flags.background_active !== "boolean" || typeof flags.stop_ready !== "boolean") {
     throw new AutoresearchError("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
+  }
+
+  if (obj.draft_pool !== undefined && obj.draft_pool !== null) {
+    if (typeof obj.draft_pool !== "object" || Array.isArray(obj.draft_pool)) {
+      throw new AutoresearchError("Invalid state: draft_pool must be an object");
+    }
+    const draftPool = obj.draft_pool as Record<string, unknown>;
+    if (!Array.isArray(draftPool.active_drafts)) {
+      throw new AutoresearchError("Invalid state: draft_pool.active_drafts must be an array");
+    }
+    for (const draft of draftPool.active_drafts) {
+      if (typeof draft !== "object" || draft === null || Array.isArray(draft)) {
+        throw new AutoresearchError("Invalid state: draft_pool.active_drafts entries must be objects");
+      }
+    }
+  }
+
+  if (obj.last_iteration !== undefined && obj.last_iteration !== null) {
+    if (typeof obj.last_iteration !== "object" || Array.isArray(obj.last_iteration)) {
+      throw new AutoresearchError("Invalid state: last_iteration must be an object");
+    }
+    const lastIteration = obj.last_iteration as Record<string, unknown>;
+    if (lastIteration.note !== undefined && typeof lastIteration.note !== "string") {
+      throw new AutoresearchError("Invalid state: last_iteration.note must be a string");
+    }
   }
 
   return {

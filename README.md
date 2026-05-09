@@ -113,6 +113,8 @@ Recommended plugin install in `opencode.json`:
 }
 ```
 
+For reproducible/pinned installs, see [INSTALL.md](INSTALL.md#pinned-installation-reproducible).
+
 Restart OpenCode, then run the setup wizard:
 
 ```text
