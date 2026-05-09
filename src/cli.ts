@@ -631,21 +631,12 @@ const main = async (): Promise<number> => {
         break;
       }
       case "score": {
-        const { resolvePath, readJsonFile, AutoresearchError: AErr } = await import("./helpers.js");
-        const { STATE_DEFAULT } = await import("./constants.js");
+        const { AutoresearchError: AErr } = await import("./helpers.js");
         const { parseScoreOutput } = await import("./score-parser.js");
 
-        // Resolve scorer: --scorer flag takes priority, else use state.scorer
-        let scorerCmd = grouped.scorer as string | undefined;
+        const scorerCmd = grouped.scorer as string | undefined;
         if (!scorerCmd) {
-          const statePath = resolvePath(grouped.repo as string | undefined, grouped["state-path"] as string | undefined, STATE_DEFAULT);
-          if (existsSync(statePath)) {
-            const state = parseRunState(readJsonFile(statePath));
-            scorerCmd = state.scorer;
-          }
-        }
-        if (!scorerCmd) {
-          throw new AErr("No scorer configured. Provide --scorer <cmd> or configure a scorer via autoresearch init --scorer <cmd>.");
+          throw new AErr("No scorer provided. Pass --scorer <cmd> to run a scorer explicitly.");
         }
 
         const repoBase = resolveRepo(grouped.repo as string | undefined);
