@@ -671,4 +671,19 @@ describe("parseRunState", () => {
     const state = { ...validState(), flags: { stop_requested: "false", needs_human: false, background_active: false, stop_ready: false } };
     expect(() => mod.parseRunState(state)).toThrow("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
   });
+
+  it("throws on non-array draft_pool.active_drafts", () => {
+    const state = { ...validState(), draft_pool: { active_drafts: { discarded: true } } };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: draft_pool.active_drafts must be an array");
+  });
+
+  it("throws on non-object draft_pool.active_drafts entries", () => {
+    const state = { ...validState(), draft_pool: { active_drafts: [null] } };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: draft_pool.active_drafts entries must be objects");
+  });
+
+  it("throws on non-string last_iteration.note", () => {
+    const state = { ...validState(), last_iteration: { note: { text: "blocked" } } };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: last_iteration.note must be a string");
+  });
 });
