@@ -44,6 +44,7 @@ const usage = (): void => {
   console.error("  score      Run the configured scorer and show normalized output");
   console.error("  digest     Generate re-entry digest for operator handoff");
   console.error("  config     Show runtime configuration");
+  console.error("  contract   Print runtime contract schemas");
   console.error("  summary    Aggregate stats across runs");
   console.error("  suggest    Suggest next goal from memory");
   console.error("  launch     Launch a background run");
@@ -747,6 +748,150 @@ const main = async (): Promise<number> => {
         console.log(`  Guard:    ${formatDisplayValue(state.guard)}`);
         console.log(`  Scorer:   ${formatDisplayValue(state.scorer ?? "—")}`);
         console.log(`  Pool:     ${state.subagent_pool ? "configured" : "none"}`);
+        break;
+      }
+      case "contract": {
+        const schemas = {
+          schema_version: "1.0.0",
+          description: "Auto Research runtime contract schemas",
+          state: {
+            type: "object",
+            required: ["schema_version", "run_id", "created_at", "updated_at", "status", "mode", "operating_mode", "goal", "scope", "metric", "verify", "label_requirements", "artifact_paths", "stats", "flags"],
+            properties: {
+              schema_version: { type: "number", description: "State schema version" },
+              run_id: { type: "string", description: "Unique run identifier" },
+              created_at: { type: "string", format: "date-time", description: "Run creation timestamp" },
+              updated_at: { type: "string", format: "date-time", description: "Last update timestamp" },
+              status: { type: "string", enum: ["running", "stopped", "completed", "needs_human"], description: "Run status" },
+              mode: { type: "string", enum: ["foreground", "background"], description: "Execution mode" },
+              operating_mode: { type: "string", enum: ["converge", "continuous", "supervised"], description: "Operating mode" },
+              goal: { type: "string", description: "Run goal description" },
+              scope: { type: "string", description: "Target scope" },
+              metric: {
+                type: "object",
+                required: ["name", "direction"],
+                properties: {
+                  name: { type: "string" },
+                  direction: { type: "string", enum: ["higher", "lower"] },
+                  baseline: { type: "string" },
+                  best: { type: "string" },
+                  latest: { type: "string" },
+                },
+              },
+              instrument_metric: { type: "object", description: "Optional secondary metric" },
+              verify: { type: "string", description: "Verification command" },
+              guard: { type: "string", description: "Guard command" },
+              scorer: { type: "string", description: "Scorer command" },
+              iterations_cap: { type: "number", description: "Maximum iterations" },
+              duration: { type: "string", description: "Duration limit" },
+              duration_seconds: { type: "number" },
+              deadline_at: { type: "string", format: "date-time" },
+              label_requirements: {
+                type: "object",
+                required: ["keep", "stop"],
+                properties: {
+                  keep: { type: "array", items: { type: "string" } },
+                  stop: { type: "array", items: { type: "string" } },
+                },
+              },
+              artifact_paths: {
+                type: "object",
+                required: ["results", "state"],
+                properties: {
+                  results: { type: "string" },
+                  state: { type: "string" },
+                },
+              },
+              stats: {
+                type: "object",
+                required: ["total_iterations", "kept", "discarded", "needs_human"],
+                properties: {
+                  total_iterations: { type: "number" },
+                  kept: { type: "number" },
+                  discarded: { type: "number" },
+                  needs_human: { type: "number" },
+                  consecutive_discards: { type: "number" },
+                  best_iteration: { type: "number" },
+                  debug_depth: { type: "number" },
+                },
+              },
+              flags: {
+                type: "object",
+                required: ["stop_requested", "needs_human", "background_active", "stop_ready"],
+                properties: {
+                  stop_requested: { type: "boolean" },
+                  needs_human: { type: "boolean" },
+                  background_active: { type: "boolean" },
+                  stop_ready: { type: "boolean" },
+                },
+              },
+              last_iteration: {
+                type: "object",
+                properties: {
+                  iteration: { type: "number" },
+                  decision: { type: "string", enum: ["keep", "discard", "needs_human"] },
+                  metric_value: { type: "string" },
+                  change_summary: { type: "string" },
+                  labels: { type: "array", items: { type: "string" } },
+                  timestamp: { type: "string", format: "date-time" },
+                },
+              },
+              draft_pool: { type: "object", description: "Draft pool configuration" },
+              lineage: { type: "object", description: "Experiment lineage" },
+              budget_exhausted: { type: "boolean" },
+              budget_blocker_reason: { type: "string" },
+            },
+          },
+          result_row: {
+            type: "object",
+            description: "Single iteration result row in TSV format",
+            properties: {
+              iteration: { type: "number" },
+              decision: { type: "string" },
+              metric_value: { type: "string" },
+              verify_status: { type: "string" },
+              guard_status: { type: "string" },
+              change_summary: { type: "string" },
+              labels: { type: "array", items: { type: "string" } },
+              timestamp: { type: "string" },
+              note: { type: "string" },
+            },
+          },
+          goal_doc: {
+            type: "object",
+            required: ["goal", "metric", "direction", "verify"],
+            properties: {
+              goal: { type: "string" },
+              metric: { type: "string" },
+              direction: { type: "string", enum: ["higher", "lower"] },
+              verify: { type: "string" },
+              guard: { type: "string" },
+              constraints: { type: "string" },
+              file_map: { type: "string" },
+              stop_conditions: { type: "string" },
+            },
+          },
+        };
+
+        if (useJson) {
+          printJson(schemas);
+          break;
+        }
+
+        console.log("Auto Research Contract Schemas");
+        console.log("==============================");
+        console.log("");
+        console.log("State Schema:");
+        console.log(`  Version:    ${schemas.state.properties.schema_version.type}`);
+        console.log(`  Required:   ${schemas.state.required.join(", ")}`);
+        console.log("");
+        console.log("Result Row Schema:");
+        console.log(`  Properties: ${Object.keys(schemas.result_row.properties).join(", ")}`);
+        console.log("");
+        console.log("Goal Doc Schema:");
+        console.log(`  Required:   ${schemas.goal_doc.required.join(", ")}`);
+        console.log("");
+        console.log("Use --json for full machine-readable schema output.");
         break;
       }
       case "summary": {
