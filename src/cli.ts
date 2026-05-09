@@ -838,7 +838,7 @@ const main = async (): Promise<number> => {
               run_id: { type: "string", description: "Unique run identifier" },
               created_at: { type: "string", format: "date-time", description: "Run creation timestamp" },
               updated_at: { type: "string", format: "date-time", description: "Last update timestamp" },
-              status: { type: "string", enum: ["running", "stopped", "completed", "needs_human"], description: "Run status" },
+              status: { type: "string", enum: ["initialized", "running", "stopping", "stopped", "completed", "needs_human"], description: "Run status" },
               mode: { type: "string", enum: ["foreground", "background"], description: "Execution mode" },
               operating_mode: { type: "string", enum: ["converge", "continuous", "supervised"], description: "Operating mode" },
               goal: { type: "string", description: "Run goal description" },
