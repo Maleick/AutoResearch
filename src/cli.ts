@@ -52,6 +52,7 @@ const usage = (): void => {
   console.error("  stop       Request a background run stop");
   console.error("  resume     Resume a background run");
   console.error("  record     Record an experiment result");
+  console.error("  leaderboard Show local leaderboard across runs");
   console.error("  doctor     Verify package installation and version");
   console.error("  help       Show this help");
   console.error("");
@@ -1710,6 +1711,42 @@ const main = async (): Promise<number> => {
           if (result.template !== "custom") console.log(`  Template: ${result.template}`);
           console.log("");
           console.log(`Run 'autoresearch init --goal "..." --metric "..." --verify "..."' to start a run.`);
+        }
+        break;
+      }
+      case "leaderboard": {
+        const { generateLeaderboard, formatLeaderboardMarkdown } = await import("./leaderboard.js");
+        const { resolveRepo } = await import("./helpers.js");
+        const repo = resolveRepo(grouped.repo as string | undefined);
+        const leaderboard = generateLeaderboard(repo);
+
+        if (useJson) {
+          printJson(leaderboard);
+          break;
+        }
+
+        if (leaderboard.entries.length === 0) {
+          console.log("No runs found. Complete some runs to see the leaderboard.");
+          break;
+        }
+
+        if (grouped.format === "markdown") {
+          console.log(formatLeaderboardMarkdown(leaderboard));
+        } else {
+          console.log("Auto Research Leaderboard");
+          console.log("=========================");
+          console.log("");
+          for (const entry of leaderboard.entries) {
+            console.log(`Run:      ${entry.run_id}`);
+            console.log(`Goal:     ${entry.goal}`);
+            console.log(`Metric:   ${entry.metric} (${entry.direction})`);
+            console.log(`Results:  ${entry.total_iterations} iterations (${entry.kept} kept, ${entry.discarded} discarded)`);
+            console.log(`Success:  ${entry.success_rate}`);
+            if (entry.best_value) console.log(`Best:     ${entry.best_value}`);
+            if (entry.runtime_seconds) console.log(`Runtime:  ${Math.round(entry.runtime_seconds / 60)}m`);
+            console.log("");
+          }
+          console.log(`Total: ${leaderboard.summary.total_runs} runs, ${leaderboard.summary.total_iterations} iterations, ${leaderboard.summary.overall_success_rate} success rate`);
         }
         break;
       }
