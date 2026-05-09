@@ -3,12 +3,30 @@ import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, rea
 import { resolve } from "path";
 import { execSync } from "child_process";
 import { MAX_DRAFTS } from "./constants.js";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo } from "./helpers.js";
+import { printJson, printJsonEnvelope, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo } from "./helpers.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
 const HELP_FLAGS = ["--help", "-h", "help"];
 const BRANCH_POLICIES = ["best", "roulette", "diverse"] as const;
+
+type SkipReason = "version_flag" | "help_flag" | "env_opt_out" | "ci_environment" | null;
+
+const shouldSkipUpdateCheck = (args: string[]): { skip: boolean; reason: SkipReason } => {
+  if (args.length > 0 && VERSION_FLAGS.includes(args[0])) {
+    return { skip: true, reason: "version_flag" };
+  }
+  if (args.length > 0 && HELP_FLAGS.includes(args[0])) {
+    return { skip: true, reason: "help_flag" };
+  }
+  if (process.env.AUTORESEARCH_NO_UPDATE === "1") {
+    return { skip: true, reason: "env_opt_out" };
+  }
+  if (process.env.CI === "true" || process.env.CI === "1") {
+    return { skip: true, reason: "ci_environment" };
+  }
+  return { skip: false, reason: null };
+};
 type BranchPolicy = typeof BRANCH_POLICIES[number];
 
 const usage = (): void => {
@@ -26,6 +44,7 @@ const usage = (): void => {
   console.error("  score      Run the configured scorer and show normalized output");
   console.error("  digest     Generate re-entry digest for operator handoff");
   console.error("  config     Show runtime configuration");
+  console.error("  contract   Print runtime contract schemas");
   console.error("  summary    Aggregate stats across runs");
   console.error("  suggest    Suggest next goal from memory");
   console.error("  launch     Launch a background run");
@@ -33,6 +52,7 @@ const usage = (): void => {
   console.error("  stop       Request a background run stop");
   console.error("  resume     Resume a background run");
   console.error("  record     Record an experiment result");
+  console.error("  leaderboard Show local leaderboard across runs");
   console.error("  doctor     Verify package installation and version");
   console.error("  help       Show this help");
   console.error("");
@@ -188,6 +208,41 @@ const formatTimestamp = (ts: string): string => {
     return d.toLocaleString();
   } catch {
     return ts;
+  }
+};
+
+const MAX_SCORE_HISTORY_BYTES = 10 * 1024 * 1024;
+
+const assertRegularBoundedFile = (filePath: string): void => {
+  const linkStats = lstatSync(filePath);
+  if (linkStats.isSymbolicLink()) {
+    throw new Error(`Refusing to read score history symlink: ${filePath}`);
+  }
+  if (!linkStats.isFile()) {
+    throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
+  }
+  if (linkStats.size > MAX_SCORE_HISTORY_BYTES) {
+    throw new Error(`Score history is too large to read safely (${linkStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
+  }
+};
+
+const readScoreHistoryFile = (filePath: string): string => {
+  assertRegularBoundedFile(filePath);
+  if (typeof fsConstants.O_NOFOLLOW !== "number") {
+    throw new Error(`Refusing to read score history because this platform does not support O_NOFOLLOW: ${filePath}`);
+  }
+  const fd = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  try {
+    const fileStats = fstatSync(fd);
+    if (!fileStats.isFile()) {
+      throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
+    }
+    if (fileStats.size > MAX_SCORE_HISTORY_BYTES) {
+      throw new Error(`Score history is too large to read safely (${fileStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
+    }
+    return readFileSync(fd, "utf-8");
+  } finally {
+    closeSync(fd);
   }
 };
 
@@ -389,7 +444,11 @@ const main = async (): Promise<number> => {
           config,
           grouped["fresh-start"] === "true",
         );
-        printJson(state);
+        if (useJson) {
+          printJsonEnvelope("init", state);
+        } else {
+          printJson(state);
+        }
         break;
       }
       case "status": {
@@ -400,7 +459,7 @@ const main = async (): Promise<number> => {
           grouped["state-path"] as string | undefined,
         );
         if (useJson) {
-          printJson(snapshot);
+          printJsonEnvelope("status", snapshot);
         } else {
           const s = snapshot;
           const stats = s.stats;
@@ -448,7 +507,7 @@ const main = async (): Promise<number> => {
         const flags = s.flags;
 
         if (useJson) {
-          printJson(snapshot);
+          printJsonEnvelope("explain", snapshot);
           break;
         }
 
@@ -513,7 +572,7 @@ const main = async (): Promise<number> => {
             }
             return obj;
           });
-          printJson({ count: records.length, records: parsed });
+          printJsonEnvelope("history", { count: records.length, records: parsed });
           break;
         }
         for (const r of records) {
@@ -540,7 +599,7 @@ const main = async (): Promise<number> => {
         const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
         const showTopComponents = grouped["top-components"] === "true";
         if (showTopComponents) {
-          const allLines = readFileSync(scoreHistoryPath, "utf-8")
+          const allLines = readScoreHistoryFile(scoreHistoryPath)
             .split("\n")
             .map((l: string) => l.trim())
             .filter(Boolean);
@@ -554,7 +613,7 @@ const main = async (): Promise<number> => {
           const { rankComponents } = await import("./score-parser.js");
           const ranking = rankComponents(allParsed);
           if (useJson) {
-            printJson({ count: allParsed.length, scores: allParsed.slice(-limit), ranking });
+            printJsonEnvelope("scores", { count: allParsed.length, scores: allParsed.slice(-limit), ranking });
             break;
           }
           console.log("Component Rankings:");
@@ -589,7 +648,7 @@ const main = async (): Promise<number> => {
               return null;
             }
           }).filter(Boolean);
-          printJson({ count: parsed.length, scores: parsed });
+          printJsonEnvelope("scores", { count: parsed.length, scores: parsed });
           break;
         }
         console.log("Score History (latest " + Math.min(limit, records.length) + "):");
@@ -664,21 +723,12 @@ const main = async (): Promise<number> => {
         break;
       }
       case "score": {
-        const { resolvePath, readJsonFile, AutoresearchError: AErr } = await import("./helpers.js");
-        const { STATE_DEFAULT } = await import("./constants.js");
+        const { AutoresearchError: AErr } = await import("./helpers.js");
         const { parseScoreOutput } = await import("./score-parser.js");
 
-        // Resolve scorer: --scorer flag takes priority, else use state.scorer
-        let scorerCmd = grouped.scorer as string | undefined;
+        const scorerCmd = grouped.scorer as string | undefined;
         if (!scorerCmd) {
-          const statePath = resolvePath(grouped.repo as string | undefined, grouped["state-path"] as string | undefined, STATE_DEFAULT);
-          if (existsSync(statePath)) {
-            const state = parseRunState(readJsonFile(statePath));
-            scorerCmd = state.scorer;
-          }
-        }
-        if (!scorerCmd) {
-          throw new AErr("No scorer configured. Provide --scorer <cmd> or configure a scorer via autoresearch init --scorer <cmd>.");
+          throw new AErr("No scorer provided. Pass --scorer <cmd> to run a scorer explicitly.");
         }
 
         const repoBase = resolveRepo(grouped.repo as string | undefined);
@@ -697,7 +747,7 @@ const main = async (): Promise<number> => {
         const percent = (normalized * 100).toFixed(1) + "%";
 
         if (useJson) {
-          printJson({
+          printJsonEnvelope("score", {
             score: scored.score,
             max: scored.max,
             normalized,
@@ -734,7 +784,7 @@ const main = async (): Promise<number> => {
         }
         const state = parseRunState(readJsonFile(statePath));
         if (useJson) {
-          printJson({
+          printJsonEnvelope("config", {
             goal: state.goal,
             mode: state.mode,
             metric: state.metric,
@@ -766,6 +816,150 @@ const main = async (): Promise<number> => {
         console.log(`  Pool:     ${state.subagent_pool ? "configured" : "none"}`);
         break;
       }
+      case "contract": {
+        const schemas = {
+          schema_version: "1.0.0",
+          description: "Auto Research runtime contract schemas",
+          state: {
+            type: "object",
+            required: ["schema_version", "run_id", "created_at", "updated_at", "status", "mode", "operating_mode", "goal", "scope", "metric", "verify", "label_requirements", "artifact_paths", "stats", "flags"],
+            properties: {
+              schema_version: { type: "number", description: "State schema version" },
+              run_id: { type: "string", description: "Unique run identifier" },
+              created_at: { type: "string", format: "date-time", description: "Run creation timestamp" },
+              updated_at: { type: "string", format: "date-time", description: "Last update timestamp" },
+              status: { type: "string", enum: ["running", "stopped", "completed", "needs_human"], description: "Run status" },
+              mode: { type: "string", enum: ["foreground", "background"], description: "Execution mode" },
+              operating_mode: { type: "string", enum: ["converge", "continuous", "supervised"], description: "Operating mode" },
+              goal: { type: "string", description: "Run goal description" },
+              scope: { type: "string", description: "Target scope" },
+              metric: {
+                type: "object",
+                required: ["name", "direction"],
+                properties: {
+                  name: { type: "string" },
+                  direction: { type: "string", enum: ["higher", "lower"] },
+                  baseline: { type: "string" },
+                  best: { type: "string" },
+                  latest: { type: "string" },
+                },
+              },
+              instrument_metric: { type: "object", description: "Optional secondary metric" },
+              verify: { type: "string", description: "Verification command" },
+              guard: { type: "string", description: "Guard command" },
+              scorer: { type: "string", description: "Scorer command" },
+              iterations_cap: { type: "number", description: "Maximum iterations" },
+              duration: { type: "string", description: "Duration limit" },
+              duration_seconds: { type: "number" },
+              deadline_at: { type: "string", format: "date-time" },
+              label_requirements: {
+                type: "object",
+                required: ["keep", "stop"],
+                properties: {
+                  keep: { type: "array", items: { type: "string" } },
+                  stop: { type: "array", items: { type: "string" } },
+                },
+              },
+              artifact_paths: {
+                type: "object",
+                required: ["results", "state"],
+                properties: {
+                  results: { type: "string" },
+                  state: { type: "string" },
+                },
+              },
+              stats: {
+                type: "object",
+                required: ["total_iterations", "kept", "discarded", "needs_human"],
+                properties: {
+                  total_iterations: { type: "number" },
+                  kept: { type: "number" },
+                  discarded: { type: "number" },
+                  needs_human: { type: "number" },
+                  consecutive_discards: { type: "number" },
+                  best_iteration: { type: "number" },
+                  debug_depth: { type: "number" },
+                },
+              },
+              flags: {
+                type: "object",
+                required: ["stop_requested", "needs_human", "background_active", "stop_ready"],
+                properties: {
+                  stop_requested: { type: "boolean" },
+                  needs_human: { type: "boolean" },
+                  background_active: { type: "boolean" },
+                  stop_ready: { type: "boolean" },
+                },
+              },
+              last_iteration: {
+                type: "object",
+                properties: {
+                  iteration: { type: "number" },
+                  decision: { type: "string", enum: ["keep", "discard", "needs_human"] },
+                  metric_value: { type: "string" },
+                  change_summary: { type: "string" },
+                  labels: { type: "array", items: { type: "string" } },
+                  timestamp: { type: "string", format: "date-time" },
+                },
+              },
+              draft_pool: { type: "object", description: "Draft pool configuration" },
+              lineage: { type: "object", description: "Experiment lineage" },
+              budget_exhausted: { type: "boolean" },
+              budget_blocker_reason: { type: "string" },
+            },
+          },
+          result_row: {
+            type: "object",
+            description: "Single iteration result row in TSV format",
+            properties: {
+              iteration: { type: "number" },
+              decision: { type: "string" },
+              metric_value: { type: "string" },
+              verify_status: { type: "string" },
+              guard_status: { type: "string" },
+              change_summary: { type: "string" },
+              labels: { type: "array", items: { type: "string" } },
+              timestamp: { type: "string" },
+              note: { type: "string" },
+            },
+          },
+          goal_doc: {
+            type: "object",
+            required: ["goal", "metric", "direction", "verify"],
+            properties: {
+              goal: { type: "string" },
+              metric: { type: "string" },
+              direction: { type: "string", enum: ["higher", "lower"] },
+              verify: { type: "string" },
+              guard: { type: "string" },
+              constraints: { type: "string" },
+              file_map: { type: "string" },
+              stop_conditions: { type: "string" },
+            },
+          },
+        };
+
+        if (useJson) {
+          printJsonEnvelope("contract", schemas);
+          break;
+        }
+
+        console.log("Auto Research Contract Schemas");
+        console.log("==============================");
+        console.log("");
+        console.log("State Schema:");
+        console.log(`  Version:    ${schemas.state.properties.schema_version.type}`);
+        console.log(`  Required:   ${schemas.state.required.join(", ")}`);
+        console.log("");
+        console.log("Result Row Schema:");
+        console.log(`  Properties: ${Object.keys(schemas.result_row.properties).join(", ")}`);
+        console.log("");
+        console.log("Goal Doc Schema:");
+        console.log(`  Required:   ${schemas.goal_doc.required.join(", ")}`);
+        console.log("");
+        console.log("Use --json for full machine-readable schema output.");
+        break;
+      }
       case "summary": {
         const { resolvePath } = await import("./helpers.js");
         const { RESULTS_DEFAULT } = await import("./constants.js");
@@ -791,7 +985,7 @@ const main = async (): Promise<number> => {
         }
 
         if (useJson) {
-          printJson({
+          printJsonEnvelope("summary", {
             total_records: records.length,
             total_kept: totalKept,
             total_discarded: totalDiscarded,
@@ -832,7 +1026,7 @@ const main = async (): Promise<number> => {
         if (!grouped.verify) errors.push("Missing required: --verify");
         
         if (useJson) {
-          printJson({ valid: errors.length === 0, errors });
+          printJsonEnvelope("validate", { valid: errors.length === 0, errors });
           return errors.length > 0 ? 1 : 0;
         }
         
@@ -873,7 +1067,7 @@ const main = async (): Promise<number> => {
         }
         
         if (useJson) {
-          printJson({ state, results_count: results.length });
+          printJsonEnvelope("report", { state, results_count: results.length });
           break;
         }
         
@@ -908,6 +1102,44 @@ const main = async (): Promise<number> => {
               console.log(`- Best attempt: iteration ${formatMarkdownField(String(s.best_iteration))} — ${formatMarkdownField(bestChangeSummary.substring(0, 60))}`);
             }
           }
+        }
+        
+        // Milestone Progress
+        console.log(`\n## Milestone Progress`);
+        if (state.stats) {
+          const s = state.stats;
+          const total = s.total_iterations;
+          const successRate = total > 0 ? ((s.kept / total) * 100).toFixed(1) : "0";
+          console.log(`- **Progress:** ${s.kept} kept / ${total} total iterations (${successRate}% success rate)`);
+          
+          if (state.iterations_cap) {
+            const progressPct = ((total / state.iterations_cap) * 100).toFixed(1);
+            console.log(`- **Cap:** ${total} / ${state.iterations_cap} iterations (${progressPct}% of cap)`);
+          }
+          
+          if (state.created_at) {
+            const startedAtMs = Date.parse(state.created_at);
+            const endedAtMs = state.updated_at ? Date.parse(state.updated_at) : Date.now();
+            if (!Number.isNaN(startedAtMs) && !Number.isNaN(endedAtMs) && endedAtMs >= startedAtMs) {
+              const elapsedMin = Math.round((endedAtMs - startedAtMs) / 1000 / 60);
+              console.log(`- **Elapsed:** ${elapsedMin} minutes`);
+            }
+          }
+          
+          // Next candidate
+          if (state.last_iteration && state.last_iteration.decision === "keep") {
+            console.log(`- **Next candidate:** Iteration ${state.last_iteration.iteration} (kept)`);
+          } else if (s.best_iteration) {
+            console.log(`- **Best candidate:** Iteration ${s.best_iteration}`);
+          }
+        }
+        
+        // Artifact pointers
+        console.log(`\n## Artifacts`);
+        console.log(`- State: \`${state.artifact_paths?.state || ".autoresearch/state.json"}\``);
+        console.log(`- Results: \`${state.artifact_paths?.results || "autoresearch-results.tsv"}\``);
+        if (grouped.repo) {
+          console.log(`- Repository: ${formatMarkdownField(grouped.repo as string)}`);
         }
         
         // Failed branches information
@@ -976,10 +1208,10 @@ const main = async (): Promise<number> => {
           break;
         }
         const memory = readFileSync(memoryPath, "utf-8");
-        const patterns = memory.match(/### Pattern: [^\n]+/g) ?? [];
+        const patterns = memory.match(/^### Pattern: [^\n]+/gm) ?? [];
         const suggestions = patterns.map(parseMemoryPatternHeading);
         if (useJson) {
-          printJson({ patterns_found: suggestions.length, suggestions });
+          printJsonEnvelope("suggest", { patterns_found: suggestions.length, suggestions });
           break;
         }
         console.log("Memory Patterns — candidate next goals:");
@@ -1127,7 +1359,7 @@ const main = async (): Promise<number> => {
           grouped["fresh-start"] === "true",
         );
         writeFileSync(launchPath, JSON.stringify({ run_id: state.run_id, goal: state.goal, mode: "background" }, null, 2) + "\n", "utf-8");
-        printJson({ status: "launched", run_id: state.run_id, launch_path: launchPath });
+        printJsonEnvelope("launch", { status: "launched", run_id: state.run_id, launch_path: launchPath });
         break;
       }
       case "complete": {
@@ -1137,7 +1369,7 @@ const main = async (): Promise<number> => {
         }
         const { completeRun } = await import("./run-manager.js");
         const state = await completeRun(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
-        printJson({ status: "completed", run_id: state.run_id });
+        printJsonEnvelope("complete", { status: "completed", run_id: state.run_id });
         break;
       }
       case "stop": {
@@ -1147,7 +1379,7 @@ const main = async (): Promise<number> => {
         }
         const { setStopRequested } = await import("./run-manager.js");
         const state = await setStopRequested(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
-        printJson({ status: "stop_requested", run_id: state.run_id });
+        printJsonEnvelope("stop", { status: "stop_requested", run_id: state.run_id });
         break;
       }
       case "resume": {
@@ -1157,7 +1389,7 @@ const main = async (): Promise<number> => {
         }
         const { resumeBackgroundRun } = await import("./run-manager.js");
         const state = await resumeBackgroundRun(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
-        printJson({ status: "resumed", run_id: state.run_id });
+        printJsonEnvelope("resume", { status: "resumed", run_id: state.run_id });
         break;
       }
       case "record": {
@@ -1231,7 +1463,7 @@ const main = async (): Promise<number> => {
            grouped["state-path"] as string | undefined,
          );
          if (useJson) {
-           printJson(digest);
+           printJsonEnvelope("digest", digest);
          } else {
            console.log(`# Auto Research Digest`);
            console.log(`\n**Run ID:** ${formatMarkdownField(digest.run_id || "—")}`);
@@ -1273,7 +1505,7 @@ const main = async (): Promise<number> => {
            if (digest.flags && Object.keys(digest.flags).length > 0) {
              console.log(`\n## Flags`);
              for (const [key, value] of Object.entries(digest.flags)) {
-               console.log(`- ${key}: ${formatMarkdownField(value)}`);
+               console.log(`- ${formatMarkdownField(key)}: ${formatMarkdownField(value)}`);
              }
            }
          }
@@ -1304,6 +1536,7 @@ const main = async (): Promise<number> => {
         const installedInfo = installedPath ? getInstalledPackageInfo(PACKAGE_NAME) : null;
         const updateCache = readUpdateCache();
 
+        const { skip: updateSkipped, reason: skipReason } = shouldSkipUpdateCheck(process.argv.slice(2));
         const updateStatus = {
           cache_exists: updateCache !== null,
           last_check: updateCache?.last_check || null,
@@ -1311,6 +1544,8 @@ const main = async (): Promise<number> => {
           latest_version: updateCache?.latest_version || null,
           update_available: updateCache?.update_available || false,
           update_disabled: process.env.AUTORESEARCH_NO_UPDATE === "1",
+          skipped: updateSkipped,
+          skip_reason: skipReason,
         };
 
         if (useJson) {
@@ -1349,7 +1584,9 @@ const main = async (): Promise<number> => {
         console.log("");
 
         console.log("Update:");
-        if (updateCache) {
+        if (updateSkipped) {
+          console.log(`  Skipped:    yes (${skipReason})`);
+        } else if (updateCache) {
           console.log(`  Last check: ${updateCache.last_check}`);
           console.log(`  Current:    ${updateCache.current_version}`);
           console.log(`  Latest:     ${updateCache.latest_version}`);
@@ -1572,6 +1809,42 @@ const main = async (): Promise<number> => {
         }
         break;
       }
+      case "leaderboard": {
+        const { generateLeaderboard, formatLeaderboardMarkdown } = await import("./leaderboard.js");
+        const { resolveRepo } = await import("./helpers.js");
+        const repo = resolveRepo(grouped.repo as string | undefined);
+        const leaderboard = generateLeaderboard(repo);
+
+        if (useJson) {
+          printJsonEnvelope("leaderboard", leaderboard);
+          break;
+        }
+
+        if (leaderboard.entries.length === 0) {
+          console.log("No runs found. Complete some runs to see the leaderboard.");
+          break;
+        }
+
+        if (grouped.format === "markdown") {
+          console.log(formatLeaderboardMarkdown(leaderboard));
+        } else {
+          console.log("Auto Research Leaderboard");
+          console.log("=========================");
+          console.log("");
+          for (const entry of leaderboard.entries) {
+            console.log(`Run:      ${entry.run_id}`);
+            console.log(`Goal:     ${entry.goal}`);
+            console.log(`Metric:   ${entry.metric} (${entry.direction})`);
+            console.log(`Results:  ${entry.total_iterations} iterations (${entry.kept} kept, ${entry.discarded} discarded)`);
+            console.log(`Success:  ${entry.success_rate}`);
+            if (entry.best_value) console.log(`Best:     ${entry.best_value}`);
+            if (entry.runtime_seconds) console.log(`Runtime:  ${Math.round(entry.runtime_seconds / 60)}m`);
+            console.log("");
+          }
+          console.log(`Total: ${leaderboard.summary.total_runs} runs, ${leaderboard.summary.total_iterations} iterations, ${leaderboard.summary.overall_success_rate} success rate`);
+        }
+        break;
+      }
       default: {
         console.error(`Unknown command: ${cmd}`);
         console.error("Run 'autoresearch --help' for usage.");
@@ -1579,7 +1852,13 @@ const main = async (): Promise<number> => {
       }
     }
   } catch (exc) {
-    console.error((exc as Error).message);
+    const { categorizeError, formatStructuredError } = await import("./error-categories.js");
+    const structured = categorizeError(exc);
+    if (useJson) {
+      console.error(formatStructuredError(structured, true));
+    } else {
+      console.error(formatStructuredError(structured, false));
+    }
     return 2;
   }
   return 0;
