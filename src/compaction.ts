@@ -95,12 +95,12 @@ export function planCompaction(
         newestLogFile = logFile;
       }
     }
+    const preservedLogs = new Set<string>(["worker.log"]);
+    if (newestLogFile) preservedLogs.add(newestLogFile);
     logFiles.forEach((logFile) => {
       const logPath = join(logsDir, logFile);
-      if (logFile === "worker.log" || logFile === newestLogFile) {
-        if (!plan.filesToPreserve.includes(logPath)) {
-          plan.filesToPreserve.push(logPath);
-        }
+      if (preservedLogs.has(logFile)) {
+        plan.filesToPreserve.push(logPath);
         return;
       }
       const size = getFileSize(logPath);

@@ -768,12 +768,28 @@ const main = async (): Promise<number> => {
         break;
       }
       case "contract": {
+        const contractSchemaVersion = "1.0.0";
         const schemas = {
-          schema_version: "1.0.0",
+          schema_version: contractSchemaVersion,
           description: "Auto Research runtime contract schemas",
           state: {
             type: "object",
-            required: ["schema_version", "run_id", "created_at", "updated_at", "status", "mode", "goal", "scope", "metric", "verify", "label_requirements", "artifact_paths", "stats", "flags"],
+            required: [
+              "schema_version",
+              "run_id",
+              "created_at",
+              "updated_at",
+              "status",
+              "mode",
+              "goal",
+              "scope",
+              "metric",
+              "verify",
+              "label_requirements",
+              "artifact_paths",
+              "stats",
+              "flags",
+            ],
             properties: {
               schema_version: { type: "number", description: "State schema version" },
               run_id: { type: "string", description: "Unique run identifier" },
@@ -899,7 +915,7 @@ const main = async (): Promise<number> => {
         console.log("==============================");
         console.log("");
         console.log("State Schema:");
-        console.log(`  Version:    ${schemas.schema_version}`);
+        console.log(`  Version:    ${contractSchemaVersion}`);
         console.log(`  Required:   ${schemas.state.required.join(", ")}`);
         console.log("");
         console.log("Result Row Schema:");
