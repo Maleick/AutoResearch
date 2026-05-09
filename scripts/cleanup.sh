@@ -8,10 +8,12 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 echo "AutoResearch cleanup starting..."
 
 # Clean old experiment outputs (>7 days)
-find "$REPO_ROOT/experiments" -maxdepth 2 -type d -mtime +7 2>/dev/null | while read -r dir; do
-  rm -rf "$dir"
-  echo "removed old experiment: $(basename "$dir")"
-done
+if [[ -d "$REPO_ROOT/experiments" ]]; then
+  find "$REPO_ROOT/experiments" -mindepth 1 -maxdepth 2 -type d -mtime +7 2>/dev/null | while read -r dir; do
+    rm -rf "$dir"
+    echo "removed old experiment: $(basename "$dir")"
+  done
+fi
 
 # Clean temporary research artifacts
 find "$REPO_ROOT/tmp" -maxdepth 1 -type f -mtime +3 2>/dev/null | while read -r f; do
