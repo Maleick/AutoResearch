@@ -766,7 +766,7 @@ const main = async (): Promise<number> => {
           description: "Auto Research runtime contract schemas",
           state: {
             type: "object",
-            required: ["schema_version", "run_id", "created_at", "updated_at", "status", "mode", "operating_mode", "goal", "scope", "metric", "verify", "label_requirements", "artifact_paths", "stats", "flags"],
+            required: ["schema_version", "run_id", "created_at", "updated_at", "status", "mode", "goal", "scope", "metric", "verify", "label_requirements", "artifact_paths", "stats", "flags"],
             properties: {
               schema_version: { type: "number", description: "State schema version" },
               run_id: { type: "string", description: "Unique run identifier" },
