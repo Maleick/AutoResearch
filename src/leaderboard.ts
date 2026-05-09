@@ -1,5 +1,46 @@
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
+import { sanitizeForTerminal } from "./helpers.js";
+
+const markdownInlineEscapes: Record<string, string> = {
+  "\\": "\\\\",
+  "`": "\\`",
+  "*": "\\*",
+  "_": "\\_",
+  "{": "\\{",
+  "}": "\\}",
+  "[": "\\[",
+  "]": "\\]",
+  "(": "\\(",
+  ")": "\\)",
+  "#": "\\#",
+  "+": "\\+",
+  "-": "\\-",
+  ".": "\\.",
+  "!": "\\!",
+  "|": "\\|",
+};
+
+const markdownHtmlEscapes: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+};
+
+function escapeMarkdownInline(value: unknown): string {
+  return sanitizeForTerminal(value ?? "")
+    .replace(/[&<>"]/g, (char) => markdownHtmlEscapes[char]!)
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .replace(/[\\`*_{}\[\]()#+\-.!|]/g, (char) => markdownInlineEscapes[char]!);
+}
+
+function escapeMarkdownTableCell(value: unknown): string {
+  const escaped = escapeMarkdownInline(value);
+  return escaped.length > 0 ? escaped : "—";
+}
 
 export interface LeaderboardEntry {
   run_id: string;
@@ -156,6 +197,28 @@ export function generateLeaderboard(repoPath: string): Leaderboard {
   };
 }
 
+export function formatLeaderboardText(leaderboard: Leaderboard): string {
+  const lines: string[] = [
+    "Auto Research Leaderboard",
+    "=========================",
+    "",
+  ];
+
+  for (const entry of leaderboard.entries) {
+    lines.push(`Run:      ${sanitizeForTerminal(entry.run_id)}`);
+    lines.push(`Goal:     ${sanitizeForTerminal(entry.goal)}`);
+    lines.push(`Metric:   ${sanitizeForTerminal(entry.metric)} (${sanitizeForTerminal(entry.direction)})`);
+    lines.push(`Results:  ${entry.total_iterations} iterations (${entry.kept} kept, ${entry.discarded} discarded)`);
+    lines.push(`Success:  ${sanitizeForTerminal(entry.success_rate)}`);
+    if (entry.best_value) lines.push(`Best:     ${sanitizeForTerminal(entry.best_value)}`);
+    if (entry.runtime_seconds) lines.push(`Runtime:  ${Math.round(entry.runtime_seconds / 60)}m`);
+    lines.push("");
+  }
+
+  lines.push(`Total: ${leaderboard.summary.total_runs} runs, ${leaderboard.summary.total_iterations} iterations, ${leaderboard.summary.overall_success_rate} success rate`);
+  return lines.join("\n");
+}
+
 export function formatLeaderboardMarkdown(leaderboard: Leaderboard): string {
   const lines: string[] = [
     "# Auto Research Leaderboard",
@@ -171,7 +234,7 @@ export function formatLeaderboardMarkdown(leaderboard: Leaderboard): string {
       ? `${Math.round(entry.runtime_seconds / 60)}m`
       : "—";
     lines.push(
-      `| ${entry.run_id} | ${entry.goal} | ${entry.metric} (${entry.direction}) | ${entry.total_iterations} | ${entry.kept} | ${entry.success_rate} | ${entry.best_value ?? "—"} | ${runtime} |`,
+      `| ${escapeMarkdownTableCell(entry.run_id)} | ${escapeMarkdownTableCell(entry.goal)} | ${escapeMarkdownTableCell(entry.metric)} (${escapeMarkdownTableCell(entry.direction)}) | ${entry.total_iterations} | ${entry.kept} | ${escapeMarkdownTableCell(entry.success_rate)} | ${escapeMarkdownTableCell(entry.best_value)} | ${runtime} |`,
     );
   }
 
