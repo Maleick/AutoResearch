@@ -510,13 +510,12 @@ export async function buildSupervisorSnapshot(
   } else if (state.max_debug_depth != null && (state.stats.debug_depth ?? 0) >= state.max_debug_depth) {
     decision = "stop";
     reason = "debug_depth_exhausted";
-  } else if (state.branch_failure_budget != null) {
-    const branchFailures = state.stats.branch_failures ?? {};
-    const anyBranchExhausted = Object.values(branchFailures).some((count) => count >= state.branch_failure_budget!);
-    if (anyBranchExhausted) {
-      decision = "stop";
-      reason = "branch_failure_budget_exhausted";
-    }
+  } else if (
+    state.branch_failure_budget != null
+    && Object.values(state.stats.branch_failures ?? {}).some((count) => count >= state.branch_failure_budget!)
+  ) {
+    decision = "stop";
+    reason = "branch_failure_budget_exhausted";
   } else if (state.status === "completed" || state.status === "stopped") {
     decision = "stop";
     reason = `state_${state.status}`;
