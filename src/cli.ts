@@ -407,7 +407,7 @@ const main = async (): Promise<number> => {
           stop_condition: grouped["stop-condition"] as string | undefined,
           rollback_strategy: grouped["rollback-strategy"] as string | undefined,
         };
-        printJson(buildSetupSummary(grouped.repo as string | undefined, config));
+        printJsonEnvelope("wizard", buildSetupSummary(grouped.repo as string | undefined, config));
         break;
       }
       case "init": {
@@ -1272,7 +1272,7 @@ const main = async (): Promise<number> => {
         };
         
         if (format === "json") {
-          console.log(JSON.stringify(exportData, null, 2));
+          printJsonEnvelope("export", exportData);
         } else if (format === "md" || format === "markdown") {
           console.log(`# Auto Research Export`);
           console.log(`\n**Run:** ${escapeMarkdownInline(exportData.state.run_id) || "—"}`);
@@ -1462,7 +1462,11 @@ const main = async (): Promise<number> => {
           scorerStatus,
           scoreComponents,
           );
-        printJson(state);
+        if (useJson) {
+          printJsonEnvelope("record", state);
+        } else {
+          printJson(state);
+        }
         break;
       }
        case "digest": {
@@ -1563,7 +1567,7 @@ const main = async (): Promise<number> => {
         };
 
         if (useJson) {
-          printJson({
+          printJsonEnvelope("doctor", {
             version: VERSION,
             skill_name: SKILL_NAME,
             runtime: `Node.js ${process.version}`,
@@ -1668,7 +1672,7 @@ const main = async (): Promise<number> => {
           }
           const doc = readGoalDoc(goalPath);
           if (useJson) {
-            printJson(doc);
+            printJsonEnvelope("goal", doc);
             break;
           }
           console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
@@ -1793,7 +1797,7 @@ const main = async (): Promise<number> => {
 
         if (isGoalDryRun) {
           if (useGoalJson) {
-            printJson({ ...result, dry_run: true });
+            printJsonEnvelope("goal", { ...result, dry_run: true });
           } else {
             console.log("[dry-run] Would write goal document to: " + goalPath);
             console.log("");
@@ -1810,7 +1814,7 @@ const main = async (): Promise<number> => {
         atomicWriteTextInRepo(goalGrouped.repo as string | undefined, goalPath, document);
 
         if (useGoalJson) {
-          printJson(result);
+          printJsonEnvelope("goal", result);
         } else {
           console.log(`✓ Goal definition written to ${goalPath}`);
           console.log(`  Goal:    ${result.goal ?? "(unset)"}`);
