@@ -1,7 +1,7 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
 import { execFileSync, spawnSync } from "child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, lstatSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const CLI = resolve(REPO_ROOT, "dist/cli.js");
@@ -173,6 +173,8 @@ describe("CLI: goal command", () => {
 
   afterEach(() => {
     try { rmSync(tmpDir, { recursive: true }); } catch {}
+    try { rmSync(tmpDir + "-victim", { force: true }); } catch {}
+    try { rmSync(tmpDir + "-outside", { force: true }); } catch {}
   });
 
   describe("goal help", () => {
@@ -276,17 +278,30 @@ describe("CLI: goal command", () => {
       rmSync(customPath, { force: true });
     });
 
-    it("does not follow a root GOAL.md symlink when using the default path", () => {
+    it("does not follow a symlinked default GOAL.md", () => {
       mkdirSync(tmpDir, { recursive: true });
-      const outsidePath = resolve(tmpDir, "..", "outside-goal-target.md");
-      rmSync(outsidePath, { force: true });
-      symlinkSync(outsidePath, resolve(tmpDir, "GOAL.md"));
+      const outsidePath = tmpDir + "-victim";
+      writeFileSync(outsidePath, "original content\n", "utf-8");
+      symlinkSync(outsidePath, goalPath);
 
       runCLI(["goal", "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--repo", tmpDir]);
 
-      expect(existsSync(outsidePath)).toBe(false);
-      expect(existsSync(goalPath)).toBe(true);
+      expect(readFileSync(outsidePath, "utf-8")).toBe("original content\n");
+      expect(lstatSync(goalPath).isSymbolicLink()).toBe(false);
+      expect(readFileSync(goalPath, "utf-8")).toContain("# Goal: test");
       rmSync(outsidePath, { force: true });
+    });
+
+    it("rejects goal paths that resolve outside the repository", () => {
+      mkdirSync(tmpDir, { recursive: true });
+      const outsidePath = tmpDir + "-outside";
+      const result = spawnSync(NODE, [CLI, "goal", "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--repo", tmpDir, "--goal-path", outsidePath], {
+        encoding: "utf-8",
+      });
+
+      expect(result.status).not.toBe(0);
+      expect((result.stdout ?? "") + (result.stderr ?? "")).toContain("Refusing to write outside repository");
+      expect(existsSync(outsidePath)).toBe(false);
     });
 
     it("includes guard in GOAL.md when provided", () => {

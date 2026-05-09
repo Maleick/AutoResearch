@@ -6,11 +6,20 @@ import {
   MemoryProvenance,
   RunState,
 } from "./types.js";
-import { existsSync, readFileSync, appendFileSync, writeFileSync } from "fs";
+import {
+  existsSync,
+  readFileSync,
+  appendFileSync,
+  lstatSync,
+  openSync,
+  writeSync,
+  closeSync,
+  constants as fsConstants,
+} from "fs";
+import { dirname, isAbsolute, parse, relative, resolve, sep } from "path";
 import {
   utcNow,
   ensureParent,
-  resolvePath,
   AutoresearchError,
 } from "./helpers.js";
 import {
@@ -303,22 +312,109 @@ export function writeMemoryFile(
     })
     .join("---\n\n");
 
-  ensureParent(memoryPath);
-  writeFileSync(memoryPath, content, "utf-8");
+  writeMemoryFileSafely(memoryPath, content);
 }
 
 export function getMemoryFilePath(
   repo: string | undefined,
   memoryPathValue: string | undefined
 ): string {
-  return resolvePath(repo, memoryPathValue, MEMORY_DEFAULT);
+  return resolvePathWithinRepo(repo, memoryPathValue, MEMORY_DEFAULT);
 }
 
 export function getAuditLogPath(
   repo: string | undefined,
   auditPathValue: string | undefined
 ): string {
-  return resolvePath(repo, auditPathValue, MEMORY_AUDIT_DEFAULT);
+  return resolvePathWithinRepo(repo, auditPathValue, MEMORY_AUDIT_DEFAULT);
+}
+
+function sanitizeMemoryText(value: unknown): string {
+  return String(value)
+    .replace(/`/g, "'")
+    .replace(/[\r\n\t]/g, (char) => {
+      switch (char) {
+        case "\r": return "\\r";
+        case "\n": return "\\n";
+        case "\t": return "\\t";
+        default: return " ";
+      }
+    })
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, " ");
+}
+
+function writeMemoryFileSafely(memoryPath: string, content: string): void {
+  const target = resolve(memoryPath);
+  assertPathContainsNoSymlinks(dirname(target));
+  ensureParent(target);
+  assertPathContainsNoSymlinks(target);
+
+  const flags = fsConstants.O_WRONLY
+    | fsConstants.O_CREAT
+    | fsConstants.O_TRUNC
+    | (fsConstants.O_NOFOLLOW ?? 0);
+  const fd = openSync(target, flags, 0o600);
+  try {
+    const buffer = Buffer.from(content, "utf-8");
+    let offset = 0;
+    while (offset < buffer.length) {
+      const bytesWritten = writeSync(fd, buffer, offset, buffer.length - offset);
+      if (bytesWritten <= 0) {
+        throw new AutoresearchError(
+          `Failed to write complete memory file: ${target}`
+        );
+      }
+      offset += bytesWritten;
+    }
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function assertPathContainsNoSymlinks(target: string): void {
+  const parsed = parse(target);
+  const relativeParts = target
+    .slice(parsed.root.length)
+    .split(sep)
+    .filter(Boolean);
+  let current = parsed.root;
+
+  for (const part of relativeParts) {
+    current = resolve(current, part);
+    if (!existsSync(current)) {
+      continue;
+    }
+    if (lstatSync(current).isSymbolicLink()) {
+      throw new AutoresearchError(
+        `Refusing to write memory file through symlink: ${current}`
+      );
+    }
+  }
+}
+
+function resolvePathWithinRepo(
+  repo: string | undefined,
+  value: string | undefined,
+  defaultName: string
+): string {
+  const repoRoot = resolve(repo ?? ".");
+  const target = value
+    ? (isAbsolute(value) ? resolve(value) : resolve(repoRoot, value))
+    : resolve(repoRoot, defaultName);
+
+  const repoRelativePath = relative(repoRoot, target);
+  if (
+    repoRelativePath === "" ||
+    repoRelativePath.startsWith(`..${sep}`) ||
+    repoRelativePath === ".." ||
+    isAbsolute(repoRelativePath)
+  ) {
+    throw new AutoresearchError(
+      `Memory path must stay within repository: ${target}`
+    );
+  }
+
+  return target;
 }
 
 export function readAuditLog(path: string): MemoryAuditLogEntry[] {
