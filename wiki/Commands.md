@@ -110,6 +110,8 @@ The `autoresearch` CLI provides background and foreground run control:
 ```mermaid
 flowchart LR
     A[autoresearch CLI] --> B[init]
+    A --> GA[goal]
+    GA --> GI[goal init]
     A --> C[wizard]
     A --> D[status]
     A --> E[launch]
@@ -121,6 +123,7 @@ flowchart LR
 ```
 
 - `autoresearch init` — Initialize a run
+- `autoresearch goal init` — Create a `GOAL.md` goal definition (interactive, flags, or stdin JSON)
 - `autoresearch wizard` — Generate setup summary
 - `autoresearch status` — Print run status
 - `autoresearch launch` — Launch background run
