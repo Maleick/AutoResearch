@@ -3,7 +3,7 @@ import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, rea
 import { resolve } from "path";
 import { execSync } from "child_process";
 import { MAX_DRAFTS } from "./constants.js";
-import { printJson, printJsonEnvelope, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo } from "./helpers.js";
+import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo } from "./helpers.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
@@ -458,11 +458,7 @@ const main = async (): Promise<number> => {
           config,
           grouped["fresh-start"] === "true",
         );
-        if (useJson) {
-          printJsonEnvelope("init", state);
-        } else {
-          printJson(state);
-        }
+        printJson(state);
         break;
       }
       case "status": {
@@ -473,7 +469,7 @@ const main = async (): Promise<number> => {
           grouped["state-path"] as string | undefined,
         );
         if (useJson) {
-          printJsonEnvelope("status", snapshot);
+          printJson(snapshot);
         } else {
           const s = snapshot;
           const stats = s.stats;
@@ -521,7 +517,7 @@ const main = async (): Promise<number> => {
         const flags = s.flags;
 
         if (useJson) {
-          printJsonEnvelope("explain", snapshot);
+          printJson(snapshot);
           break;
         }
 
@@ -586,7 +582,7 @@ const main = async (): Promise<number> => {
             }
             return obj;
           });
-          printJsonEnvelope("history", { count: records.length, records: parsed });
+          printJson({ count: records.length, records: parsed });
           break;
         }
         for (const r of records) {
@@ -627,7 +623,7 @@ const main = async (): Promise<number> => {
           const { rankComponents } = await import("./score-parser.js");
           const ranking = rankComponents(allParsed);
           if (useJson) {
-            printJsonEnvelope("scores", { count: allParsed.length, scores: allParsed.slice(-limit), ranking });
+            printJson({ count: allParsed.length, scores: allParsed.slice(-limit), ranking });
             break;
           }
           console.log("Component Rankings:");
@@ -662,7 +658,7 @@ const main = async (): Promise<number> => {
               return null;
             }
           }).filter(Boolean);
-          printJsonEnvelope("scores", { count: parsed.length, scores: parsed });
+          printJson({ count: parsed.length, scores: parsed });
           break;
         }
         console.log("Score History (latest " + Math.min(limit, records.length) + "):");
@@ -761,7 +757,7 @@ const main = async (): Promise<number> => {
         const percent = (normalized * 100).toFixed(1) + "%";
 
         if (useJson) {
-          printJsonEnvelope("score", {
+          printJson({
             score: scored.score,
             max: scored.max,
             normalized,
@@ -798,7 +794,7 @@ const main = async (): Promise<number> => {
         }
         const state = parseRunState(readJsonFile(statePath));
         if (useJson) {
-          printJsonEnvelope("config", {
+          printJson({
             goal: state.goal,
             mode: state.mode,
             metric: state.metric,
@@ -954,7 +950,7 @@ const main = async (): Promise<number> => {
         };
 
         if (useJson) {
-          printJsonEnvelope("contract", schemas);
+          printJson(schemas);
           break;
         }
 
@@ -999,7 +995,7 @@ const main = async (): Promise<number> => {
         }
 
         if (useJson) {
-          printJsonEnvelope("summary", {
+          printJson({
             total_records: records.length,
             total_kept: totalKept,
             total_discarded: totalDiscarded,
@@ -1040,7 +1036,7 @@ const main = async (): Promise<number> => {
         if (!grouped.verify) errors.push("Missing required: --verify");
         
         if (useJson) {
-          printJsonEnvelope("validate", { valid: errors.length === 0, errors });
+          printJson({ valid: errors.length === 0, errors });
           return errors.length > 0 ? 1 : 0;
         }
         
@@ -1081,7 +1077,7 @@ const main = async (): Promise<number> => {
         }
         
         if (useJson) {
-          printJsonEnvelope("report", { state, results_count: results.length });
+          printJson({ state, results_count: results.length });
           break;
         }
         
@@ -1225,7 +1221,7 @@ const main = async (): Promise<number> => {
         const patterns = memory.match(/^### Pattern: [^\n]+/gm) ?? [];
         const suggestions = patterns.map(parseMemoryPatternHeading);
         if (useJson) {
-          printJsonEnvelope("suggest", { patterns_found: suggestions.length, suggestions });
+          printJson({ patterns_found: suggestions.length, suggestions });
           break;
         }
         console.log("Memory Patterns — candidate next goals:");
@@ -1373,7 +1369,7 @@ const main = async (): Promise<number> => {
           grouped["fresh-start"] === "true",
         );
         writeFileSync(launchPath, JSON.stringify({ run_id: state.run_id, goal: state.goal, mode: "background" }, null, 2) + "\n", "utf-8");
-        printJsonEnvelope("launch", { status: "launched", run_id: state.run_id, launch_path: launchPath });
+        printJson({ status: "launched", run_id: state.run_id, launch_path: launchPath });
         break;
       }
       case "complete": {
@@ -1383,7 +1379,7 @@ const main = async (): Promise<number> => {
         }
         const { completeRun } = await import("./run-manager.js");
         const state = await completeRun(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
-        printJsonEnvelope("complete", { status: "completed", run_id: state.run_id });
+        printJson({ status: "completed", run_id: state.run_id });
         break;
       }
       case "stop": {
@@ -1393,7 +1389,7 @@ const main = async (): Promise<number> => {
         }
         const { setStopRequested } = await import("./run-manager.js");
         const state = await setStopRequested(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
-        printJsonEnvelope("stop", { status: "stop_requested", run_id: state.run_id });
+        printJson({ status: "stop_requested", run_id: state.run_id });
         break;
       }
       case "resume": {
@@ -1403,7 +1399,7 @@ const main = async (): Promise<number> => {
         }
         const { resumeBackgroundRun } = await import("./run-manager.js");
         const state = await resumeBackgroundRun(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
-        printJsonEnvelope("resume", { status: "resumed", run_id: state.run_id });
+        printJson({ status: "resumed", run_id: state.run_id });
         break;
       }
       case "record": {
@@ -1481,7 +1477,7 @@ const main = async (): Promise<number> => {
            grouped["state-path"] as string | undefined,
          );
          if (useJson) {
-           printJsonEnvelope("digest", digest);
+           printJson(digest);
          } else {
            console.log(`# Auto Research Digest`);
            console.log(`\n**Run ID:** ${formatMarkdownField(digest.run_id || "—")}`);
@@ -1834,7 +1830,7 @@ const main = async (): Promise<number> => {
         const leaderboard = generateLeaderboard(repo);
 
         if (useJson) {
-          printJsonEnvelope("leaderboard", leaderboard);
+          printJson(leaderboard);
           break;
         }
 
