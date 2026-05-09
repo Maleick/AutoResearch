@@ -466,4 +466,17 @@ describe("appendIteration", () => {
     expect(diskState.stats.kept).toBe(1);
     expect(diskState.stats.total_iterations).toBe(1);
   });
+
+  it("refuses to append score history through a symlink", async () => {
+    initState();
+    const outsideFile = resolve(TMP_DIR, "outside-score-history.jsonl");
+    writeFileSync(outsideFile, "ORIGINAL\n", "utf-8");
+    const scoreHistoryDir = resolve(stateDir, ".autoresearch");
+    mkdirSync(scoreHistoryDir, { recursive: true });
+    symlinkSync(outsideFile, resolve(scoreHistoryDir, "score-history.jsonl"));
+
+    await expect(mod.appendIteration(stateDir, "autoresearch-results.tsv", "state.json", "keep", "10", undefined, "pass", "pass", "", "blocked symlink", [], ""))
+      .rejects.toThrow("Refusing to write symlinked score history file");
+    expect(readFileSync(outsideFile, "utf-8")).toBe("ORIGINAL\n");
+  });
 });

@@ -15,8 +15,9 @@ import {
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
-import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
+import { writeFileSync, appendFileSync, existsSync, constants, lstatSync, openSync, fstatSync, closeSync, writeSync } from "fs";
 import { lstat, open } from "fs/promises";
+import { dirname } from "path";
 
 const MAX_RESULTS_BYTES = 10 * 1024 * 1024;
 
@@ -106,8 +107,7 @@ export async function appendIteration(
     verify_status: verifyStatus,
     guard_status: guardStatus,
   };
-  ensureParent(scoreHistoryPath);
-  appendFileSync(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "utf-8");
+  appendRegularFileNoFollow(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "score history");
 
   const newState: RunState = {
     ...state,
@@ -151,6 +151,56 @@ export async function appendIteration(
 
   atomicWriteJson(statePath, newState);
   return newState;
+}
+
+function appendRegularFileNoFollow(filePath: string, content: string, artifactName: string): void {
+  ensureParent(filePath);
+
+  const parentPath = dirname(filePath);
+  const parentStats = lstatSync(parentPath);
+  if (parentStats.isSymbolicLink()) {
+    throw new AutoresearchError(`Refusing to write ${artifactName} under symlinked directory: ${parentPath}`);
+  }
+  if (!parentStats.isDirectory()) {
+    throw new AutoresearchError(`Refusing to write ${artifactName} under non-directory path: ${parentPath}`);
+  }
+
+  try {
+    const pathStats = lstatSync(filePath);
+    if (pathStats.isSymbolicLink()) {
+      throw new AutoresearchError(`Refusing to write symlinked ${artifactName} file: ${filePath}`);
+    }
+    if (!pathStats.isFile()) {
+      throw new AutoresearchError(`Refusing to write non-regular ${artifactName} file: ${filePath}`);
+    }
+  } catch (err) {
+    if (err instanceof AutoresearchError) throw err;
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") throw err;
+  }
+
+  const noFollow = typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
+  const nonBlock = typeof constants.O_NONBLOCK === "number" ? constants.O_NONBLOCK : 0;
+  let fd: number | undefined;
+  try {
+    fd = openSync(filePath, constants.O_WRONLY | constants.O_CREAT | constants.O_APPEND | noFollow | nonBlock, 0o666);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ELOOP") {
+      throw new AutoresearchError(`Refusing to write symlinked ${artifactName} file: ${filePath}`);
+    }
+    throw err;
+  }
+
+  try {
+    const stats = fstatSync(fd);
+    if (!stats.isFile()) {
+      throw new AutoresearchError(`Refusing to write non-regular ${artifactName} file: ${filePath}`);
+    }
+    writeSync(fd, content, null, "utf-8");
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export function makeStatePayload(
