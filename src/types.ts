@@ -74,9 +74,22 @@ export interface LastIteration {
   stop_labels_satisfied: boolean;
   missing_keep_labels: string[];
   missing_stop_labels: string[];
+  id?: string;
+  parent_id?: string;
+  branch?: string;
+  stage?: string;
+  agent?: string;
 }
 
 export type OperatingMode = "converge" | "continuous" | "supervised";
+
+export interface ExperimentLineage {
+  id: string;
+  parent_id: string | null;
+  branch: string;
+  stage: string;
+  agent: string;
+}
 
 export interface RunState {
   schema_version: number;
@@ -107,6 +120,7 @@ export interface RunState {
   flags: RunFlags;
   last_iteration?: LastIteration;
   draft_pool?: DraftPoolConfig;
+  lineage?: ExperimentLineage;
 }
 
 export interface SupervisorSnapshot {
