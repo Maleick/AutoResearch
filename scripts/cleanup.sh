@@ -16,6 +16,15 @@ fi
 remove_path() {
   local path="$1"
   local label="$2"
+
+  case "$path" in
+    "$REPO_ROOT"/*) ;;
+    *)
+      echo "refusing to remove path outside repository: $path" >&2
+      return 1
+      ;;
+  esac
+
   if [[ "$APPLY" == true ]]; then
     rm -rf -- "$path"
     echo "removed $label: $(basename "$path")"
@@ -32,16 +41,16 @@ fi
 
 # Clean old experiment outputs (>7 days)
 if [[ -d "$REPO_ROOT/experiments" ]]; then
-  find "$REPO_ROOT/experiments" -mindepth 1 -maxdepth 2 -type d -mtime +7 2>/dev/null | while read -r dir; do
+  while IFS= read -r -d '' dir; do
     remove_path "$dir" "old experiment"
-  done
+  done < <(find "$REPO_ROOT/experiments" -mindepth 1 -maxdepth 2 -type d -mtime +7 -print0 2>/dev/null)
 fi
 
 # Clean temporary research artifacts
 if [[ -d "$REPO_ROOT/tmp" ]]; then
-  find "$REPO_ROOT/tmp" -maxdepth 1 -type f -mtime +3 2>/dev/null | while read -r f; do
+  while IFS= read -r -d '' f; do
     remove_path "$f" "old temp"
-  done
+  done < <(find "$REPO_ROOT/tmp" -maxdepth 1 -type f -mtime +3 -print0 2>/dev/null)
 fi
 
 # Clean node_modules/.cache if present
