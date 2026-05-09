@@ -215,7 +215,7 @@ export function formatLeaderboardText(leaderboard: Leaderboard): string {
     lines.push("");
   }
 
-  lines.push(`Total: ${leaderboard.summary.total_runs} runs, ${leaderboard.summary.total_iterations} iterations, ${leaderboard.summary.overall_success_rate} success rate`);
+  lines.push(`Total: ${leaderboard.summary.total_runs} runs, ${leaderboard.summary.total_iterations} iterations, ${sanitizeForTerminal(leaderboard.summary.overall_success_rate)} success rate`);
   return lines.join("\n");
 }
 
