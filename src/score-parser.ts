@@ -110,9 +110,9 @@ export interface ComponentDelta {
  * Result of ranking components for a run.
  */
 export interface ComponentRanking {
-  /** Components with the most negative delta (largest decreases), sorted descending by magnitude */
+  /** Components with the most negative delta (largest decreases), sorted ascending by delta value (most negative first) */
   top_negative: ComponentDelta[];
-  /** Components with the most positive delta (largest increases), sorted descending by magnitude */
+  /** Components with the most positive delta (largest increases), sorted descending by delta value (most positive first) */
   top_positive: ComponentDelta[];
 }
 

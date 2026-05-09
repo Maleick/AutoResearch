@@ -999,7 +999,7 @@ const main = async (): Promise<number> => {
           try {
             const parsed = JSON.parse(grouped["score-components"] as string);
             if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-              throw new Error("score-components must be a JSON object");
+              throw new Error('score-components must be a JSON object with string keys and numeric values, e.g., {"accuracy": 0.8, "coverage": 0.6}');
             }
             scoreComponents = parsed as Record<string, number>;
           } catch (e) {
