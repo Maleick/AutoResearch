@@ -1143,12 +1143,12 @@ const main = async (): Promise<number> => {
          } else {
            console.log(`# Auto Research Digest`);
            console.log(`\n**Run ID:** ${formatMarkdownField(digest.run_id || "—")}`);
-           console.log(`**Status:** ${formatMarkdownField(digest.status || "—")}`);
+            console.log(`**Status:** ${sanitizeForTerminal(digest.status || "—")}`);
            console.log(`**Mode:** ${formatMarkdownField(digest.mode || "—")}`);
            console.log(`**Goal:** ${formatMarkdownField(digest.goal || "—")}`);
            if (digest.metric) {
              const m = digest.metric;
-             console.log(`**Metric:** ${formatMarkdownField(m.name)} (${formatMarkdownField(m.direction)})`);
+              console.log(`**Metric:** ${sanitizeForTerminal(m.name)} (${sanitizeForTerminal(m.direction)})`);
              console.log(`  Best: ${formatMarkdownField(m.best || "—")} | Latest: ${formatMarkdownField(m.latest || "—")}`);
            }
            if (digest.stats) {
@@ -1168,7 +1168,7 @@ const main = async (): Promise<number> => {
              }
            }
            console.log(`\n## Next Action`);
-           console.log(`${formatMarkdownField(digest.next_action || "No specific next action recommended")}`);
+            console.log(`${sanitizeForTerminal(digest.next_action || "No specific next action recommended")}`);
            if (digest.blockers && digest.blockers.length > 0) {
              console.log(`\n## Blockers`);
              for (const blocker of digest.blockers) {
