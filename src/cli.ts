@@ -1246,7 +1246,7 @@ const main = async (): Promise<number> => {
            if (digest.flags && Object.keys(digest.flags).length > 0) {
              console.log(`\n## Flags`);
              for (const [key, value] of Object.entries(digest.flags)) {
-               console.log(`- ${key}: ${formatMarkdownField(value)}`);
+               console.log(`- ${formatMarkdownField(key)}: ${formatMarkdownField(value)}`);
              }
            }
          }
