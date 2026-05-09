@@ -469,4 +469,69 @@ describe("run-manager", () => {
       expect(snapshot2.reason).toBe("no_progress");
     });
   });
+
+  describe("debug budget enforcement", () => {
+    it("stops when max-debug-depth exhausted", async () => {
+      const { initializeRun, appendIteration, buildSupervisorSnapshot } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "debug critical bug",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+        max_debug_depth: 2,
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      await appendIteration(tmpDir, undefined, undefined, "discard", "10", undefined, "fail", "pass", "", "debug1", [], "");
+      const snapshot1 = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
+      expect(snapshot1.decision).toBe("relaunch");
+      expect(snapshot1.max_debug_depth).toBe(2);
+      await appendIteration(tmpDir, undefined, undefined, "discard", "10", undefined, "fail", "pass", "", "debug2", [], "");
+      const snapshot2 = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
+      expect(snapshot2.decision).toBe("stop");
+      expect(snapshot2.reason).toBe("debug_depth_exhausted");
+      expect(snapshot2.budget_exhausted).toBe(true);
+    });
+
+    it("stops when branch-failure-budget exhausted", async () => {
+      const { initializeRun, appendIteration, buildSupervisorSnapshot } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "debug critical bug",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+        branch_failure_budget: 2,
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      await appendIteration(tmpDir, undefined, undefined, "discard", "10", undefined, "fail", "pass", "", "branch1", [], "");
+      const snapshot1 = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
+      expect(snapshot1.decision).toBe("relaunch");
+      expect(snapshot1.branch_failure_budget).toBe(2);
+      await appendIteration(tmpDir, undefined, undefined, "discard", "10", undefined, "fail", "pass", "", "branch2", [], "");
+      const snapshot2 = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
+      expect(snapshot2.decision).toBe("stop");
+      expect(snapshot2.reason).toBe("branch_failure_budget_exhausted");
+      expect(snapshot2.budget_exhausted).toBe(true);
+    });
+
+    it("initializes debug stats to zero", async () => {
+      const { initializeRun, buildSupervisorSnapshot } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+        max_debug_depth: 5,
+        branch_failure_budget: 3,
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      const snapshot = await buildSupervisorSnapshot(tmpDir, undefined, undefined);
+      expect(snapshot.max_debug_depth).toBe(5);
+      expect(snapshot.branch_failure_budget).toBe(3);
+      expect(snapshot.stats.debug_depth).toBe(0);
+      expect(snapshot.stats.branch_failures).toBe(0);
+    });
+  });
 });

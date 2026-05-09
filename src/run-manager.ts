@@ -178,10 +178,26 @@ export async function appendIteration(
   } else if (effectiveDecision === "discard") {
     newState.stats.discarded = newState.stats.discarded + 1;
     newState.stats.consecutive_discards = newState.stats.consecutive_discards + 1;
+    if (state.mode === "debug" || state.mode === "fix" || state.max_debug_depth != null) {
+      newState.stats.debug_depth = (state.stats.debug_depth ?? 0) + 1;
+    }
   } else if (effectiveDecision === "needs_human") {
     newState.stats.needs_human = newState.stats.needs_human + 1;
     newState.flags.needs_human = true;
     newState.stats.consecutive_discards = 0;
+  }
+
+  if (state.branch_failure_budget != null && decision === "discard") {
+    const activeBranch = state.draft_pool?.active_drafts?.find((b) => b.status === "running");
+    const branchId = activeBranch?.branch_id ?? "main";
+    const branchFailures = { ...(state.stats.branch_failures ?? {}) };
+    branchFailures[branchId] = (branchFailures[branchId] ?? 0) + 1;
+    newState.stats.branch_failures = branchFailures;
+
+    if (branchFailures[branchId] >= state.branch_failure_budget) {
+      newState.budget_exhausted = true;
+      newState.budget_blocker_reason = `Branch ${branchId} exceeded failure budget of ${state.branch_failure_budget}`;
+    }
   }
 
   newState.last_iteration = {
@@ -339,6 +355,8 @@ export function makeStatePayload(
       needs_human: 0,
       consecutive_discards: 0,
       best_iteration: undefined,
+      debug_depth: 0,
+      branch_failures: {} as Record<string, number>,
     },
     flags: {
       stop_requested: false,
@@ -349,6 +367,9 @@ export function makeStatePayload(
     subagent_pool: subagentPool,
     continuation_policy: continuationPolicy,
     draft_pool: draftPool,
+    max_debug_depth: config.max_debug_depth,
+    branch_failure_budget: config.branch_failure_budget,
+    budget_exhausted: false,
     lineage: {
       id: `exp-${runId}`,
       parent_id: null,
@@ -486,6 +507,16 @@ export async function buildSupervisorSnapshot(
   } else if (state.max_no_progress != null && state.stats.consecutive_discards >= state.max_no_progress) {
     decision = "stop";
     reason = "no_progress";
+  } else if (state.max_debug_depth != null && (state.stats.debug_depth ?? 0) >= state.max_debug_depth) {
+    decision = "stop";
+    reason = "debug_depth_exhausted";
+  } else if (state.branch_failure_budget != null) {
+    const branchFailures = state.stats.branch_failures ?? {};
+    const anyBranchExhausted = Object.values(branchFailures).some((count) => count >= state.branch_failure_budget!);
+    if (anyBranchExhausted) {
+      decision = "stop";
+      reason = "branch_failure_budget_exhausted";
+    }
   } else if (state.status === "completed" || state.status === "stopped") {
     decision = "stop";
     reason = `state_${state.status}`;
@@ -501,7 +532,10 @@ export async function buildSupervisorSnapshot(
     goal: state.goal,
     metric: state.metric,
     instrument_metric: state.instrument_metric,
-    stats: state.stats,
+    stats: {
+      ...state.stats,
+      branch_failures: Object.values(state.stats.branch_failures ?? {}).reduce((total, count) => total + count, 0),
+    } as unknown as RunState["stats"],
     last_iteration: state.last_iteration,
     results_rows: resultsRows,
     artifact_paths: state.artifact_paths,
@@ -510,6 +544,10 @@ export async function buildSupervisorSnapshot(
     subagent_pool: state.subagent_pool,
     continuation_policy: state.continuation_policy,
     draft_pool: state.draft_pool,
+    max_debug_depth: state.max_debug_depth,
+    branch_failure_budget: state.branch_failure_budget,
+    budget_exhausted: state.budget_exhausted || reason === "debug_depth_exhausted" || reason === "branch_failure_budget_exhausted",
+    budget_blocker_reason: state.budget_blocker_reason,
   };
 }
 

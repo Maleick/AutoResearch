@@ -54,9 +54,13 @@ const usage = (): void => {
   console.error("  --scope         In-scope files or subsystem");
   console.error("  --iterations    Iteration cap");
   console.error("  --max-no-progress  Max consecutive discards before stop");
+  console.error("  --max-debug-depth  Max debug loop depth before stop");
+  console.error("  --branch-failure-budget  Max failures per branch before stop");
   console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
   console.error(`  --num-drafts    Number of parallel drafts (default: 1, max: ${MAX_DRAFTS})`);
   console.error("  --branch-policy Branch selection policy: best, roulette, diverse");
+  console.error("  --max-debug-depth   Max debug experiment depth before stop");
+  console.error("  --branch-failure-budget  Per-branch failure budget before stop");
   console.error("  --json          Output raw JSON (default: human-readable)");
   console.error("  --results-path  Custom results TSV path");
   console.error("  --state-path    Custom state JSON path");
@@ -349,6 +353,8 @@ const main = async (): Promise<number> => {
           outcome_direction: grouped["outcome-direction"] as string | undefined,
           instrument_metric: grouped["instrument-metric"] as string | undefined,
           instrument_direction: grouped["instrument-direction"] as string | undefined,
+          max_debug_depth: parsePositiveInt(grouped["max-debug-depth"] as string | undefined, "max_debug_depth"),
+          branch_failure_budget: parsePositiveInt(grouped["branch-failure-budget"] as string | undefined, "branch_failure_budget"),
         };
         const state = await initializeRun(
           grouped.repo as string | undefined,
@@ -1062,6 +1068,8 @@ const main = async (): Promise<number> => {
           scorer: grouped.scorer as string | undefined,
           iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
           max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
+          max_debug_depth: parsePositiveInt(grouped["max-debug-depth"] as string | undefined, "max_debug_depth"),
+          branch_failure_budget: parsePositiveInt(grouped["branch-failure-budget"] as string | undefined, "branch_failure_budget"),
           duration: grouped.duration as string | undefined,
           memory_path: grouped["memory-path"] as string | undefined,
           required_keep_labels: grouped["required-keep-labels"] as string[] | undefined,
