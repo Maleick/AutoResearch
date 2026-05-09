@@ -1,7 +1,7 @@
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { execFileSync, execSync } from "child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const CLI = resolve(REPO_ROOT, "dist/cli.js");
@@ -890,6 +890,21 @@ describe("CLI Commands", () => {
       const out = execFileSync("node", [CLI, "scores", "--top-components", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("No component data found");
     });
+
+    it("refuses to read top-components score history symlinks", () => {
+      const targetPath = resolve(tmpDir, "outside-score-history.jsonl");
+      writeFileSync(targetPath, JSON.stringify({ score_components: { accuracy: 1 } }) + "\n", "utf-8");
+      rmSync(scoreHistoryPath);
+      symlinkSync(targetPath, scoreHistoryPath);
+
+      expect(() => execFileSync("node", [CLI, "scores", "--top-components", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT })).toThrow(/Refusing to read score history symlink/);
+    });
+
+    it("refuses to read oversized top-components score history", () => {
+      writeFileSync(scoreHistoryPath, " ".repeat((10 * 1024 * 1024) + 1), "utf-8");
+
+      expect(() => execFileSync("node", [CLI, "scores", "--top-components", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT })).toThrow(/Score history is too large to read safely/);
+    });
   });
 
   describe("record command with score-components", () => {
@@ -1286,67 +1301,29 @@ describe("CLI Commands", () => {
       try { rmSync(tmpDir, { recursive: true }); } catch {}
     });
 
+    it("errors when missing --once flag", () => {
+      expect(() => {
+        execSync(`node ${CLI} worker --repo ${tmpDir}`, { encoding: "utf-8", stdio: "pipe" });
+      }).toThrow();
+    });
+
+    it("exits non-zero when no state exists", () => {
+      expect(() => {
+        execSync(`node ${CLI} worker --once --repo ${tmpDir}`, { encoding: "utf-8", stdio: "pipe" });
+      }).toThrow();
+    });
+
     it("reports not ready when no state exists", () => {
+      let threw = false;
       try {
-        execSync(`node ${CLI} worker --once --repo ${tmpDir}`, { encoding: "utf-8" });
+        execSync(`node ${CLI} worker --once --repo ${tmpDir}`, { encoding: "utf-8", stdio: "pipe" });
       } catch (e) {
-        const stdout = (e as { stdout?: Buffer }).stdout?.toString() ?? "";
+        threw = true;
+        const stdout = (e as { stdout?: string }).stdout ?? "";
         expect(stdout).toContain("Not ready");
         expect(stdout).toContain("No run state found");
       }
-    });
-
-    it("exits non-zero when no state exists", () => {
-      expect(() => {
-        execSync(`node ${CLI} worker --once --repo ${tmpDir}`, { encoding: "utf-8", stdio: "pipe" });
-      }).toThrow();
-    });
-
-    it("reports ready when state is initialized", () => {
-      execSync(`node ${CLI} init --goal "test" --metric "tests" --verify "echo test" --repo ${tmpDir}`, { encoding: "utf-8" });
-      const out = execSync(`node ${CLI} worker --once --repo ${tmpDir}`, { encoding: "utf-8" });
-      expect(out).toContain("Ready");
-      expect(out).toContain("iteration 1");
-    });
-
-    it("outputs JSON envelope with --json flag", () => {
-      execSync(`node ${CLI} init --goal "test" --metric "tests" --verify "echo test" --repo ${tmpDir}`, { encoding: "utf-8" });
-      const out = execSync(`node ${CLI} worker --once --repo ${tmpDir} --json`, { encoding: "utf-8" });
-      const json = JSON.parse(out);
-      expect(json.ok).toBe(true);
-      expect(json.command).toBe("worker");
-      expect(json.data.ready).toBe(true);
-      expect(json.data.iteration).toBe(1);
-    });
-
-    it("reports not ready when stop is requested", () => {
-      execSync(`node ${CLI} launch --goal "test" --metric "tests" --verify "echo test" --repo ${tmpDir}`, { encoding: "utf-8" });
-      execSync(`node ${CLI} stop --repo ${tmpDir}`, { encoding: "utf-8" });
-      try {
-        execSync(`node ${CLI} worker --once --repo ${tmpDir}`, { encoding: "utf-8" });
-      } catch (e) {
-        const stdout = (e as { stdout?: Buffer }).stdout?.toString() ?? "";
-        expect(stdout).toContain("Not ready");
-        expect(stdout).toContain("Stop requested");
-      }
-    });
-
-    it("reports not ready when run is completed", () => {
-      execSync(`node ${CLI} init --goal "test" --metric "tests" --verify "echo test" --repo ${tmpDir}`, { encoding: "utf-8" });
-      execSync(`node ${CLI} complete --repo ${tmpDir}`, { encoding: "utf-8" });
-      try {
-        execSync(`node ${CLI} worker --once --repo ${tmpDir}`, { encoding: "utf-8" });
-      } catch (e) {
-        const stdout = (e as { stdout?: Buffer }).stdout?.toString() ?? "";
-        expect(stdout).toContain("Not ready");
-        expect(stdout).toContain("terminal");
-      }
-    });
-
-    it("exits non-zero when no state exists", () => {
-      expect(() => {
-        execSync(`node ${CLI} worker --once --repo ${tmpDir}`, { encoding: "utf-8", stdio: "pipe" });
-      }).toThrow();
+      if (!threw) throw new Error("Expected command to exit non-zero but it succeeded");
     });
 
     it("reports ready when state is initialized", () => {
@@ -1369,23 +1346,31 @@ describe("CLI Commands", () => {
     it("reports not ready when stop is requested", () => {
       execSync(`node ${CLI} init --goal "test" --metric "tests" --verify "echo test" --mode background --repo ${tmpDir}`, { encoding: "utf-8" });
       execSync(`node ${CLI} stop --repo ${tmpDir}`, { encoding: "utf-8" });
-      expect(() => {
+      let threw = false;
+      try {
         execSync(`node ${CLI} worker --once --repo ${tmpDir}`, { encoding: "utf-8", stdio: "pipe" });
-      }).toThrow();
+      } catch (e) {
+        threw = true;
+        const stdout = (e as { stdout?: string }).stdout ?? "";
+        expect(stdout).toContain("Not ready");
+        expect(stdout).toContain("Stop requested");
+      }
+      if (!threw) throw new Error("Expected command to exit non-zero but it succeeded");
     });
 
     it("reports not ready when run is completed", () => {
       execSync(`node ${CLI} init --goal "test" --metric "tests" --verify "echo test" --repo ${tmpDir}`, { encoding: "utf-8" });
       execSync(`node ${CLI} complete --repo ${tmpDir}`, { encoding: "utf-8" });
-      expect(() => {
+      let threw = false;
+      try {
         execSync(`node ${CLI} worker --once --repo ${tmpDir}`, { encoding: "utf-8", stdio: "pipe" });
-      }).toThrow();
-    });
-
-    it("errors when missing --once flag", () => {
-      expect(() => {
-        execSync(`node ${CLI} worker --repo ${tmpDir}`, { encoding: "utf-8", stdio: "pipe" });
-      }).toThrow();
+      } catch (e) {
+        threw = true;
+        const stdout = (e as { stdout?: string }).stdout ?? "";
+        expect(stdout).toContain("Not ready");
+        expect(stdout).toContain("terminal");
+      }
+      if (!threw) throw new Error("Expected command to exit non-zero but it succeeded");
     });
   });
 });

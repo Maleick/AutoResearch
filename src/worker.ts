@@ -1,5 +1,5 @@
 import { existsSync } from "fs";
-import { resolvePath, parseRunState, readJsonFile, utcNow } from "./helpers.js";
+import { resolvePath, parseRunState, readJsonFile } from "./helpers.js";
 import { STATE_DEFAULT } from "./constants.js";
 
 export interface WorkerOnceResult {
@@ -10,7 +10,6 @@ export interface WorkerOnceResult {
   goal: string;
   metric?: string;
   reason?: string;
-  checked_at: string;
 }
 
 export function workerOnce(
@@ -28,7 +27,6 @@ export function workerOnce(
       iteration: 0,
       goal: "(none)",
       reason: `No run state found at ${statePath}`,
-      checked_at: utcNow(),
     };
   }
 
@@ -44,7 +42,6 @@ export function workerOnce(
       iteration: state.stats.total_iterations ?? 0,
       goal: state.goal ?? "(none)",
       reason: `Run is terminal (${state.status})`,
-      checked_at: utcNow(),
     };
   }
 
@@ -56,7 +53,6 @@ export function workerOnce(
       iteration: state.stats.total_iterations ?? 0,
       goal: state.goal ?? "(none)",
       reason: "Stop requested",
-      checked_at: utcNow(),
     };
   }
 
@@ -70,7 +66,6 @@ export function workerOnce(
         iteration: state.stats.total_iterations ?? 0,
         goal: state.goal ?? "(none)",
         reason: `Deadline passed (${state.deadline_at})`,
-        checked_at: utcNow(),
       };
     }
   }
@@ -85,7 +80,6 @@ export function workerOnce(
       iteration: currentIter,
       goal: state.goal ?? "(none)",
       reason: `Iteration cap reached (${currentIter}/${iterCap})`,
-      checked_at: utcNow(),
     };
   }
 
@@ -99,6 +93,5 @@ export function workerOnce(
     goal: state.goal ?? "(none)",
     metric: state.metric ? `${state.metric.name || "metric"} (${state.metric.direction || "lower"})` : undefined,
     reason: undefined,
-    checked_at: utcNow(),
   };
 }
