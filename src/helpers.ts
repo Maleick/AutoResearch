@@ -1,5 +1,5 @@
-import { writeFileSync, mkdirSync, readFileSync, renameSync, unlinkSync, existsSync } from "fs";
-import { resolve, dirname, join } from "path";
+import { writeFileSync, mkdirSync, readFileSync, renameSync, unlinkSync, existsSync, realpathSync, openSync, closeSync, constants as fsConstants } from "fs";
+import { resolve, dirname, join, relative, basename, isAbsolute } from "path";
 import { execFileSync } from "child_process";
 import { PACKAGE_NAME } from "./constants.js";
 
@@ -48,6 +48,56 @@ function atomicWriteText(filePath: string, content: string): void {
   } catch {
     try { unlinkSync(tmp); } catch { /* ignore */ }
     throw new AutoresearchError("Failed to write " + filePath);
+  }
+}
+
+function isPathInside(parent: string, child: string): boolean {
+  const rel = relative(parent, child);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+function nearestExistingAncestor(pathName: string): string {
+  let current = pathName;
+  while (!existsSync(current)) {
+    const parent = dirname(current);
+    if (parent === current) return current;
+    current = parent;
+  }
+  return current;
+}
+
+export function atomicWriteTextInRepo(repo: string | undefined, filePath: string, content: string): void {
+  const repoRoot = realpathSync(resolveRepo(repo));
+  const targetPath = resolve(filePath);
+  const targetParent = dirname(targetPath);
+  const existingAncestor = nearestExistingAncestor(targetParent);
+  const existingAncestorReal = realpathSync(existingAncestor);
+
+  if (!isPathInside(repoRoot, existingAncestorReal)) {
+    throw new AutoresearchError("Refusing to write outside repository: " + targetPath);
+  }
+
+  mkdirSync(targetParent, { recursive: true });
+  const targetParentReal = realpathSync(targetParent);
+  if (!isPathInside(repoRoot, targetParentReal)) {
+    throw new AutoresearchError("Refusing to write outside repository: " + targetPath);
+  }
+
+  const tmp = join(targetParent, `.autoresearch-${basename(targetPath)}.${process.pid}.${Date.now()}.tmp`);
+  let fd: number | undefined;
+  try {
+    fd = openSync(tmp, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
+    writeFileSync(fd, content, "utf-8");
+    closeSync(fd);
+    fd = undefined;
+    renameSync(tmp, targetPath);
+  } catch (err) {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch { /* ignore */ }
+    }
+    try { unlinkSync(tmp); } catch { /* ignore */ }
+    if (err instanceof AutoresearchError) throw err;
+    throw new AutoresearchError("Failed to write " + targetPath + ": " + (err as Error).message);
   }
 }
 

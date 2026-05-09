@@ -2,7 +2,7 @@
 import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { MAX_DRAFTS } from "./constants.js";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc } from "./helpers.js";
+import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo } from "./helpers.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
@@ -1122,7 +1122,7 @@ const main = async (): Promise<number> => {
         const { GOAL_TEMPLATES, getGoalTemplate, buildGoalDocument, buildGoalInitResult } = await import("./goal-init.js");
         const { GOAL_DEFAULT } = await import("./constants.js");
         const { resolvePath } = await import("./helpers.js");
-        const { writeFileSync, existsSync: goalExistsSync } = await import("fs");
+        const { existsSync: goalExistsSync } = await import("fs");
 
         const templateId = (goalGrouped.template as string | undefined) ?? "custom";
         if (!GOAL_TEMPLATES.find((t) => t.id === templateId)) {
@@ -1231,7 +1231,7 @@ const main = async (): Promise<number> => {
           if (verbose) console.error(`[verbose] Overwriting existing ${goalPath}`);
         }
 
-        writeFileSync(goalPath, document, "utf-8");
+        atomicWriteTextInRepo(goalGrouped.repo as string | undefined, goalPath, document);
 
         if (useGoalJson) {
           printJson(result);
