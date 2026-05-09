@@ -37,6 +37,8 @@ export function buildSetupSummary(
   }
   if (config.iterations != null) stopReasons.push(`${config.iterations} iterations complete`);
   if (config.duration) stopReasons.push(`${config.duration} elapses`);
+  if (config.max_debug_depth != null) stopReasons.push(`${config.max_debug_depth} debug experiments exhausted`);
+  if (config.branch_failure_budget != null) stopReasons.push(`${config.branch_failure_budget} branch failures exhausted`);
 
   const questions: { id: string; prompt: string; reason: string }[] = [];
   if (!config.goal) questions.push({ id: "goal", prompt: "What outcome should this run optimize for?", reason: "The loop needs one concrete result to chase." });
@@ -62,5 +64,7 @@ export function buildSetupSummary(
     rollback_strategy: config.rollback_strategy ?? "discard current experiment and keep last verified state",
     missing_required: missingRequired,
     questions,
+    max_debug_depth: config.max_debug_depth,
+    branch_failure_budget: config.branch_failure_budget,
   };
 }
