@@ -1,5 +1,5 @@
-import { writeFileSync, mkdirSync, readFileSync, renameSync, unlinkSync, existsSync } from "fs";
-import { resolve, dirname, join } from "path";
+import { writeFileSync, mkdirSync, readFileSync, renameSync, unlinkSync, existsSync, realpathSync, openSync, closeSync, constants as fsConstants } from "fs";
+import { resolve, dirname, join, relative, basename, isAbsolute } from "path";
 import { execFileSync } from "child_process";
 import { PACKAGE_NAME } from "./constants.js";
 
@@ -48,6 +48,56 @@ function atomicWriteText(filePath: string, content: string): void {
   } catch {
     try { unlinkSync(tmp); } catch { /* ignore */ }
     throw new AutoresearchError("Failed to write " + filePath);
+  }
+}
+
+function isPathInside(parent: string, child: string): boolean {
+  const rel = relative(parent, child);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+function nearestExistingAncestor(pathName: string): string {
+  let current = pathName;
+  while (!existsSync(current)) {
+    const parent = dirname(current);
+    if (parent === current) return current;
+    current = parent;
+  }
+  return current;
+}
+
+export function atomicWriteTextInRepo(repo: string | undefined, filePath: string, content: string): void {
+  const repoRoot = realpathSync(resolveRepo(repo));
+  const targetPath = resolve(filePath);
+  const targetParent = dirname(targetPath);
+  const existingAncestor = nearestExistingAncestor(targetParent);
+  const existingAncestorReal = realpathSync(existingAncestor);
+
+  if (!isPathInside(repoRoot, existingAncestorReal)) {
+    throw new AutoresearchError("Refusing to write outside repository: " + targetPath);
+  }
+
+  mkdirSync(targetParent, { recursive: true });
+  const targetParentReal = realpathSync(targetParent);
+  if (!isPathInside(repoRoot, targetParentReal)) {
+    throw new AutoresearchError("Refusing to write outside repository: " + targetPath);
+  }
+
+  const tmp = join(targetParent, `.autoresearch-${basename(targetPath)}.${process.pid}.${Date.now()}.tmp`);
+  let fd: number | undefined;
+  try {
+    fd = openSync(tmp, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
+    writeFileSync(fd, content, "utf-8");
+    closeSync(fd);
+    fd = undefined;
+    renameSync(tmp, targetPath);
+  } catch (err) {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch { /* ignore */ }
+    }
+    try { unlinkSync(tmp); } catch { /* ignore */ }
+    if (err instanceof AutoresearchError) throw err;
+    throw new AutoresearchError("Failed to write " + targetPath + ": " + (err as Error).message);
   }
 }
 
@@ -105,6 +155,15 @@ export function normalizeResultStatus(value: string | undefined | null, fieldNam
   const normalized = value.trim().toLowerCase();
   if (!["pass", "fail", "skip"].includes(normalized)) {
     throw new AutoresearchError("Unsupported " + fieldName + ": " + value);
+  }
+  return normalized;
+}
+
+export function normalizeScorerStatus(value: string | undefined | null): string {
+  if (!value) return "ok";
+  const normalized = value.trim().toLowerCase();
+  if (!["ok", "ok-low-score", "scorer-broken"].includes(normalized)) {
+    throw new AutoresearchError("Unsupported scorer_status: " + value);
   }
   return normalized;
 }
@@ -214,7 +273,7 @@ export function countTsvDataRows(content: string): number {
   return lines.length > 1 ? lines.slice(1).filter((l) => l.trim()).length : 0;
 }
 
-import type { OperatingMode, RunState } from "./types.js";
+import type { GoalDoc, OperatingMode, RunState } from "./types.js";
 
 export function parseRunState(value: unknown): RunState {
   if (typeof value !== "object" || value === null) {
@@ -339,4 +398,57 @@ export function getInstalledPackageInfo(packageName: string): { version?: string
   } catch {
     return null;
   }
+}
+
+export function formatGoalDoc(doc: GoalDoc): string {
+  const field = (name: string, value: string | undefined): string =>
+    `## ${name}\n${value ?? ""}\n`;
+  return [
+    "# AutoResearch Goal",
+    "",
+    "<!-- autoresearch goal.md -->",
+    "",
+    field("goal", doc.goal),
+    field("metric", doc.metric),
+    field("direction", doc.direction),
+    field("verify", doc.verify),
+    field("guard", doc.guard),
+    field("constraints", doc.constraints),
+    field("file_map", doc.file_map),
+    field("stop_conditions", doc.stop_conditions),
+  ].join("\n");
+}
+
+export function parseGoalDocContent(content: string): GoalDoc {
+  const sections: Record<string, string> = {};
+  const parts = content.split(/^## /m);
+  for (const part of parts.slice(1)) {
+    const newlineIndex = part.indexOf("\n");
+    if (newlineIndex < 0) continue;
+    const heading = part.slice(0, newlineIndex).trim().toLowerCase();
+    const body = part.slice(newlineIndex + 1).trim();
+    sections[heading] = body;
+  }
+  return {
+    goal: sections["goal"] ?? "",
+    metric: sections["metric"] ?? "",
+    direction: sections["direction"] ?? "lower",
+    verify: sections["verify"] ?? "",
+    guard: sections["guard"] || undefined,
+    constraints: sections["constraints"] || undefined,
+    file_map: sections["file_map"] || undefined,
+    stop_conditions: sections["stop_conditions"] || undefined,
+  };
+}
+
+export function writeGoalDoc(filePath: string, doc: GoalDoc): void {
+  atomicWriteText(filePath, formatGoalDoc(doc) + "\n");
+}
+
+export function readGoalDoc(filePath: string): GoalDoc {
+  if (!existsSync(filePath)) {
+    throw new AutoresearchError("Missing file: " + filePath);
+  }
+  const content = readFileSync(filePath, "utf-8");
+  return parseGoalDocContent(content);
 }
