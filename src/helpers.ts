@@ -350,6 +350,31 @@ export function parseRunState(value: unknown): RunState {
     throw new AutoresearchError("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
   }
 
+  if (obj.draft_pool !== undefined && obj.draft_pool !== null) {
+    if (typeof obj.draft_pool !== "object" || Array.isArray(obj.draft_pool)) {
+      throw new AutoresearchError("Invalid state: draft_pool must be an object");
+    }
+    const draftPool = obj.draft_pool as Record<string, unknown>;
+    if (!Array.isArray(draftPool.active_drafts)) {
+      throw new AutoresearchError("Invalid state: draft_pool.active_drafts must be an array");
+    }
+    for (const draft of draftPool.active_drafts) {
+      if (typeof draft !== "object" || draft === null || Array.isArray(draft)) {
+        throw new AutoresearchError("Invalid state: draft_pool.active_drafts entries must be objects");
+      }
+    }
+  }
+
+  if (obj.last_iteration !== undefined && obj.last_iteration !== null) {
+    if (typeof obj.last_iteration !== "object" || Array.isArray(obj.last_iteration)) {
+      throw new AutoresearchError("Invalid state: last_iteration must be an object");
+    }
+    const lastIteration = obj.last_iteration as Record<string, unknown>;
+    if (lastIteration.note !== undefined && typeof lastIteration.note !== "string") {
+      throw new AutoresearchError("Invalid state: last_iteration.note must be a string");
+    }
+  }
+
   return {
     ...obj,
     operating_mode,
