@@ -800,6 +800,12 @@ describe("CLI Commands", () => {
       expect(() => {
         execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"__proto__":"best"}', "--repo", tmpDir], { encoding: "utf-8" });
       }).toThrow(/not a valid draft ID/);
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"constructor":"best"}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/not a valid draft ID/);
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"prototype":"best"}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/not a valid draft ID/);
     });
 
     it("rejects empty-string values in branch policy overrides", () => {

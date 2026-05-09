@@ -315,11 +315,12 @@ const normalizeBranchPolicy = (value: string | undefined): BranchPolicy => {
 const PROTO_POISON_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 const normalizeOverrideBranchPolicy = (branchId: string, value: string): BranchPolicy => {
-  if (value.trim() === "") {
+  const trimmed = value.trim();
+  if (trimmed === "") {
     throw new Error(`Invalid branch policy override for ${branchId}: value must not be empty`);
   }
-  if ((BRANCH_POLICIES as readonly string[]).includes(value)) return value as BranchPolicy;
-  throw new Error(`Invalid branch policy override for ${branchId}: "${value}" is not one of: ${BRANCH_POLICIES.join(", ")}`);
+  if ((BRANCH_POLICIES as readonly string[]).includes(trimmed)) return trimmed as BranchPolicy;
+  throw new Error(`Invalid branch policy override for ${branchId}: "${trimmed}" is not one of: ${BRANCH_POLICIES.join(", ")}`);
 };
 
 const parseBranchPolicyOverrides = (value: string | undefined): Record<string, BranchPolicy> | undefined => {
