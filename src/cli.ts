@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
+import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { MAX_DRAFTS } from "./constants.js";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
+import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, ensureParent } from "./helpers.js";
+import { pickBadgeColor, renderBadgeMarkdown, renderBadgeSvg, slugifyBadgeToken } from "./badge.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
@@ -20,6 +21,7 @@ const usage = (): void => {
   console.error("  explain    Human-readable run state");
   console.error("  history    Show recent iteration log");
   console.error("  scores     Show score trend history");
+  console.error("  badge      Generate score badge markdown + SVG");
   console.error("  config     Show runtime configuration");
   console.error("  summary    Aggregate stats across runs");
   console.error("  suggest    Suggest next goal from memory");
@@ -67,6 +69,7 @@ const usage = (): void => {
   console.error("  autoresearch status");
   console.error("  autoresearch explain");
   console.error("  autoresearch history");
+  console.error("  autoresearch badge --type score");
 };
 
 const parseArgs = (args: string[]): Record<string, string> => {
@@ -538,6 +541,113 @@ const main = async (): Promise<number> => {
         console.log(`\nShowing ${records.length} score records.`);
         break;
       }
+      case "badge": {
+        const { resolvePath, AutoresearchError } = await import("./helpers.js");
+        const { SCORE_HISTORY_DEFAULT } = await import("./constants.js");
+        const scoreHistoryPath = resolvePath(grouped.repo as string | undefined, grouped["score-history-path"] as string | undefined, SCORE_HISTORY_DEFAULT);
+        if (!existsSync(scoreHistoryPath)) {
+          console.log("No score history found.");
+          break;
+        }
+
+        const lines = readTailLines(scoreHistoryPath, 50);
+        let latestRecord: Record<string, unknown> | null = null;
+        for (let i = lines.length - 1; i >= 0; i -= 1) {
+          try {
+            const parsed = JSON.parse(lines[i] as string) as unknown;
+            if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+              latestRecord = parsed as Record<string, unknown>;
+              break;
+            }
+          } catch {
+            // Continue scanning for the latest valid JSON object.
+          }
+        }
+        if (!latestRecord) {
+          throw new AutoresearchError("No valid score records found.");
+        }
+
+        const parseNumber = (value: unknown): number | null => {
+          if (typeof value === "number") return Number.isFinite(value) ? value : null;
+          if (typeof value === "string" && value.trim().length > 0) {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+          }
+          return null;
+        };
+
+        const inferRatio = (value: number, maxValue: number | null): number | null => {
+          if (maxValue !== null && maxValue > 0) return value / maxValue;
+          if (value >= 0 && value <= 1) return value;
+          if (value >= 0 && value <= 100) return value / 100;
+          return null;
+        };
+
+        const badgeType = (grouped.type as string | undefined) ?? "score";
+        if (badgeType !== "score" && badgeType !== "component") {
+          throw new AutoresearchError("Unsupported badge type: " + badgeType + ". Valid: score, component");
+        }
+
+        let label = (grouped.label as string | undefined) ?? "score";
+        let valueText = "";
+        let ratio: number | null = null;
+        let markdownDefault = ".autoresearch/score-badge.md";
+        let svgDefault = ".autoresearch/score-badge.svg";
+
+        if (badgeType === "score") {
+          const scoreValue = parseNumber(latestRecord.score ?? latestRecord.metric_value);
+          if (scoreValue === null) throw new AutoresearchError("Latest score record does not contain a numeric score.");
+          const maxValue = parseNumber(latestRecord.max ?? latestRecord.metric_max);
+          valueText = maxValue !== null && maxValue > 0 ? `${scoreValue}/${maxValue}` : String(scoreValue);
+          ratio = inferRatio(scoreValue, maxValue);
+        } else {
+          const componentsRaw = latestRecord.score_components ?? latestRecord.components;
+          if (typeof componentsRaw !== "object" || componentsRaw === null || Array.isArray(componentsRaw)) {
+            throw new AutoresearchError("Latest score record does not contain component scores.");
+          }
+          const components = componentsRaw as Record<string, unknown>;
+          const componentNames = Object.keys(components).sort();
+          if (componentNames.length === 0) throw new AutoresearchError("Latest score record has no component entries.");
+          const requested = grouped.component as string | undefined;
+          const componentName = requested ?? componentNames[0]!;
+          if (!(componentName in components)) {
+            throw new AutoresearchError(`Component not found in latest score record: ${componentName}`);
+          }
+          const componentValue = parseNumber(components[componentName]);
+          if (componentValue === null) {
+            throw new AutoresearchError(`Component value is not numeric: ${componentName}`);
+          }
+          let componentMax: number | null = null;
+          const maxesRaw = latestRecord.component_maxes;
+          if (typeof maxesRaw === "object" && maxesRaw !== null && !Array.isArray(maxesRaw)) {
+            componentMax = parseNumber((maxesRaw as Record<string, unknown>)[componentName]);
+          }
+          label = (grouped.label as string | undefined) ?? componentName;
+          valueText = componentMax !== null && componentMax > 0 ? `${componentValue}/${componentMax}` : String(componentValue);
+          ratio = inferRatio(componentValue, componentMax);
+          const slug = slugifyBadgeToken(componentName);
+          markdownDefault = `.autoresearch/score-component-${slug}.md`;
+          svgDefault = `.autoresearch/score-component-${slug}.svg`;
+        }
+
+        const markdownPath = resolvePath(grouped.repo as string | undefined, grouped["markdown-path"] as string | undefined, markdownDefault);
+        const svgPath = resolvePath(grouped.repo as string | undefined, grouped["svg-path"] as string | undefined, svgDefault);
+        const svg = renderBadgeSvg(label, valueText, pickBadgeColor(ratio));
+        const markdown = renderBadgeMarkdown(label, valueText, svgPath, markdownPath);
+        ensureParent(svgPath);
+        writeFileSync(svgPath, svg + "\n", "utf-8");
+        ensureParent(markdownPath);
+        writeFileSync(markdownPath, markdown + "\n", "utf-8");
+
+        if (useJson) {
+          printJson({ type: badgeType, label, value: valueText, markdown_path: markdownPath, svg_path: svgPath });
+          break;
+        }
+        console.log(`Badge generated (${badgeType}).`);
+        console.log(`  Markdown: ${markdownPath}`);
+        console.log(`  SVG:      ${svgPath}`);
+        break;
+      }
       case "config": {
         const { resolvePath, readJsonFile } = await import("./helpers.js");
         const { STATE_DEFAULT } = await import("./constants.js");
@@ -803,8 +913,8 @@ const main = async (): Promise<number> => {
       }
       case "completion": {
         const shell = grouped.shell as string || "bash";
-        const commands = ["init", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
-        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
+        const commands = ["init", "wizard", "status", "explain", "history", "scores", "badge", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
+        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--score-history-path", "--type", "--component", "--label", "--markdown-path", "--svg-path", "--format", "--shell"];
         
         if (shell === "bash" || shell === "zsh") {
           console.log(`# Auto Research CLI completion for ${shell}`);

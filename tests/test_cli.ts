@@ -795,6 +795,49 @@ describe("CLI Commands", () => {
     });
   });
 
+  describe("badge command", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-badge");
+    const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+    const scoreSvgPath = resolve(tmpDir, ".autoresearch", "score-badge.svg");
+    const scoreMdPath = resolve(tmpDir, ".autoresearch", "score-badge.md");
+    const componentSvgPath = resolve(tmpDir, ".autoresearch", "component-accuracy.svg");
+    const componentMdPath = resolve(tmpDir, ".autoresearch", "component-accuracy.md");
+
+    beforeEach(() => {
+      mkdirSync(resolve(tmpDir, ".autoresearch"), { recursive: true });
+      writeFileSync(scoreHistoryPath, [
+        "{\"timestamp\":\"2026-05-08T10:00:00Z\",\"iteration\":1,\"metric_value\":\"10\"}",
+        "{\"timestamp\":\"2026-05-08T10:01:00Z\",\"iteration\":2,\"score\":8,\"max\":10,\"score_components\":{\"accuracy\":0.8,\"stability\":0.6}}",
+      ].join("\n") + "\n", "utf-8");
+    });
+
+    afterEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    it("generates markdown and svg for score badge", () => {
+      const out = execFileSync("node", [CLI, "badge", "--repo", tmpDir, "--markdown-path", scoreMdPath, "--svg-path", scoreSvgPath], { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("Badge generated (score).");
+      const svg = readFileSync(scoreSvgPath, "utf-8");
+      const md = readFileSync(scoreMdPath, "utf-8");
+      expect(svg).toContain("<svg");
+      expect(svg).toContain(">8/10<");
+      expect(md).toContain("score: 8/10");
+      expect(md).toContain("score\\-badge\\.svg");
+    });
+
+    it("generates markdown and svg for component badge", () => {
+      const out = execFileSync("node", [CLI, "badge", "--repo", tmpDir, "--type", "component", "--component", "accuracy", "--markdown-path", componentMdPath, "--svg-path", componentSvgPath], { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("Badge generated (component).");
+      const svg = readFileSync(componentSvgPath, "utf-8");
+      const md = readFileSync(componentMdPath, "utf-8");
+      expect(svg).toContain(">accuracy<");
+      expect(svg).toContain(">0.8<");
+      expect(md).toContain("accuracy: 0\\.8");
+      expect(md).toContain("component\\-accuracy\\.svg");
+    });
+  });
+
   describe("summary command", () => {
     it("shows summary with json", () => {
       const out = execSync(`node ${CLI} summary --json`, { encoding: "utf-8", cwd: REPO_ROOT });
