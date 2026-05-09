@@ -10,12 +10,6 @@ import {
   normalizeOperatingMode,
   normalizeScorerStatus,
   parseDurationSeconds,
-  normalizeLabels,
-  missingRequiredLabels,
-  writeGoalDoc,
-  normalizeScorerStatus,
-  AutoresearchError,
-} from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT, GOAL_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
 import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
@@ -311,6 +305,7 @@ export function makeStatePayload(
         num_drafts: config.num_drafts ?? 1,
         branch_selection_policy: config.branch_selection_policy ?? "best",
         baseline_iteration: 0,
+        branch_policy_overrides: config.branch_policy_overrides,
       })
     : undefined;
 

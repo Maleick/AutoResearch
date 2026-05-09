@@ -13,6 +13,7 @@ export class AutoresearchError extends Error {
 }
 
 export interface JsonEnvelope {
+  [key: string]: unknown;
   ok: boolean;
   command: string;
   timestamp: string;
@@ -28,8 +29,16 @@ export function printJson(payload: unknown): void {
   console.log(JSON.stringify(payload, null, 2));
 }
 
+function legacyJsonFields(data: unknown): Record<string, unknown> {
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    return {};
+  }
+  return data as Record<string, unknown>;
+}
+
 export function printJsonEnvelope(command: string, data: unknown, ok = true, error?: JsonEnvelope["error"]): void {
   const envelope: JsonEnvelope = {
+    ...legacyJsonFields(data),
     ok,
     command,
     timestamp: new Date().toISOString(),

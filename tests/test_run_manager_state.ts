@@ -120,6 +120,29 @@ describe("makeStatePayload", () => {
     const state = mod.makeStatePayload(config, "results.tsv", "state.json");
     expect(state.flags.stop_ready).toBe(false);
   });
+
+  it("passes branch policy overrides into draft pool state", async () => {
+    const subagentPool = await import(resolve(REPO_ROOT, "dist/subagent-pool.js"));
+    subagentPool.resetBranchIdCounter();
+    const config = {
+      goal: "test",
+      metric: "score",
+      direction: "higher",
+      verify: "npm test",
+      mode: "foreground",
+      num_drafts: 3,
+      branch_selection_policy: "best",
+      branch_policy_overrides: {
+        "draft-0": "roulette",
+        "draft-2": "diverse",
+      },
+    };
+    const state = mod.makeStatePayload(config, "results.tsv", "state.json");
+
+    expect(state.draft_pool?.active_drafts[0].policy_override).toBe("roulette");
+    expect(state.draft_pool?.active_drafts[1].policy_override).toBeUndefined();
+    expect(state.draft_pool?.active_drafts[2].policy_override).toBe("diverse");
+  });
 });
 
 describe("setStopRequested", () => {
