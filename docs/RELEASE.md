@@ -4,7 +4,7 @@ This package uses semantic-release to publish GitHub Releases and npm packages. 
 
 ## Version Alignment
 
-During normal releases, semantic-release updates `VERSION`, `package.json`, `package-lock.json`, `src/constants.ts`, `.opencode-plugin/plugin.json`, `README.md`, and `CHANGELOG.md`. Do not hand-edit these files for routine patch/minor releases.
+Semantic-release publishes from the checked-out merge commit but does not push release commits back to protected `main`. Keep version surfaces aligned in release-prep PRs when pinned install docs or runtime version constants need to change.
 
 ## Release Steps
 
@@ -41,7 +41,7 @@ GitHub Actions will:
 2. Verify package contents
 3. Run tests
 4. Run semantic-release on `main`
-5. Update release-managed version files and `CHANGELOG.md`
+5. Sync version files in the release workspace for packaging
 6. Create a GitHub Release
 7. Publish npm `latest` with provenance through trusted publishing
 
