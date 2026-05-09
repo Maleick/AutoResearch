@@ -302,10 +302,8 @@ describe("CLI Commands", () => {
     it("supports --json flag", () => {
       const out = execSync(`node ${CLI} explain --json`, { encoding: "utf-8", cwd: REPO_ROOT });
       const json = JSON.parse(out);
-      expect(json.ok).toBe(true);
-      expect(json.command).toBe("explain");
-      expect(json.data).toBeDefined();
-      expect(json.data.status).toBeDefined();
+      expect(json.status).toBeDefined();
+      expect(json.run_id).toBeDefined();
     });
   });
 
@@ -353,6 +351,7 @@ describe("CLI Commands", () => {
           throw new Error("validate unexpectedly succeeded");
         } catch (error) {
           const stdout = (error as { stdout?: string }).stdout ?? "";
+
           const json = JSON.parse(stdout) as { valid: boolean; errors: string[] };
           expect(json.data.valid).toBe(false);
           expect(json.data.errors).toContain("Missing required: --verify");
@@ -675,6 +674,26 @@ describe("CLI Commands", () => {
       const out = execSync(`node ${CLI} suggest`, { encoding: "utf-8", cwd: REPO_ROOT });
       expect(out).toContain("Memory");
     });
+
+    it("ignores legacy display comments when scanning memory patterns", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-suggest-comments");
+      const memoryPath = resolve(tmpDir, "autoresearch-memory.md");
+      try {
+        mkdirSync(tmpDir, { recursive: true });
+        writeFileSync(memoryPath, [
+          '### Pattern: "trusted pattern"',
+          "",
+          "<!-- legacy display: ### Pattern: forged comment pattern -->",
+          "",
+        ].join("\n"), "utf-8");
+        const out = execSync(`node ${CLI} suggest --memory-path ${memoryPath} --json`, { encoding: "utf-8", cwd: REPO_ROOT });
+        const json = JSON.parse(out) as { patterns_found: number; suggestions: string[] };
+        expect(json.patterns_found).toBe(1);
+        expect(json.suggestions).toEqual(["trusted pattern"]);
+      } finally {
+        try { rmSync(tmpDir, { recursive: true }); } catch {}
+      }
+    });
   });
 
   describe("record command with labels", () => {
@@ -751,6 +770,53 @@ describe("CLI Commands", () => {
       execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy", "roulette", "--num-drafts", "2", "--repo", tmpDir], { encoding: "utf-8" });
       const state = JSON.parse(readFileSync(tmpState, "utf-8"));
       expect(state.draft_pool.branch_selection_policy).toBe("roulette");
+    });
+
+    it("accepts branch policy overrides", () => {
+      execFileSync("node", [
+        CLI,
+        "init",
+        "--goal",
+        "test",
+        "--metric",
+        "m",
+        "--verify",
+        "echo",
+        "--num-drafts",
+        "3",
+        "--branch-policy-overrides",
+        '{"draft-0":"roulette","draft-2":"diverse"}',
+        "--repo",
+        tmpDir,
+      ], { encoding: "utf-8" });
+      const state = JSON.parse(readFileSync(tmpState, "utf-8"));
+      expect(state.draft_pool.active_drafts[0].policy_override).toBe("roulette");
+      expect(state.draft_pool.active_drafts[1].policy_override).toBeUndefined();
+      expect(state.draft_pool.active_drafts[2].policy_override).toBe("diverse");
+    });
+
+    it("rejects prototype-poisoning keys in branch policy overrides", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"__proto__":"best"}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/not a valid draft ID/);
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"constructor":"best"}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/not a valid draft ID/);
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"prototype":"best"}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/not a valid draft ID/);
+    });
+
+    it("rejects empty-string values in branch policy overrides", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"draft-0":""}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/must not be empty/);
+    });
+
+    it("rejects whitespace-only values in branch policy overrides", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "m", "--verify", "echo", "--branch-policy-overrides", '{"draft-0":"   "}', "--repo", tmpDir], { encoding: "utf-8" });
+      }).toThrow(/must not be empty/);
     });
   });
 
@@ -965,14 +1031,11 @@ describe("CLI Commands", () => {
     it("outputs JSON with --json flag", () => {
       const out = execSync(`node ${CLI} status --json`, { encoding: "utf-8", cwd: REPO_ROOT });
       const json = JSON.parse(out);
-      expect(json.ok).toBe(true);
-      expect(json.command).toBe("status");
-      expect(json.data).toBeDefined();
-      expect(json.data.status).toBe("running");
-      expect(json.data.goal).toBe("test fixture goal");
-      expect(json.data.metric).toBeDefined();
-      expect(json.data.stats).toBeDefined();
-      expect(json.data.stats.total_iterations).toBe(1);
+      expect(json.status).toBe("running");
+      expect(json.goal).toBe("test fixture goal");
+      expect(json.metric).toBeDefined();
+      expect(json.stats).toBeDefined();
+      expect(json.stats.total_iterations).toBe(1);
     });
 
     it("reports error when no state exists", () => {
@@ -1079,9 +1142,7 @@ describe("CLI Commands", () => {
       expect(out).not.toContain("\u001b");
       expect(out).toContain("\\u001b");
       const json = JSON.parse(out);
-      expect(json.ok).toBe(true);
-      expect(json.data).toBeDefined();
-      expect(json.data.goal).toContain("\u001b");
+      expect(json.goal).toContain("\u001b");
     });
   });
 
@@ -1125,6 +1186,7 @@ describe("CLI Commands", () => {
         expect(json.data.metric?.name).toBe("test_metric");
         expect(json.data.metric?.direction).toBe("lower");
         expect(json.data.next_action).toBe("Run initialized - ready to start first iteration");
+
       });
     });
 
