@@ -76,6 +76,7 @@ export interface LastIteration {
   stop_labels_satisfied: boolean;
   missing_keep_labels: string[];
   missing_stop_labels: string[];
+  note?: string;
   id?: string;
   parent_id?: string;
   branch?: string;

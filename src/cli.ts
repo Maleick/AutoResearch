@@ -862,7 +862,64 @@ const main = async (): Promise<number> => {
           console.log(`- Kept: ${formatMarkdownField(s.kept)}`);
           console.log(`- Discarded: ${formatMarkdownField(s.discarded)}`);
           console.log(`- Needs human: ${formatMarkdownField(s.needs_human)}`);
+          
+          // Best attempt details
+          if (s.best_iteration !== undefined && results.length > 0) {
+            const bestIterationResults = results.filter(r => {
+              const cols = r.split("\t");
+              return cols[1] === String(s.best_iteration);
+            });
+            if (bestIterationResults.length > 0) {
+              const bestCols = bestIterationResults[0].split("\t");
+              const bestChangeSummary = tsvField(resultHeaders, bestCols, "change_summary", 7);
+              console.log(`- Best attempt: iteration ${formatMarkdownField(String(s.best_iteration))} — ${formatMarkdownField(bestChangeSummary.substring(0, 60))}`);
+            }
+          }
         }
+        
+        // Failed branches information
+        if (state.draft_pool && state.draft_pool.active_drafts) {
+          const failedBranches = state.draft_pool.active_drafts.filter(draft => draft.status === "discarded");
+          if (failedBranches.length > 0) {
+            console.log(`\n## Failed Branches`);
+            for (const branch of failedBranches.slice(0, 5)) { // Limit to 5 branches
+              console.log(`- Branch ${formatMarkdownField(branch.branch_id)}: iteration ${formatMarkdownField(String(branch.iteration))} (parent: ${formatMarkdownField(String(branch.parent_iteration))}) — ${formatMarkdownField(branch.metric_value ?? "no metric")}`);
+            }
+            if (failedBranches.length > 5) {
+              console.log(`  ... and ${formatMarkdownField(String(failedBranches.length - 5))} more failed branches`);
+            }
+          }
+        }
+        
+        // Blockers information
+        if (state.flags.needs_human) {
+          console.log(`\n## Blockers`);
+          console.log(`- Human input required: ${formatMarkdownField(state.last_iteration?.change_summary ?? "awaiting user decision")}`);
+          
+          // Add more blocker details if available in note
+          if (state.last_iteration?.note) {
+            console.log(`- Details: ${formatMarkdownField(state.last_iteration.note.substring(0, 100))}${state.last_iteration.note.length > 100 ? "..." : ""}`);
+          }
+        }
+        
+        // Next actions information
+        console.log(`\n## Next Actions`);
+        if (state.status === "running") {
+          if (state.flags.needs_human) {
+            console.log(`- Awaiting human input to continue`);
+          } else if (state.flags.stop_requested) {
+            console.log(`- Stop requested, will complete current iteration then stop`);
+          } else {
+            console.log(`- Continue with next iteration`);
+          }
+        } else if (state.status === "completed") {
+          console.log(`- Run completed successfully`);
+        } else if (state.status === "stopped" || state.status === "stopping") {
+          console.log(`- Run stopped; use 'autoresearch resume' to continue`);
+        } else {
+          console.log(`- Initialize a new run with 'autoresearch init'`);
+        }
+        
         if (results.length > 0) {
           console.log(`\n## Iterations`);
           for (const r of results) {
