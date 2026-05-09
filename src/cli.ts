@@ -2,7 +2,7 @@
 import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { MAX_DRAFTS } from "./constants.js";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
+import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc } from "./helpers.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
@@ -18,6 +18,7 @@ const usage = (): void => {
   console.error("  wizard     Generate a setup summary");
   console.error("  status     Print run status");
   console.error("  explain    Human-readable run state");
+  console.error("  goal       Show or validate the goal document");
   console.error("  history    Show recent iteration log");
   console.error("  scores     Show score trend history");
   console.error("  config     Show runtime configuration");
@@ -428,6 +429,28 @@ const main = async (): Promise<number> => {
         if (flags?.needs_human) console.log("   ⚠  Needs human review");
         if (flags?.stop_requested) console.log("   ⏹  Stop was requested");
         if (flags?.background_active) console.log("   📡  Background active — `autoresearch status` to check");
+        break;
+      }
+      case "goal": {
+        const { resolvePath } = await import("./helpers.js");
+        const { GOAL_DEFAULT } = await import("./constants.js");
+        const goalPath = resolvePath(grouped.repo as string | undefined, grouped["goal-path"] as string | undefined, GOAL_DEFAULT);
+        if (!existsSync(goalPath)) {
+          console.log("No goal document found. Run 'autoresearch init' first.");
+          break;
+        }
+        const doc = readGoalDoc(goalPath);
+        if (useJson) {
+          printJson(doc);
+          break;
+        }
+        console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
+        console.log(`Metric:           ${formatDisplayValue(doc.metric)} (${formatDisplayValue(doc.direction)})`);
+        console.log(`Verify:           ${formatDisplayValue(doc.verify)}`);
+        if (doc.guard) console.log(`Guard:            ${formatDisplayValue(doc.guard)}`);
+        if (doc.file_map) console.log(`File map:         ${formatDisplayValue(doc.file_map)}`);
+        if (doc.constraints) console.log(`Constraints:      ${formatDisplayValue(doc.constraints)}`);
+        if (doc.stop_conditions) console.log(`Stop conditions:  ${formatDisplayValue(doc.stop_conditions)}`);
         break;
       }
       case "history": {

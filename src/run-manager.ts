@@ -11,9 +11,10 @@ import {
   parseDurationSeconds,
   normalizeLabels,
   missingRequiredLabels,
+  writeGoalDoc,
   AutoresearchError,
 } from "./helpers.js";
-import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT } from "./constants.js";
+import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT, GOAL_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
 import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
 import { lstat, open } from "fs/promises";
@@ -26,9 +27,11 @@ export async function initializeRun(
   statePathValue: string | undefined,
   config: RunConfig,
   freshStart: boolean,
+  goalPathValue?: string,
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
+  const goalPath = resolvePath(repo, goalPathValue, GOAL_DEFAULT);
 
   if (existsSync(statePath) && !freshStart) {
     throw new AutoresearchError(`${statePath} already exists. Use --fresh-start to archive.`);
@@ -42,6 +45,18 @@ export async function initializeRun(
 
   const state = makeStatePayload(config, resultsPath, statePath);
   atomicWriteJson(statePath, state);
+
+  writeGoalDoc(goalPath, {
+    goal: config.goal,
+    metric: config.outcome_metric ?? config.metric,
+    direction: config.outcome_direction ?? config.direction ?? "lower",
+    verify: config.verify ?? "",
+    guard: config.guard,
+    constraints: undefined,
+    file_map: config.scope ? config.scope : undefined,
+    stop_conditions: config.stop_condition,
+  });
+
   return state;
 }
 
