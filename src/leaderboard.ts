@@ -2,39 +2,32 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { sanitizeForTerminal } from "./helpers.js";
 
-const markdownInlineEscapes: Record<string, string> = {
-  "\\": "\\\\",
-  "`": "\\`",
-  "*": "\\*",
-  "_": "\\_",
-  "{": "\\{",
-  "}": "\\}",
-  "[": "\\[",
-  "]": "\\]",
-  "(": "\\(",
-  ")": "\\)",
-  "#": "\\#",
-  "+": "\\+",
-  "-": "\\-",
-  ".": "\\.",
-  "!": "\\!",
-  "|": "\\|",
-};
+function escapeMarkdownHtmlChar(char: string): string {
+  switch (char) {
+    case "&":
+      return "&amp;";
+    case "<":
+      return "&lt;";
+    case ">":
+      return "&gt;";
+    case '"':
+      return "&quot;";
+    default:
+      return char;
+  }
+}
 
-const markdownHtmlEscapes: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-};
+function escapeMarkdownInlineChar(char: string): string {
+  return `\\${char}`;
+}
 
 function escapeMarkdownInline(value: unknown): string {
   return sanitizeForTerminal(value ?? "")
-    .replace(/[&<>"]/g, (char) => markdownHtmlEscapes[char]!)
+    .replace(/[&<>"]/g, escapeMarkdownHtmlChar)
     .replace(/[\r\n\t]+/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim()
-    .replace(/[\\`*_{}\[\]()#+\-.!|]/g, (char) => markdownInlineEscapes[char]!);
+    .replace(/[\\`*_{}\[\]()#+\-.!|]/g, escapeMarkdownInlineChar);
 }
 
 function escapeMarkdownTableCell(value: unknown): string {
