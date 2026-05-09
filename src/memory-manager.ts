@@ -347,7 +347,17 @@ function writeMemoryFileSafely(memoryPath: string, content: string): void {
     | (fsConstants.O_NOFOLLOW ?? 0);
   const fd = openSync(target, flags, 0o600);
   try {
-    writeSync(fd, content, 0, "utf-8");
+    const buffer = Buffer.from(content, "utf-8");
+    let offset = 0;
+    while (offset < buffer.length) {
+      const bytesWritten = writeSync(fd, buffer, offset, buffer.length - offset);
+      if (bytesWritten <= 0) {
+        throw new AutoresearchError(
+          `Failed to write complete memory file: ${target}`
+        );
+      }
+      offset += bytesWritten;
+    }
   } finally {
     closeSync(fd);
   }
