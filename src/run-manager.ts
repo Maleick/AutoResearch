@@ -88,9 +88,12 @@ export async function appendIteration(
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
   const now = utcNow();
   const scorerStatusValue = typeof scorerStatusOrScoreComponents === "string" ? scorerStatusOrScoreComponents : undefined;
-  const scoreComponents = typeof scorerStatusOrScoreComponents === "object"
+  const inferredLineage = lineage
+    ?? (isExperimentLineage(scorerStatusOrScoreComponents) ? scorerStatusOrScoreComponents : undefined)
+    ?? (isExperimentLineage(scoreComponentsValue) ? scoreComponentsValue : undefined);
+  const scoreComponents = typeof scorerStatusOrScoreComponents === "object" && !isExperimentLineage(scorerStatusOrScoreComponents)
     ? scorerStatusOrScoreComponents
-    : scoreComponentsValue;
+    : isExperimentLineage(scoreComponentsValue) ? undefined : scoreComponentsValue;
   const scorerStatus = normalizeScorerStatus(scorerStatusValue);
   const effectiveDecision = scorerStatus === "scorer-broken" && (decision === "keep" || decision === "discard")
     ? "needs_human"
@@ -106,11 +109,11 @@ export async function appendIteration(
     throw new AutoresearchError(`Keep requires labels: ${missingKeep.join(", ")}`);
   }
 
-  const lineageId = lineage?.id ?? `${state.run_id}-iter-${currentIteration}`;
-  const lineageParentId = lineage?.parent_id ?? (currentIteration > 1 ? `${state.run_id}-iter-${currentIteration - 1}` : "");
-  const lineageBranch = lineage?.branch ?? state.draft_pool?.best_branch_id ?? "main";
-  const lineageStage = lineage?.stage ?? "experiment";
-  const lineageAgent = lineage?.agent ?? "orchestrator";
+  const lineageId = inferredLineage?.id ?? `${state.run_id}-iter-${currentIteration}`;
+  const lineageParentId = inferredLineage?.parent_id ?? (currentIteration > 1 ? `${state.run_id}-iter-${currentIteration - 1}` : "");
+  const lineageBranch = inferredLineage?.branch ?? state.draft_pool?.best_branch_id ?? "main";
+  const lineageStage = inferredLineage?.stage ?? "experiment";
+  const lineageAgent = inferredLineage?.agent ?? "orchestrator";
 
   const resultRow = [
     now,
@@ -206,6 +209,11 @@ export async function appendIteration(
 
   atomicWriteJson(statePath, newState);
   return newState;
+}
+
+function isExperimentLineage(value: unknown): value is { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string } {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  return ["id", "parent_id", "branch", "stage", "agent"].some((key) => key in value);
 }
 
 async function appendTextFileNoFollow(filePath: string, content: string, description: string): Promise<void> {

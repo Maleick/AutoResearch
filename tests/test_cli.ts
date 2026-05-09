@@ -107,6 +107,10 @@ describe("CLI Commands", () => {
     const tmpResults = resolve(tmpDir, "autoresearch-results.tsv");
     const tmpLaunch = resolve(tmpDir, ".autoresearch", "launch.json");
 
+    beforeEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
     afterEach(() => {
       try { rmSync(tmpDir, { recursive: true }); } catch {}
     });
