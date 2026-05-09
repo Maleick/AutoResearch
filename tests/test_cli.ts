@@ -1435,4 +1435,30 @@ describe("CLI Commands", () => {
       if (!threw) throw new Error("Expected command to exit non-zero but it succeeded");
     });
   });
+
+  describe("strategy pack", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-pack");
+
+    beforeEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    afterEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    it("exports a pack from completed state", () => {
+      execSync(`node ${CLI} init --goal "strategy test" --metric "failures" --verify "npm test" --repo ${tmpDir}`, { encoding: "utf-8" });
+      execSync(`node ${CLI} record --decision keep --metric-value 5 --verify-status pass --change-summary "test" --repo ${tmpDir}`, { encoding: "utf-8" });
+      const out = execSync(`node ${CLI} pack export --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(out).toContain("Strategy pack exported");
+    });
+
+    it("list shows exported packs", () => {
+      execSync(`node ${CLI} init --goal "strategy test" --metric "failures" --verify "npm test" --repo ${tmpDir}`, { encoding: "utf-8" });
+      execSync(`node ${CLI} pack export --repo ${tmpDir}`, { encoding: "utf-8" });
+      const out = execSync(`node ${CLI} pack list --repo ${tmpDir}`, { encoding: "utf-8" });
+      expect(out).toContain("strategy-test");
+    });
+  });
 });
