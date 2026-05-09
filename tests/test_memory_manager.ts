@@ -1,6 +1,14 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { unlinkSync, existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from "fs";
+import {
+  unlinkSync,
+  existsSync,
+  mkdirSync,
+  rmSync,
+  readFileSync,
+  writeFileSync,
+  symlinkSync,
+} from "fs";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 
@@ -685,9 +693,22 @@ describe("Memory Manager", () => {
   });
 
   describe("getMemoryFilePath", () => {
-    it("returns absolute path as-is", () => {
-      const path = mod.getMemoryFilePath(undefined, "/abs/path/memory.md");
-      expect(path).toBe("/abs/path/memory.md");
+    it("rejects absolute paths outside the repo", () => {
+      expect(() =>
+        mod.getMemoryFilePath(REPO_ROOT, "/abs/path/memory.md")
+      ).toThrow(/Memory path must stay within repository/);
+    });
+
+    it("allows absolute paths inside the repo", () => {
+      const expected = resolve(REPO_ROOT, "memory.md");
+      const path = mod.getMemoryFilePath(REPO_ROOT, expected);
+      expect(path).toBe(expected);
+    });
+
+    it("rejects relative paths escaping the repo", () => {
+      expect(() => mod.getMemoryFilePath("/my/repo", "../memory.md")).toThrow(
+        /Memory path must stay within repository/
+      );
     });
 
     it("resolves relative path against repo", () => {
@@ -702,9 +723,22 @@ describe("Memory Manager", () => {
   });
 
   describe("getAuditLogPath", () => {
-    it("returns absolute path as-is", () => {
-      const path = mod.getAuditLogPath(undefined, "/abs/path/audit.log");
-      expect(path).toBe("/abs/path/audit.log");
+    it("rejects absolute paths outside the repo", () => {
+      expect(() =>
+        mod.getAuditLogPath(REPO_ROOT, "/abs/path/audit.log")
+      ).toThrow(/Memory path must stay within repository/);
+    });
+
+    it("allows absolute paths inside the repo", () => {
+      const expected = resolve(REPO_ROOT, "audit.log");
+      const path = mod.getAuditLogPath(REPO_ROOT, expected);
+      expect(path).toBe(expected);
+    });
+
+    it("rejects relative paths escaping the repo", () => {
+      expect(() => mod.getAuditLogPath("/my/repo", "../audit.log")).toThrow(
+        /Memory path must stay within repository/
+      );
     });
 
     it("resolves relative path against repo", () => {
@@ -876,6 +910,71 @@ describe("Memory Manager", () => {
         expect(content).not.toContain("### Pattern:");
       } finally {
         try { unlinkSync(memPath); } catch {}
+      }
+    });
+    it("escapes newlines and backticks in memory fields", () => {
+      const memPath = resolve(REPO_ROOT, ".autoresearch-test-write-memory7.md");
+      try {
+        mod.writeMemoryFile(memPath, [
+          makeItem({
+            pattern: "safe\n### injected",
+            description: "desc\n- injected",
+            provenance: {
+              ...makeProvenance(),
+              run_id: "run`break",
+              goal: "goal\necho injected",
+              labels: ["prod", "label\n- injected"],
+            },
+          }),
+        ]);
+        const content = readFileSync(memPath, "utf-8");
+        expect(content).toContain("### Pattern: safe\\n### injected");
+        expect(content).toContain("**Description:** desc\\n- injected");
+        expect(content).toContain("- Goal: goal\\necho injected");
+        expect(content).toContain("prod, label\\n- injected");
+        expect(content).toContain("Run: `run'break`");
+        expect(content).not.toContain("\n### injected");
+        expect(content).not.toContain("\necho injected");
+      } finally {
+        try { unlinkSync(memPath); } catch {}
+      }
+    });
+
+    it("refuses to write through a symlinked memory file", () => {
+      const testDir = resolve(REPO_ROOT, ".autoresearch-test-symlink-memory");
+      const victim = resolve(testDir, "outside-victim.md");
+      const symlinkPath = resolve(testDir, "autoresearch-memory.md");
+      try {
+        mkdirSync(testDir, { recursive: true });
+        writeFileSync(victim, "do not replace", "utf-8");
+        symlinkSync(victim, symlinkPath);
+
+        expect(() => mod.writeMemoryFile(symlinkPath, [makeItem()])).toThrow(
+          /Refusing to write memory file through symlink/
+        );
+        expect(readFileSync(victim, "utf-8")).toBe("do not replace");
+      } finally {
+        try { rmSync(testDir, { recursive: true, force: true }); } catch {}
+      }
+    });
+
+    it("refuses to write through a symlinked parent directory", () => {
+      const testDir = resolve(REPO_ROOT, ".autoresearch-test-symlink-parent");
+      const outsideDir = resolve(testDir, "outside");
+      const symlinkDir = resolve(testDir, "linked");
+      const memPath = resolve(symlinkDir, "autoresearch-memory.md");
+      try {
+        mkdirSync(outsideDir, { recursive: true });
+        symlinkSync(outsideDir, symlinkDir, "dir");
+
+        expect(() => mod.writeMemoryFile(memPath, [makeItem()])).toThrow(
+          /Refusing to write memory file through symlink/
+        );
+        expect(existsSync(resolve(outsideDir, "autoresearch-memory.md"))).toBe(
+          false
+        );
+      } finally {
+        try { rmSync(testDir, { recursive: true, force: true }); } catch {}
       }
     });
   });
