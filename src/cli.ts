@@ -1061,9 +1061,13 @@ const main = async (): Promise<number> => {
             console.log(`- **Cap:** ${total} / ${state.iterations_cap} iterations (${progressPct}% of cap)`);
           }
           
-          if (state.duration_seconds) {
-            const elapsedMin = Math.round(state.duration_seconds / 60);
-            console.log(`- **Elapsed:** ${elapsedMin} minutes`);
+          if (state.created_at) {
+            const startedAtMs = Date.parse(state.created_at);
+            const endedAtMs = state.updated_at ? Date.parse(state.updated_at) : Date.now();
+            if (!Number.isNaN(startedAtMs) && !Number.isNaN(endedAtMs) && endedAtMs >= startedAtMs) {
+              const elapsedMin = Math.round((endedAtMs - startedAtMs) / 1000 / 60);
+              console.log(`- **Elapsed:** ${elapsedMin} minutes`);
+            }
           }
           
           // Next candidate
