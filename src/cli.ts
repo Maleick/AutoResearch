@@ -210,6 +210,41 @@ const formatTimestamp = (ts: string): string => {
   }
 };
 
+const MAX_SCORE_HISTORY_BYTES = 10 * 1024 * 1024;
+
+const assertRegularBoundedFile = (filePath: string): void => {
+  const linkStats = lstatSync(filePath);
+  if (linkStats.isSymbolicLink()) {
+    throw new Error(`Refusing to read score history symlink: ${filePath}`);
+  }
+  if (!linkStats.isFile()) {
+    throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
+  }
+  if (linkStats.size > MAX_SCORE_HISTORY_BYTES) {
+    throw new Error(`Score history is too large to read safely (${linkStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
+  }
+};
+
+const readScoreHistoryFile = (filePath: string): string => {
+  assertRegularBoundedFile(filePath);
+  if (typeof fsConstants.O_NOFOLLOW !== "number") {
+    throw new Error(`Refusing to read score history because this platform does not support O_NOFOLLOW: ${filePath}`);
+  }
+  const fd = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  try {
+    const fileStats = fstatSync(fd);
+    if (!fileStats.isFile()) {
+      throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
+    }
+    if (fileStats.size > MAX_SCORE_HISTORY_BYTES) {
+      throw new Error(`Score history is too large to read safely (${fileStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
+    }
+    return readFileSync(fd, "utf-8");
+  } finally {
+    closeSync(fd);
+  }
+};
+
 const readTailLines = (filePath: string, limit: number): string[] => {
   if (limit <= 0) return [];
 
@@ -333,7 +368,7 @@ const main = async (): Promise<number> => {
           stop_condition: grouped["stop-condition"] as string | undefined,
           rollback_strategy: grouped["rollback-strategy"] as string | undefined,
         };
-        printJson(buildSetupSummary(grouped.repo as string | undefined, config));
+        printJsonEnvelope("wizard", buildSetupSummary(grouped.repo as string | undefined, config));
         break;
       }
       case "init": {
@@ -538,7 +573,7 @@ const main = async (): Promise<number> => {
         const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
         const showTopComponents = grouped["top-components"] === "true";
         if (showTopComponents) {
-          const allLines = readFileSync(scoreHistoryPath, "utf-8")
+          const allLines = readScoreHistoryFile(scoreHistoryPath)
             .split("\n")
             .map((l: string) => l.trim())
             .filter(Boolean);
@@ -1043,6 +1078,44 @@ const main = async (): Promise<number> => {
           }
         }
         
+        // Milestone Progress
+        console.log(`\n## Milestone Progress`);
+        if (state.stats) {
+          const s = state.stats;
+          const total = s.total_iterations;
+          const successRate = total > 0 ? ((s.kept / total) * 100).toFixed(1) : "0";
+          console.log(`- **Progress:** ${s.kept} kept / ${total} total iterations (${successRate}% success rate)`);
+          
+          if (state.iterations_cap) {
+            const progressPct = ((total / state.iterations_cap) * 100).toFixed(1);
+            console.log(`- **Cap:** ${total} / ${state.iterations_cap} iterations (${progressPct}% of cap)`);
+          }
+          
+          if (state.created_at) {
+            const startedAtMs = Date.parse(state.created_at);
+            const endedAtMs = state.updated_at ? Date.parse(state.updated_at) : Date.now();
+            if (!Number.isNaN(startedAtMs) && !Number.isNaN(endedAtMs) && endedAtMs >= startedAtMs) {
+              const elapsedMin = Math.round((endedAtMs - startedAtMs) / 1000 / 60);
+              console.log(`- **Elapsed:** ${elapsedMin} minutes`);
+            }
+          }
+          
+          // Next candidate
+          if (state.last_iteration && state.last_iteration.decision === "keep") {
+            console.log(`- **Next candidate:** Iteration ${state.last_iteration.iteration} (kept)`);
+          } else if (s.best_iteration) {
+            console.log(`- **Best candidate:** Iteration ${s.best_iteration}`);
+          }
+        }
+        
+        // Artifact pointers
+        console.log(`\n## Artifacts`);
+        console.log(`- State: \`${state.artifact_paths?.state || ".autoresearch/state.json"}\``);
+        console.log(`- Results: \`${state.artifact_paths?.results || "autoresearch-results.tsv"}\``);
+        if (grouped.repo) {
+          console.log(`- Repository: ${formatMarkdownField(grouped.repo as string)}`);
+        }
+        
         // Failed branches information
         if (state.draft_pool && state.draft_pool.active_drafts) {
           const failedBranches = state.draft_pool.active_drafts.filter(draft => draft.status === "discarded");
@@ -1109,7 +1182,7 @@ const main = async (): Promise<number> => {
           break;
         }
         const memory = readFileSync(memoryPath, "utf-8");
-        const patterns = memory.match(/### Pattern: [^\n]+/g) ?? [];
+        const patterns = memory.match(/^### Pattern: [^\n]+/gm) ?? [];
         const suggestions = patterns.map(parseMemoryPatternHeading);
         if (useJson) {
           printJsonEnvelope("suggest", { patterns_found: suggestions.length, suggestions });
@@ -1159,7 +1232,7 @@ const main = async (): Promise<number> => {
         };
         
         if (format === "json") {
-          console.log(JSON.stringify(exportData, null, 2));
+          printJsonEnvelope("export", exportData);
         } else if (format === "md" || format === "markdown") {
           console.log(`# Auto Research Export`);
           console.log(`\n**Run:** ${escapeMarkdownInline(exportData.state.run_id) || "—"}`);
@@ -1348,7 +1421,11 @@ const main = async (): Promise<number> => {
           scorerStatus,
           scoreComponents,
           );
-        printJson(state);
+        if (useJson) {
+          printJsonEnvelope("record", state);
+        } else {
+          printJson(state);
+        }
         break;
       }
        case "digest": {
@@ -1405,7 +1482,7 @@ const main = async (): Promise<number> => {
            if (digest.flags && Object.keys(digest.flags).length > 0) {
              console.log(`\n## Flags`);
              for (const [key, value] of Object.entries(digest.flags)) {
-               console.log(`- ${key}: ${formatMarkdownField(value)}`);
+               console.log(`- ${formatMarkdownField(key)}: ${formatMarkdownField(value)}`);
              }
            }
          }
@@ -1449,7 +1526,7 @@ const main = async (): Promise<number> => {
         };
 
         if (useJson) {
-          printJson({
+          printJsonEnvelope("doctor", {
             version: VERSION,
             skill_name: SKILL_NAME,
             runtime: `Node.js ${process.version}`,
@@ -1554,7 +1631,7 @@ const main = async (): Promise<number> => {
           }
           const doc = readGoalDoc(goalPath);
           if (useJson) {
-            printJson(doc);
+            printJsonEnvelope("goal", doc);
             break;
           }
           console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
@@ -1679,7 +1756,7 @@ const main = async (): Promise<number> => {
 
         if (isGoalDryRun) {
           if (useGoalJson) {
-            printJson({ ...result, dry_run: true });
+            printJsonEnvelope("goal", { ...result, dry_run: true });
           } else {
             console.log("[dry-run] Would write goal document to: " + goalPath);
             console.log("");
@@ -1696,7 +1773,7 @@ const main = async (): Promise<number> => {
         atomicWriteTextInRepo(goalGrouped.repo as string | undefined, goalPath, document);
 
         if (useGoalJson) {
-          printJson(result);
+          printJsonEnvelope("goal", result);
         } else {
           console.log(`✓ Goal definition written to ${goalPath}`);
           console.log(`  Goal:    ${result.goal ?? "(unset)"}`);
@@ -1752,7 +1829,13 @@ const main = async (): Promise<number> => {
       }
     }
   } catch (exc) {
-    console.error((exc as Error).message);
+    const { categorizeError, formatStructuredError } = await import("./error-categories.js");
+    const structured = categorizeError(exc);
+    if (useJson) {
+      console.error(formatStructuredError(structured, true));
+    } else {
+      console.error(formatStructuredError(structured, false));
+    }
     return 2;
   }
   return 0;
