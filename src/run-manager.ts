@@ -13,7 +13,6 @@ import {
   normalizeLabels,
   missingRequiredLabels,
   writeGoalDoc,
-  normalizeScorerStatus,
   AutoresearchError,
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT, GOAL_DEFAULT } from "./constants.js";

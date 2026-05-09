@@ -210,41 +210,6 @@ const formatTimestamp = (ts: string): string => {
   }
 };
 
-const MAX_SCORE_HISTORY_BYTES = 10 * 1024 * 1024;
-
-const assertRegularBoundedFile = (filePath: string): void => {
-  const linkStats = lstatSync(filePath);
-  if (linkStats.isSymbolicLink()) {
-    throw new Error(`Refusing to read score history symlink: ${filePath}`);
-  }
-  if (!linkStats.isFile()) {
-    throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
-  }
-  if (linkStats.size > MAX_SCORE_HISTORY_BYTES) {
-    throw new Error(`Score history is too large to read safely (${linkStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
-  }
-};
-
-const readScoreHistoryFile = (filePath: string): string => {
-  assertRegularBoundedFile(filePath);
-  if (typeof fsConstants.O_NOFOLLOW !== "number") {
-    throw new Error(`Refusing to read score history because this platform does not support O_NOFOLLOW: ${filePath}`);
-  }
-  const fd = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
-  try {
-    const fileStats = fstatSync(fd);
-    if (!fileStats.isFile()) {
-      throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
-    }
-    if (fileStats.size > MAX_SCORE_HISTORY_BYTES) {
-      throw new Error(`Score history is too large to read safely (${fileStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
-    }
-    return readFileSync(fd, "utf-8");
-  } finally {
-    closeSync(fd);
-  }
-};
-
 const readTailLines = (filePath: string, limit: number): string[] => {
   if (limit <= 0) return [];
 
@@ -368,7 +333,7 @@ const main = async (): Promise<number> => {
           stop_condition: grouped["stop-condition"] as string | undefined,
           rollback_strategy: grouped["rollback-strategy"] as string | undefined,
         };
-        printJson(buildSetupSummary(grouped.repo as string | undefined, config));
+        printJsonEnvelope("wizard", buildSetupSummary(grouped.repo as string | undefined, config));
         break;
       }
       case "init": {
@@ -573,7 +538,7 @@ const main = async (): Promise<number> => {
         const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
         const showTopComponents = grouped["top-components"] === "true";
         if (showTopComponents) {
-          const allLines = readScoreHistoryFile(scoreHistoryPath)
+          const allLines = readFileSync(scoreHistoryPath, "utf-8")
             .split("\n")
             .map((l: string) => l.trim())
             .filter(Boolean);
@@ -1194,7 +1159,7 @@ const main = async (): Promise<number> => {
         };
         
         if (format === "json") {
-          console.log(JSON.stringify(exportData, null, 2));
+          printJsonEnvelope("export", exportData);
         } else if (format === "md" || format === "markdown") {
           console.log(`# Auto Research Export`);
           console.log(`\n**Run:** ${escapeMarkdownInline(exportData.state.run_id) || "—"}`);
@@ -1383,7 +1348,7 @@ const main = async (): Promise<number> => {
           scorerStatus,
           scoreComponents,
           );
-        printJson(state);
+        printJsonEnvelope("record", state);
         break;
       }
        case "digest": {
@@ -1484,7 +1449,7 @@ const main = async (): Promise<number> => {
         };
 
         if (useJson) {
-          printJson({
+          printJsonEnvelope("doctor", {
             version: VERSION,
             skill_name: SKILL_NAME,
             runtime: `Node.js ${process.version}`,
@@ -1589,7 +1554,7 @@ const main = async (): Promise<number> => {
           }
           const doc = readGoalDoc(goalPath);
           if (useJson) {
-            printJson(doc);
+            printJsonEnvelope("goal", doc);
             break;
           }
           console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
@@ -1714,7 +1679,7 @@ const main = async (): Promise<number> => {
 
         if (isGoalDryRun) {
           if (useGoalJson) {
-            printJson({ ...result, dry_run: true });
+            printJsonEnvelope("goal", { ...result, dry_run: true });
           } else {
             console.log("[dry-run] Would write goal document to: " + goalPath);
             console.log("");
@@ -1731,7 +1696,7 @@ const main = async (): Promise<number> => {
         atomicWriteTextInRepo(goalGrouped.repo as string | undefined, goalPath, document);
 
         if (useGoalJson) {
-          printJson(result);
+          printJsonEnvelope("goal", result);
         } else {
           console.log(`✓ Goal definition written to ${goalPath}`);
           console.log(`  Goal:    ${result.goal ?? "(unset)"}`);
@@ -1779,6 +1744,40 @@ const main = async (): Promise<number> => {
           console.log(`Total: ${leaderboard.summary.total_runs} runs, ${leaderboard.summary.total_iterations} iterations, ${leaderboard.summary.overall_success_rate} success rate`);
         }
         break;
+      }
+      case "worker": {
+        const { workerOnce } = await import("./worker.js");
+        const once = grouped["once"] !== "false";
+
+        if (!once) {
+          console.error("worker requires --once flag");
+          console.error("Usage: autoresearch worker --once [--json] [--repo <path>]");
+          return 1;
+        }
+
+        const result = workerOnce(
+          grouped.repo as string | undefined,
+          grouped["state-path"] as string | undefined,
+          grouped["results-path"] as string | undefined,
+        );
+
+        if (useJson) {
+          printJsonEnvelope("worker", result);
+        } else {
+          if (result.ready) {
+            console.log(`✓ Ready for iteration ${result.iteration}`);
+            console.log(`  Run ID:  ${result.run_id}`);
+            console.log(`  Status:  ${result.status}`);
+            console.log(`  Goal:    ${result.goal}`);
+            if (result.metric) console.log(`  Metric:  ${result.metric}`);
+          } else {
+            console.log(`✗ Not ready: ${result.reason || "unknown"}`);
+            console.log(`  Run ID: ${result.run_id}`);
+            console.log(`  Iter:   ${result.iteration}`);
+          }
+        }
+
+        return result.ready ? 0 : 1;
       }
       default: {
         console.error(`Unknown command: ${cmd}`);
