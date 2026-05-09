@@ -95,3 +95,68 @@ export function parseScoreOutput(output: string): ScoreOutput {
     details: obj.details as Record<string, unknown> | undefined
   };
 }
+
+/**
+ * A ranked component entry showing its name and net delta across a run.
+ */
+export interface ComponentDelta {
+  /** Component name */
+  name: string;
+  /** Net change: last observed value minus first observed value */
+  delta: number;
+}
+
+/**
+ * Result of ranking components for a run.
+ */
+export interface ComponentRanking {
+  /** Components with the most negative delta (largest decreases), sorted ascending by delta value (most negative first) */
+  top_negative: ComponentDelta[];
+  /** Components with the most positive delta (largest increases), sorted descending by delta value (most positive first) */
+  top_positive: ComponentDelta[];
+}
+
+/**
+ * Ranks score components across a sequence of score history records by their
+ * net change from first to last observed value.
+ *
+ * Records without a `score_components` field are skipped. The function returns
+ * the `topN` largest positive and negative deltas.
+ *
+ * @param records - Array of score history records, each optionally containing
+ *   a `score_components` map.
+ * @param topN - Maximum number of entries in each ranking list (default: 5).
+ * @returns ComponentRanking with top_negative and top_positive lists.
+ */
+export function rankComponents(
+  records: Array<{ score_components?: Record<string, number> }>,
+  topN: number = 5,
+): ComponentRanking {
+  const first: Record<string, number> = {};
+  const last: Record<string, number> = {};
+
+  for (const rec of records) {
+    if (rec.score_components == null) continue;
+    for (const [name, value] of Object.entries(rec.score_components)) {
+      if (!(name in first)) first[name] = value;
+      last[name] = value;
+    }
+  }
+
+  const deltas: ComponentDelta[] = Object.keys(first).map((name) => ({
+    name,
+    delta: (last[name] ?? first[name]) - first[name],
+  }));
+
+  const positive = deltas
+    .filter((d) => d.delta > 0)
+    .sort((a, b) => b.delta - a.delta)
+    .slice(0, topN);
+
+  const negative = deltas
+    .filter((d) => d.delta < 0)
+    .sort((a, b) => a.delta - b.delta)
+    .slice(0, topN);
+
+  return { top_negative: negative, top_positive: positive };
+}

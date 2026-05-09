@@ -161,3 +161,100 @@ describe("parseScoreOutput", () => {
     });
   });
 });
+
+describe("rankComponents", () => {
+  let mod: any;
+  beforeAll(async () => { mod = await importScoreParser(); });
+
+  it("exports rankComponents function", () => {
+    expect(typeof mod.rankComponents).toBe("function");
+  });
+
+  it("returns empty rankings for empty input", () => {
+    const result = mod.rankComponents([]);
+    expect(result.top_positive).toEqual([]);
+    expect(result.top_negative).toEqual([]);
+  });
+
+  it("returns empty rankings when no records have score_components", () => {
+    const records = [
+      { decision: "keep" },
+      { decision: "discard" },
+    ];
+    const result = mod.rankComponents(records);
+    expect(result.top_positive).toEqual([]);
+    expect(result.top_negative).toEqual([]);
+  });
+
+  it("computes deltas from first to last observation for each component", () => {
+    const records = [
+      { score_components: { accuracy: 0.5, coverage: 0.8 } },
+      { score_components: { accuracy: 0.7, coverage: 0.6 } },
+      { score_components: { accuracy: 0.9, coverage: 0.5 } },
+    ];
+    const result = mod.rankComponents(records);
+    expect(result.top_positive).toHaveLength(1);
+    expect(result.top_positive[0].name).toBe("accuracy");
+    expect(result.top_positive[0].delta).toBeCloseTo(0.4);
+    expect(result.top_negative).toHaveLength(1);
+    expect(result.top_negative[0].name).toBe("coverage");
+    expect(result.top_negative[0].delta).toBeCloseTo(-0.3);
+  });
+
+  it("skips records without score_components", () => {
+    const records = [
+      { score_components: { accuracy: 0.5 } },
+      {},
+      { score_components: { accuracy: 0.9 } },
+    ];
+    const result = mod.rankComponents(records);
+    expect(result.top_positive[0].name).toBe("accuracy");
+    expect(result.top_positive[0].delta).toBeCloseTo(0.4);
+  });
+
+  it("respects topN limit", () => {
+    const records = [
+      { score_components: { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 } },
+      { score_components: { a: 2, b: 3, c: 4, d: 5, e: 6, f: 7 } },
+    ];
+    const result = mod.rankComponents(records, 3);
+    expect(result.top_positive).toHaveLength(3);
+    expect(result.top_negative).toHaveLength(0);
+  });
+
+  it("uses topN default of 5", () => {
+    const records = [
+      { score_components: { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7 } },
+      { score_components: { a: 2, b: 3, c: 4, d: 5, e: 6, f: 7, g: 8 } },
+    ];
+    const result = mod.rankComponents(records);
+    expect(result.top_positive).toHaveLength(5);
+  });
+
+  it("excludes zero-delta components from both lists", () => {
+    const records = [
+      { score_components: { stable: 1.0, rising: 0.5 } },
+      { score_components: { stable: 1.0, rising: 0.8 } },
+    ];
+    const result = mod.rankComponents(records);
+    expect(result.top_positive.map((c: { name: string }) => c.name)).not.toContain("stable");
+    expect(result.top_negative.map((c: { name: string }) => c.name)).not.toContain("stable");
+    expect(result.top_positive[0].name).toBe("rising");
+  });
+
+  it("sorts top_positive descending and top_negative by most negative first", () => {
+    const records = [
+      { score_components: { a: 10, b: 5, c: 1, d: 20, e: -5, f: -10 } },
+      { score_components: { a: 11, b: 8, c: 4, d: 21, e: -10, f: -20 } },
+    ];
+    const result = mod.rankComponents(records);
+    const positiveDeltas = result.top_positive.map((c: { delta: number }) => c.delta);
+    for (let i = 1; i < positiveDeltas.length; i++) {
+      expect(positiveDeltas[i - 1]).toBeGreaterThanOrEqual(positiveDeltas[i]);
+    }
+    const negativeDeltas = result.top_negative.map((c: { delta: number }) => c.delta);
+    for (let i = 1; i < negativeDeltas.length; i++) {
+      expect(negativeDeltas[i - 1]).toBeLessThanOrEqual(negativeDeltas[i]);
+    }
+  });
+});
