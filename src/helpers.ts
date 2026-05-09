@@ -223,7 +223,7 @@ export function countTsvDataRows(content: string): number {
   return lines.length > 1 ? lines.slice(1).filter((l) => l.trim()).length : 0;
 }
 
-import type { OperatingMode, RunState } from "./types.js";
+import type { GoalDoc, OperatingMode, RunState } from "./types.js";
 
 export function parseRunState(value: unknown): RunState {
   if (typeof value !== "object" || value === null) {
@@ -348,4 +348,57 @@ export function getInstalledPackageInfo(packageName: string): { version?: string
   } catch {
     return null;
   }
+}
+
+export function formatGoalDoc(doc: GoalDoc): string {
+  const field = (name: string, value: string | undefined): string =>
+    `## ${name}\n${value ?? ""}\n`;
+  return [
+    "# AutoResearch Goal",
+    "",
+    "<!-- autoresearch goal.md -->",
+    "",
+    field("goal", doc.goal),
+    field("metric", doc.metric),
+    field("direction", doc.direction),
+    field("verify", doc.verify),
+    field("guard", doc.guard),
+    field("constraints", doc.constraints),
+    field("file_map", doc.file_map),
+    field("stop_conditions", doc.stop_conditions),
+  ].join("\n");
+}
+
+export function parseGoalDocContent(content: string): GoalDoc {
+  const sections: Record<string, string> = {};
+  const parts = content.split(/^## /m);
+  for (const part of parts.slice(1)) {
+    const newlineIndex = part.indexOf("\n");
+    if (newlineIndex < 0) continue;
+    const heading = part.slice(0, newlineIndex).trim().toLowerCase();
+    const body = part.slice(newlineIndex + 1).trim();
+    sections[heading] = body;
+  }
+  return {
+    goal: sections["goal"] ?? "",
+    metric: sections["metric"] ?? "",
+    direction: sections["direction"] ?? "lower",
+    verify: sections["verify"] ?? "",
+    guard: sections["guard"] || undefined,
+    constraints: sections["constraints"] || undefined,
+    file_map: sections["file_map"] || undefined,
+    stop_conditions: sections["stop_conditions"] || undefined,
+  };
+}
+
+export function writeGoalDoc(filePath: string, doc: GoalDoc): void {
+  atomicWriteText(filePath, formatGoalDoc(doc) + "\n");
+}
+
+export function readGoalDoc(filePath: string): GoalDoc {
+  if (!existsSync(filePath)) {
+    throw new AutoresearchError("Missing file: " + filePath);
+  }
+  const content = readFileSync(filePath, "utf-8");
+  return parseGoalDocContent(content);
 }
