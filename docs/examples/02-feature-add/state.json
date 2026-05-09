@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "run_id": "feat-darkmode-2026-0515-c7e9",
+  "created_at": "2026-05-15T09:00:00.000Z",
+  "updated_at": "2026-05-15T16:45:33.000Z",
+  "status": "completed",
+  "mode": "background",
+  "operating_mode": "converge",
+  "goal": "Add dark mode toggle to React dashboard without degrading performance",
+  "scope": "src/components/,src/hooks/,src/styles/",
+  "metric": {
+    "name": "lighthouse_performance",
+    "direction": "higher",
+    "baseline": "0.89",
+    "best": "0.92",
+    "latest": "0.92"
+  },
+  "verify": "lighthouse --quiet --output json | jq '.categories.performance.score'",
+  "guard": "npm run typecheck && npm run lint",
+  "max_no_progress": 5,
+  "iterations_cap": 15,
+  "label_requirements": {
+    "keep": ["feature_working", "performance_maintained"],
+    "stop": ["max_iterations", "goal_reached"]
+  },
+  "artifact_paths": {
+    "results": "autoresearch-results.tsv",
+    "state": ".autoresearch/state.json"
+  },
+  "stats": {
+    "total_iterations": 6,
+    "kept": 3,
+    "discarded": 3,
+    "needs_human": 0,
+    "consecutive_discards": 0,
+    "best_iteration": 5
+  },
+  "flags": {
+    "stop_requested": false,
+    "needs_human": false,
+    "background_active": false,
+    "stop_ready": true
+  },
+  "last_iteration": {
+    "iteration": 6,
+    "decision": "keep",
+    "metric_value": "0.92",
+    "change_summary": "CSS custom properties approach - zero runtime JS, perfect score maintained",
+    "labels": ["feature_working", "performance_maintained", "goal_reached"],
+    "timestamp": "2026-05-15T16:45:33.000Z",
+    "keep_labels_satisfied": true,
+    "stop_labels_satisfied": true,
+    "missing_keep_labels": [],
+    "missing_stop_labels": []
+  }
+}

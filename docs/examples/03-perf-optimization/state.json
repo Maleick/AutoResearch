@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "run_id": "perf-api-latency-2026-0520-d4f2",
+  "created_at": "2026-05-20T08:00:00.000Z",
+  "updated_at": "2026-05-20T18:30:45.000Z",
+  "status": "completed",
+  "mode": "background",
+  "operating_mode": "converge",
+  "goal": "Reduce /api/users endpoint P99 latency from 450ms to under 200ms",
+  "scope": "src/api/,src/db/,src/cache/",
+  "metric": {
+    "name": "p99_latency_ms",
+    "direction": "lower",
+    "baseline": "450",
+    "best": "187",
+    "latest": "187"
+  },
+  "verify": "node benchmark.js --metric p99",
+  "guard": "npm run test:integration",
+  "max_no_progress": 6,
+  "iterations_cap": 20,
+  "label_requirements": {
+    "keep": ["latency_improved"],
+    "stop": ["goal_reached", "max_no_progress"]
+  },
+  "artifact_paths": {
+    "results": "autoresearch-results.tsv",
+    "state": ".autoresearch/state.json"
+  },
+  "stats": {
+    "total_iterations": 12,
+    "kept": 4,
+    "discarded": 8,
+    "needs_human": 0,
+    "consecutive_discards": 0,
+    "best_iteration": 10
+  },
+  "flags": {
+    "stop_requested": false,
+    "needs_human": false,
+    "background_active": false,
+    "stop_ready": true
+  },
+  "last_iteration": {
+    "iteration": 12,
+    "decision": "keep",
+    "metric_value": "187",
+    "change_summary": "Connection pooling with prepared statements - final optimization",
+    "labels": ["latency_improved", "goal_reached"],
+    "timestamp": "2026-05-20T18:30:45.000Z",
+    "keep_labels_satisfied": true,
+    "stop_labels_satisfied": true,
+    "missing_keep_labels": [],
+    "missing_stop_labels": []
+  }
+}
