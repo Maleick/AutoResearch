@@ -1217,6 +1217,45 @@ const main = async (): Promise<number> => {
         break;
       }
       case "suggest": {
+        const evidenceGated = grouped["evidence"] === "true";
+
+        if (evidenceGated) {
+          const { generateIssueCandidate } = await import("./evidence.js");
+          const candidate = generateIssueCandidate(
+            grouped.repo as string | undefined,
+            grouped.goal as string | undefined,
+            grouped.metric as string | undefined,
+            grouped.verify as string | undefined,
+            grouped["score-history-path"] as string | undefined,
+          );
+
+          if (!candidate) {
+            if (useJson) {
+              printJsonEnvelope("suggest", { candidates: [], reason: "insufficient_evidence" });
+            } else {
+              console.log("No evidence-gated issue candidates found.");
+              console.log("Insufficient failure clusters or score history not available.");
+            }
+            break;
+          }
+
+          if (useJson) {
+            printJsonEnvelope("suggest", { candidates: [candidate], evidence_gated: true });
+          } else {
+            console.log(`Evidence-Gated Issue Candidate:`);
+            console.log(`  Title:   ${candidate.title}`);
+            console.log(`  Goal:    ${candidate.goal}`);
+            console.log(`  Metric:  ${candidate.metric}`);
+            console.log(`  Evidence: ${candidate.evidence.total_discards} discards in ${candidate.evidence.total_runs} cluster(s)`);
+            console.log(``);
+            console.log(`  Suggested command:`);
+            console.log(`    ${candidate.suggest_command}`);
+            console.log(``);
+            console.log(`Review before opening. This candidate is NOT auto-submitted.`);
+          }
+          break;
+        }
+
         const { resolvePath } = await import("./helpers.js");
         const { MEMORY_DEFAULT } = await import("./constants.js");
         const memoryPath = resolvePath(grouped.repo as string | undefined, grouped["memory-path"] as string | undefined, MEMORY_DEFAULT);
