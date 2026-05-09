@@ -531,26 +531,6 @@ if (parts.length === 11) {
     };
   }
 
-  return {
-    timestamp: parts[0],
-    iteration: parseInt(parts[1], 10),
-    decision: parts[2],
-    metric_value: parts[3],
-    instrument_value: parts[4],
-    verify_status: parts[5],
-    guard_status: parts[6],
-    hypothesis: parts[7],
-    change_summary: parts[8],
-    labels: parts[9],
-    note: parts[10],
-    id: parts[11],
-    parent_id: parts[12],
-    branch: parts[13],
-    stage: parts[14],
-    agent: parts[15],
-  };
-  }
-
   if (parts.length < 16) return null;
 
   return {
