@@ -53,6 +53,7 @@ const usage = (): void => {
   console.error("  resume     Resume a background run");
   console.error("  record     Record an experiment result");
   console.error("  leaderboard Show local leaderboard across runs");
+  console.error("  compact    Compact .autoresearch history (archive old runs)");
   console.error("  doctor     Verify package installation and version");
   console.error("  help       Show this help");
   console.error("");
@@ -1781,6 +1782,60 @@ const main = async (): Promise<number> => {
             console.log("");
           }
           console.log(`Total: ${leaderboard.summary.total_runs} runs, ${leaderboard.summary.total_iterations} iterations, ${leaderboard.summary.overall_success_rate} success rate`);
+        }
+        break;
+      }
+      case "compact": {
+        const { planCompaction, executeCompaction } = await import("./compaction.js");
+        const { resolveRepo } = await import("./helpers.js");
+        const repo = resolveRepo(grouped.repo as string | undefined);
+        const preserveCount = parseInt(grouped["preserve-iterations"] as string || "5", 10);
+
+        if (dryRun) {
+          console.log("[dry-run] Would compact .autoresearch history");
+        }
+
+        const plan = planCompaction(repo, preserveCount);
+
+        if (plan.filesToArchive.length === 0) {
+          console.log("No files to compact. History is already minimal.");
+          break;
+        }
+
+        console.log(`Compaction plan for ${repo}:`);
+        console.log(`  Preserve: ${plan.filesToPreserve.length} files/directories`);
+        console.log(`  Archive:  ${plan.filesToArchive.length} files/directories`);
+        console.log(`  Space:    ${(plan.estimatedSpaceReclaimed / 1024).toFixed(1)} KB estimated`);
+
+        if (useJson) {
+          printJson({ plan });
+          break;
+        }
+
+        if (dryRun) {
+          console.log("\n[dry-run] Would archive:");
+          for (const f of plan.filesToArchive) {
+            console.log(`  - ${f}`);
+          }
+          break;
+        }
+
+        // Warning before destructive operation
+        console.error("\nWARNING: This will archive old run data. Recent runs will be preserved.");
+        console.error("Use --dry-run to preview. Use --preserve-iterations=N to adjust retention.");
+        console.error("");
+
+        const result = executeCompaction(repo, plan, false);
+
+        if (result.success) {
+          console.log(`\nCompacted successfully:`);
+          console.log(`  Archived: ${result.archived.length} items`);
+          console.log(`  Space reclaimed: ${(result.spaceReclaimed / 1024).toFixed(1)} KB`);
+          if (result.rollbackPath) {
+            console.log(`  Rollback: ${result.rollbackPath}`);
+          }
+        } else {
+          console.error("Compaction completed with errors. Some files may not have been archived.");
         }
         break;
       }
