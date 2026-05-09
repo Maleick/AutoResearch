@@ -90,11 +90,10 @@ export async function appendIteration(
   const now = utcNow();
   const scorerStatusValue = typeof scorerStatusOrScoreComponents === "string" ? scorerStatusOrScoreComponents : undefined;
   const inferredLineage = lineage
-    ?? (isExperimentLineage(scorerStatusOrScoreComponents) ? scorerStatusOrScoreComponents : undefined)
-    ?? (isExperimentLineage(scoreComponentsValue) ? scoreComponentsValue : undefined);
+    ?? (isExperimentLineage(scorerStatusOrScoreComponents) ? scorerStatusOrScoreComponents : undefined);
   const scoreComponents = typeof scorerStatusOrScoreComponents === "object" && !isExperimentLineage(scorerStatusOrScoreComponents)
     ? scorerStatusOrScoreComponents
-    : isExperimentLineage(scoreComponentsValue) ? undefined : scoreComponentsValue;
+    : scoreComponentsValue;
   const scorerStatus = normalizeScorerStatus(scorerStatusValue);
   const effectiveDecision = scorerStatus === "scorer-broken" && (decision === "keep" || decision === "discard")
     ? "needs_human"
@@ -231,7 +230,14 @@ export async function appendIteration(
 
 function isExperimentLineage(value: unknown): value is { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string } {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  return ["id", "parent_id", "branch", "stage", "agent"].some((key) => key in value);
+  const record = value as Record<string, unknown>;
+  let hasLineageValue = false;
+  for (const key of ["id", "parent_id", "branch", "stage", "agent"]) {
+    if (!(key in record) || record[key] === undefined) continue;
+    if (typeof record[key] !== "string") return false;
+    hasLineageValue = true;
+  }
+  return hasLineageValue;
 }
 
 async function appendTextFileNoFollow(filePath: string, content: string, description: string): Promise<void> {

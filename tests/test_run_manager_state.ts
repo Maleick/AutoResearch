@@ -517,6 +517,36 @@ describe("appendIteration", () => {
     });
   });
 
+  it("preserves score component keys that overlap lineage fields", async () => {
+    initState();
+    const result = await mod.appendIteration(
+      stateDir,
+      "autoresearch-results.tsv",
+      "state.json",
+      "keep",
+      "90",
+      undefined,
+      "pass",
+      "pass",
+      "hyp",
+      "change",
+      ["test"],
+      "note",
+      undefined,
+      undefined,
+      undefined,
+      { branch: 0.75, stage: 1 },
+    );
+    const scoreHistory = JSON.parse(readFileSync(resolve(stateDir, ".autoresearch/score-history.jsonl"), "utf-8").trim());
+
+    expect(result.last_iteration.score_components).toEqual({ branch: 0.75, stage: 1 });
+    expect(result.last_iteration.branch).toBe("main");
+    expect(result.last_iteration.stage).toBe("experiment");
+    expect(scoreHistory.score_components).toEqual({ branch: 0.75, stage: 1 });
+    expect(scoreHistory.branch).toBe("main");
+    expect(scoreHistory.stage).toBe("experiment");
+  });
+
   it("writes a provided instrument value to the results file and state", async () => {
     initState();
     const instrumentValue = "instrument-123";
