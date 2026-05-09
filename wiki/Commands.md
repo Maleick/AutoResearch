@@ -172,7 +172,8 @@ flowchart LR
     A --> G[resume]
     A --> H[complete]
     A --> I[record]
-    A --> J[doctor]
+    A --> J[score]
+    A --> K[doctor]
 ```
 
 - `autoresearch init` — Initialize a run

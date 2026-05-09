@@ -871,8 +871,8 @@ const main = async (): Promise<number> => {
       }
       case "completion": {
         const shell = grouped.shell as string || "bash";
-        const commands = ["init", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
-        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
+        const commands = ["init", "wizard", "status", "explain", "history", "scores", "score", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
+        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--scorer", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
         
         if (shell === "bash" || shell === "zsh") {
           console.log(`# Auto Research CLI completion for ${shell}`);
@@ -915,6 +915,7 @@ const main = async (): Promise<number> => {
           scorer: grouped.scorer as string | undefined,
           iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
           max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
+          duration: grouped.duration as string | undefined,
           memory_path: grouped["memory-path"] as string | undefined,
           required_keep_labels: grouped["required-keep-labels"] as string[] | undefined,
           required_stop_labels: grouped["required-stop-labels"] as string[] | undefined,
