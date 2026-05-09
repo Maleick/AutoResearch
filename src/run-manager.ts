@@ -13,6 +13,7 @@ import {
   normalizeLabels,
   missingRequiredLabels,
   writeGoalDoc,
+  normalizeScorerStatus,
   AutoresearchError,
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT, GOAL_DEFAULT } from "./constants.js";
@@ -89,11 +90,10 @@ export async function appendIteration(
   const now = utcNow();
   const scorerStatusValue = typeof scorerStatusOrScoreComponents === "string" ? scorerStatusOrScoreComponents : undefined;
   const inferredLineage = lineage
-    ?? (isExperimentLineage(scorerStatusOrScoreComponents) ? scorerStatusOrScoreComponents : undefined)
-    ?? (isExperimentLineage(scoreComponentsValue) ? scoreComponentsValue : undefined);
+    ?? (isExperimentLineage(scorerStatusOrScoreComponents) ? scorerStatusOrScoreComponents : undefined);
   const scoreComponents = typeof scorerStatusOrScoreComponents === "object" && !isExperimentLineage(scorerStatusOrScoreComponents)
     ? scorerStatusOrScoreComponents
-    : isExperimentLineage(scoreComponentsValue) ? undefined : scoreComponentsValue;
+    : scoreComponentsValue;
   const scorerStatus = normalizeScorerStatus(scorerStatusValue);
   const effectiveDecision = scorerStatus === "scorer-broken" && (decision === "keep" || decision === "discard")
     ? "needs_human"
@@ -218,6 +218,7 @@ export async function appendIteration(
     branch: lineageBranch,
     stage: lineageStage,
     agent: lineageAgent,
+    score_components: scoreComponents,
   };
   if (scoreComponents != null) {
     newState.last_iteration.score_components = scoreComponents;
@@ -229,7 +230,14 @@ export async function appendIteration(
 
 function isExperimentLineage(value: unknown): value is { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string } {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  return ["id", "parent_id", "branch", "stage", "agent"].some((key) => key in value);
+  const record = value as Record<string, unknown>;
+  let hasLineageValue = false;
+  for (const key of ["id", "parent_id", "branch", "stage", "agent"]) {
+    if (!(key in record) || record[key] === undefined) continue;
+    if (typeof record[key] !== "string") return false;
+    hasLineageValue = true;
+  }
+  return hasLineageValue;
 }
 
 async function appendTextFileNoFollow(filePath: string, content: string, description: string): Promise<void> {
@@ -303,6 +311,7 @@ export function makeStatePayload(
         num_drafts: config.num_drafts ?? 1,
         branch_selection_policy: config.branch_selection_policy ?? "best",
         baseline_iteration: 0,
+        branch_policy_overrides: config.branch_policy_overrides,
       })
     : undefined;
 
@@ -510,13 +519,12 @@ export async function buildSupervisorSnapshot(
   } else if (state.max_debug_depth != null && (state.stats.debug_depth ?? 0) >= state.max_debug_depth) {
     decision = "stop";
     reason = "debug_depth_exhausted";
-  } else if (state.branch_failure_budget != null) {
-    const branchFailures = state.stats.branch_failures ?? {};
-    const anyBranchExhausted = Object.values(branchFailures).some((count) => count >= state.branch_failure_budget!);
-    if (anyBranchExhausted) {
-      decision = "stop";
-      reason = "branch_failure_budget_exhausted";
-    }
+  } else if (
+    state.branch_failure_budget != null
+    && Object.values(state.stats.branch_failures ?? {}).some((count) => count >= state.branch_failure_budget!)
+  ) {
+    decision = "stop";
+    reason = "branch_failure_budget_exhausted";
   } else if (state.status === "completed" || state.status === "stopped") {
     decision = "stop";
     reason = `state_${state.status}`;
