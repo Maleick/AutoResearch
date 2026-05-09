@@ -108,9 +108,18 @@ export function categorizeError(error: Error): StructuredError {
 
   // Execution errors
   if (message.includes("failed") || message.includes("timeout") || message.includes("Timed out")) {
+    const code =
+      message.includes("timeout") || message.includes("Timed out")
+        ? "TIMEOUT"
+        : message.includes("guard")
+          ? "GUARD_FAILED"
+          : message.includes("scorer")
+            ? "SCORER_FAILED"
+            : "VERIFY_FAILED";
+
     return {
       kind: "execution",
-      code: message.includes("timeout") ? "TIMEOUT" : "VERIFY_FAILED",
+      code,
       message,
       recoverable: true,
     };
