@@ -16,8 +16,9 @@ import {
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT, GOAL_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
-import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
+import { writeFileSync, appendFileSync, existsSync, constants, lstatSync, openSync, fstatSync, closeSync, writeSync } from "fs";
 import { lstat, open } from "fs/promises";
+import { dirname } from "path";
 
 const MAX_RESULTS_BYTES = 10 * 1024 * 1024;
 
