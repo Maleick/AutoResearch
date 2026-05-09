@@ -52,6 +52,7 @@ const usage = (): void => {
   console.error("  stop       Request a background run stop");
   console.error("  resume     Resume a background run");
   console.error("  record     Record an experiment result");
+  console.error("  queue      Manage background task queue");
   console.error("  leaderboard Show local leaderboard across runs");
   console.error("  doctor     Verify package installation and version");
   console.error("  help       Show this help");
@@ -1843,6 +1844,75 @@ const main = async (): Promise<number> => {
         }
         break;
       }
+      case "queue": {
+        const subCmd = cmdArgs[0] || "list";
+
+        if (subCmd === "help") {
+          console.error("Usage: autoresearch queue <subcommand> [options]");
+          console.error("");
+          console.error("Subcommands:");
+          console.error("  list     List tasks in the queue (default)");
+          console.error("  enqueue  Enqueue a new task");
+          console.error("  clean    Remove completed and failed tasks");
+          break;
+        }
+
+        if (subCmd === "enqueue") {
+          if (!grouped.goal || !grouped.metric || !grouped.verify) {
+            console.error("--goal, --metric, and --verify are required for enqueue");
+            return 1;
+          }
+          const { enqueueTasks } = await import("./task-queue.js");
+          const tasks = await enqueueTasks(
+            grouped.repo as string | undefined,
+            [{ goal: grouped.goal as string, metric: grouped.metric as string, verify: grouped.verify as string }],
+          );
+          if (useJson) {
+            printJson({ enqueued: tasks });
+          } else {
+            for (const t of tasks) {
+              console.log(`Enqueued: ${t.id} - ${t.goal}`);
+            }
+          }
+          break;
+        }
+
+        if (subCmd === "clean") {
+          const { listTasks, writeManifest, resolveQueuePath } = await import("./task-queue.js");
+          const queuePath = resolveQueuePath(grouped.repo as string | undefined);
+          const manifest = await listTasks(grouped.repo as string | undefined);
+          const before = manifest.tasks.length;
+          manifest.tasks = manifest.tasks.filter((t) => t.status === "pending" || t.status === "leased");
+          manifest.updated_at = new Date().toISOString();
+          const removed = before - manifest.tasks.length;
+          await writeManifest(queuePath, manifest);
+
+          if (useJson) {
+            printJson({ removed });
+          } else {
+            console.log(`Cleaned ${removed} completed/failed tasks. ${manifest.tasks.length} remain.`);
+          }
+          break;
+        }
+
+        const { listTasks } = await import("./task-queue.js");
+        const manifest = await listTasks(grouped.repo as string | undefined);
+
+        if (useJson) {
+          printJson(manifest);
+        } else {
+          if (manifest.tasks.length === 0) {
+            console.log("No tasks in queue.");
+          } else {
+            console.log(`Task Queue (${manifest.tasks.length} tasks):`);
+            for (const task of manifest.tasks) {
+              const icon = task.status === "completed" ? "v" : task.status === "failed" ? "x" : task.status === "leased" ? ">" : "*";
+              console.log(`  ${icon} ${task.id}  [${task.status}]  ${task.goal}`);
+            }
+          }
+        }
+        break;
+      }
       case "leaderboard": {
         const { generateLeaderboard, formatLeaderboardMarkdown, formatLeaderboardText } = await import("./leaderboard.js");
         const { resolveRepo } = await import("./helpers.js");
@@ -1865,6 +1935,40 @@ const main = async (): Promise<number> => {
           console.log(formatLeaderboardText(leaderboard));
         }
         break;
+      }
+      case "worker": {
+        const { workerOnce } = await import("./worker.js");
+        const once = grouped["once"] === "true";
+
+        if (!once) {
+          console.error("worker requires --once flag");
+          console.error("Usage: autoresearch worker --once [--json] [--repo <path>]");
+          return 1;
+        }
+
+        const result = workerOnce(
+          grouped.repo as string | undefined,
+          grouped["state-path"] as string | undefined,
+          grouped["results-path"] as string | undefined,
+        );
+
+        if (useJson) {
+          printJsonEnvelope("worker", result);
+        } else {
+          if (result.ready) {
+            console.log(`✓ Ready for iteration ${result.iteration}`);
+            console.log(`  Run ID:  ${result.run_id}`);
+            console.log(`  Status:  ${result.status}`);
+            console.log(`  Goal:    ${result.goal}`);
+            if (result.metric) console.log(`  Metric:  ${result.metric}`);
+          } else {
+            console.log(`✗ Not ready: ${result.reason || "unknown"}`);
+            console.log(`  Run ID: ${result.run_id}`);
+            console.log(`  Iter:   ${result.iteration}`);
+          }
+        }
+
+        return result.ready ? 0 : 1;
       }
       default: {
         console.error(`Unknown command: ${cmd}`);
