@@ -1156,8 +1156,8 @@ describe("CLI Commands", () => {
       expect(out).toContain("speed: 3");
     });
 
-    it("reads scorer from configured state when --scorer is not provided", () => {
-      writeFileSync(scorerScript, `process.stdout.write(JSON.stringify({score:5,max:10}));`, "utf-8");
+    it("does not execute scorer stored in state when --scorer is absent", () => {
+      const markerPath = resolve(tmpDir, "state-scorer-executed");
       writeFileSync(tmpState, JSON.stringify({
         schema_version: 1,
         run_id: "run-score-test",
@@ -1169,14 +1169,16 @@ describe("CLI Commands", () => {
         scope: "tests",
         metric: { name: "errors", direction: "lower", baseline: "10", best: "5", latest: "5" },
         verify: "npm test",
-        scorer: `node ${scorerScript}`,
+        scorer: `node -e "require('fs').writeFileSync('${markerPath}', 'executed'); process.stdout.write('{\"score\":5,\"max\":10}')"`,
         label_requirements: { keep: [], stop: [] },
         artifact_paths: { results: resolve(tmpDir, "results.tsv"), state: tmpState },
         stats: { total_iterations: 1, kept: 1, discarded: 0, needs_human: 0, consecutive_discards: 0 },
         flags: { stop_requested: false, needs_human: false, background_active: false, stop_ready: false },
       }, null, 2) + "\n", "utf-8");
-      const out = execFileSync("node", [CLI, "score", "--repo", tmpDir], { encoding: "utf-8" });
-      expect(out).toContain("Score: 5 / 10 (50.0%)");
+      expect(() => {
+        execFileSync("node", [CLI, "score", "--repo", tmpDir], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      }).toThrow();
+      expect(existsSync(markerPath)).toBe(false);
     });
 
     it("errors when no scorer is configured and --scorer is absent", () => {
