@@ -104,11 +104,6 @@ export async function appendIteration(
   const resultRow = [
     now,
     String(currentIteration),
-    lineageId,
-    lineageParentId,
-    lineageBranch,
-    lineageStage,
-    lineageAgent,
     decision,
     metricValue ?? "",
     instrumentValue ?? "",
@@ -118,6 +113,11 @@ export async function appendIteration(
     changeSummary,
     labelList.join(","),
     note ?? "",
+    lineageId,
+    lineageParentId,
+    lineageBranch,
+    lineageStage,
+    lineageAgent,
   ].join("\t") + "\n";
 
   appendFileSync(resultsPath, resultRow, "utf-8");
@@ -510,7 +510,7 @@ export function parseResultRow(line: string): ResultRow | null {
 
   if (parts.length < 11) return null;
 
-if (parts.length === 11) {
+  if (parts.length === 11) {
     return {
       timestamp: parts[0],
       iteration: parseInt(parts[1], 10),
@@ -536,19 +536,19 @@ if (parts.length === 11) {
   return {
     timestamp: parts[0],
     iteration: parseInt(parts[1], 10),
-    id: parts[2],
-    parent_id: parts[3],
-    branch: parts[4],
-    stage: parts[5],
-    agent: parts[6],
-    decision: parts[7],
-    metric_value: parts[8],
-    instrument_value: parts[9],
-    verify_status: parts[10],
-    guard_status: parts[11],
-    hypothesis: parts[12],
-    change_summary: parts[13],
-    labels: parts[14],
-    note: parts[15],
+    decision: parts[2],
+    metric_value: parts[3],
+    instrument_value: parts[4],
+    verify_status: parts[5],
+    guard_status: parts[6],
+    hypothesis: parts[7],
+    change_summary: parts[8],
+    labels: parts[9],
+    note: parts[10],
+    id: parts[11],
+    parent_id: parts[12],
+    branch: parts[13],
+    stage: parts[14],
+    agent: parts[15],
   };
 }
