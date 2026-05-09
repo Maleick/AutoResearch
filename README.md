@@ -226,10 +226,13 @@ cat .autoresearch/state.json | jq .
 | Command | Purpose |
 | --- | --- |
 | `autoresearch init` | Initialize a run |
+| `autoresearch goal init` | Create a `GOAL.md` goal definition file (interactive or from flags) |
 | `autoresearch wizard` | Generate setup summary |
 | `autoresearch status` | Print run status |
 | `autoresearch explain` | Human-readable run state |
 | `autoresearch history` | Show recent iteration log |
+| `autoresearch scores` | Show score trend history |
+| `autoresearch badge` | Generate score/component badge markdown + SVG |
 | `autoresearch config` | Show runtime configuration |
 | `autoresearch report` | Generate markdown report |
 | `autoresearch summary` | Aggregate stats across runs |
@@ -243,6 +246,43 @@ cat .autoresearch/state.json | jq .
 | `autoresearch completion` | Generate shell completions |
 | `autoresearch doctor` | Verify installation |
 | `autoresearch help` | Show usage |
+
+### `autoresearch goal init`
+
+Create a `GOAL.md` goal definition file. Supports interactive wizard, CLI flags, and stdin JSON.
+
+**Interactive (TTY):**
+```bash
+autoresearch goal init
+```
+
+**From flags (non-interactive):**
+```bash
+autoresearch goal init \
+  --goal "Reduce test failures" \
+  --metric failures \
+  --direction lower \
+  --verify "npm test" \
+  --guard "npm run lint"
+```
+
+**From a preset template:**
+```bash
+autoresearch goal init --template performance   # benchmark_ms / lower / npm run bench
+autoresearch goal init --template quality       # test_failures / lower / npm test
+autoresearch goal init --template coverage      # coverage_pct / higher / npm run coverage
+```
+
+**From stdin JSON (CI / scripted use):**
+```bash
+echo '{"goal":"reduce latency","metric":"p99_ms","direction":"lower","verify":"npm run bench"}' \
+  | autoresearch goal init
+```
+
+**Dry-run preview:**
+```bash
+autoresearch goal init --template performance --dry-run
+```
 
 ## Architecture
 
