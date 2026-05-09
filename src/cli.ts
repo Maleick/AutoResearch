@@ -1063,7 +1063,7 @@ const main = async (): Promise<number> => {
           
           if (state.duration_seconds) {
             const elapsedMin = Math.round(state.duration_seconds / 60);
-            console.log(`- **Elapsed:** ${elapsedMin} minutes`);
+            console.log(`- **Duration limit:** ${elapsedMin} minutes`);
           }
           
           // Next candidate
@@ -1792,7 +1792,7 @@ const main = async (): Promise<number> => {
     }
   } catch (exc) {
     const { categorizeError, formatStructuredError } = await import("./error-categories.js");
-    const structured = categorizeError(exc as Error);
+    const structured = categorizeError(exc);
     if (useJson) {
       console.error(formatStructuredError(structured, true));
     } else {

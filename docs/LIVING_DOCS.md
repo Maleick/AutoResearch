@@ -46,9 +46,9 @@ When behavior-changing code is modified, corresponding documentation must be upd
 - Update unrelated documentation
 - Skip docs for user-facing changes
 
-## CI Integration
+## CI Integration (Example)
 
-The check runs in CI on pull requests:
+You can run the check in CI on pull requests:
 
 ```yaml
 - name: Check documentation changes

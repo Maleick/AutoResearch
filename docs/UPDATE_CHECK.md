@@ -4,10 +4,10 @@ Auto Research includes an automatic update check that runs at startup for most c
 
 ## Behavior
 
-The update check verifies whether a newer version of `opencode-autoresearch` is available on npm. It caches the result to avoid repeated network requests.
+The update status currently reads locally cached update metadata when present.
 
 - **Cache location**: `~/.cache/opencode-autoresearch/update-check.json`
-- **Cache TTL**: 24 hours (`86400000` ms)
+- **Current behavior**: Cache display only (no live npm registry probe yet)
 - **Default**: Enabled for all users (opt-out, not opt-in)
 
 ## Skip Matrix

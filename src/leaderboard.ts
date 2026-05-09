@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
+import { RESULTS_DEFAULT, STATE_DEFAULT } from "./constants.js";
+import { parseMetricValue } from "./metric-comparator.js";
 
 export interface LeaderboardEntry {
   run_id: string;
@@ -26,7 +28,10 @@ export interface Leaderboard {
   };
 }
 
-function parseResultsFile(resultsPath: string): { kept: number; discarded: number; bestValue: string | null; latestValue: string | null } {
+function parseResultsFile(
+  resultsPath: string,
+  direction: "lower" | "higher",
+): { kept: number; discarded: number; bestValue: string | null; latestValue: string | null } {
   if (!existsSync(resultsPath)) {
     return { kept: 0, discarded: 0, bestValue: null, latestValue: null };
   }
@@ -61,8 +66,19 @@ function parseResultsFile(resultsPath: string): { kept: number; discarded: numbe
 
     if (metricValue) {
       latestValue = metricValue;
-      if (bestValue === null || metricValue < bestValue) {
+      if (bestValue === null) {
         bestValue = metricValue;
+      } else {
+        const currentNumeric = parseMetricValue(metricValue);
+        const bestNumeric = parseMetricValue(bestValue);
+        if (currentNumeric !== null && bestNumeric !== null) {
+          const isBetter = direction === "higher" ? currentNumeric > bestNumeric : currentNumeric < bestNumeric;
+          if (isBetter) {
+            bestValue = metricValue;
+          }
+        } else if (currentNumeric !== null && bestNumeric === null) {
+          bestValue = metricValue;
+        }
       }
     }
   }
@@ -85,6 +101,7 @@ function calculateRuntime(state: Record<string, unknown>): number | null {
 export function generateLeaderboard(repoPath: string): Leaderboard {
   const autoresearchDir = resolve(repoPath, ".autoresearch");
   const entries: LeaderboardEntry[] = [];
+  const seenStatePaths = new Set<string>();
 
   if (!existsSync(autoresearchDir)) {
     return {
@@ -103,10 +120,12 @@ export function generateLeaderboard(repoPath: string): Leaderboard {
     const resultsPath = resolve(runPath, "results.tsv");
 
     if (!existsSync(statePath)) continue;
+    seenStatePaths.add(statePath);
 
     try {
       const state = JSON.parse(readFileSync(statePath, "utf-8"));
-      const results = parseResultsFile(resultsPath);
+      const direction = state.metric?.direction === "higher" ? "higher" : "lower";
+      const results = parseResultsFile(resultsPath, direction);
       const runtime = calculateRuntime(state);
 
       entries.push({
@@ -128,6 +147,38 @@ export function generateLeaderboard(repoPath: string): Leaderboard {
     } catch {
       // Skip corrupted state files
       continue;
+    }
+  }
+
+  const currentStatePath = resolve(repoPath, STATE_DEFAULT);
+  if (existsSync(currentStatePath) && !seenStatePaths.has(currentStatePath)) {
+    try {
+      const state = JSON.parse(readFileSync(currentStatePath, "utf-8"));
+      const direction = state.metric?.direction === "higher" ? "higher" : "lower";
+      const stateResultsPath = typeof state.artifact_paths?.results === "string"
+        ? resolve(repoPath, state.artifact_paths.results)
+        : resolve(repoPath, RESULTS_DEFAULT);
+      const results = parseResultsFile(stateResultsPath, direction);
+      const runtime = calculateRuntime(state);
+
+      entries.push({
+        run_id: state.run_id || "current",
+        goal: state.goal || "Unknown",
+        metric: state.metric?.name || "Unknown",
+        direction,
+        total_iterations: results.kept + results.discarded,
+        kept: results.kept,
+        discarded: results.discarded,
+        success_rate: results.kept + results.discarded > 0
+          ? `${((results.kept / (results.kept + results.discarded)) * 100).toFixed(1)}%`
+          : "0%",
+        best_value: results.bestValue,
+        latest_value: results.latestValue,
+        runtime_seconds: runtime,
+        completed_at: state.updated_at || null,
+      });
+    } catch {
+      // Skip corrupted state files
     }
   }
 

@@ -52,8 +52,63 @@ describe("Leaderboard", () => {
     expect(lb.entries[0].total_iterations).toBe(3);
     expect(lb.entries[0].kept).toBe(2);
     expect(lb.entries[0].discarded).toBe(1);
-    expect(lb.entries[0].best_value).toBe("10");
+    expect(lb.entries[0].best_value).toBe("8");
     expect(lb.entries[0].runtime_seconds).toBe(3600);
+  });
+
+  it("selects best value using metric direction", () => {
+    const runDir = resolve(tmpDir, ".autoresearch", "run-test-higher");
+    mkdirSync(runDir, { recursive: true });
+
+    writeFileSync(
+      resolve(runDir, "state.json"),
+      JSON.stringify({
+        run_id: "run-test-higher",
+        goal: "Increase score",
+        metric: { name: "score", direction: "higher" },
+        created_at: "2026-05-01T10:00:00Z",
+        updated_at: "2026-05-01T11:00:00Z",
+      }),
+    );
+
+    writeFileSync(
+      resolve(runDir, "results.tsv"),
+      "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n" +
+      "2026-05-01T10:05:00Z\t1\tkeep\t10\t\tok\tok\t\tInitial\t\t\n" +
+      "2026-05-01T10:10:00Z\t2\tdiscard\t8\t\tok\tok\t\tRegressed\t\t\n" +
+      "2026-05-01T10:15:00Z\t3\tkeep\t15\t\tok\tok\t\tImproved\t\t\n",
+    );
+
+    const lb = generateLeaderboard(tmpDir);
+    expect(lb.entries).toHaveLength(1);
+    expect(lb.entries[0].best_value).toBe("15");
+  });
+
+  it("generates leaderboard from default state and results artifacts", () => {
+    const stateDir = resolve(tmpDir, ".autoresearch");
+    mkdirSync(stateDir, { recursive: true });
+
+    writeFileSync(
+      resolve(stateDir, "state.json"),
+      JSON.stringify({
+        run_id: "run-current",
+        goal: "Current run",
+        metric: { name: "errors", direction: "lower" },
+        created_at: "2026-05-01T10:00:00Z",
+        updated_at: "2026-05-01T10:30:00Z",
+      }),
+    );
+
+    writeFileSync(
+      resolve(tmpDir, "autoresearch-results.tsv"),
+      "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n" +
+      "2026-05-01T10:05:00Z\t1\tkeep\t12\t\tok\tok\t\tImproved\t\t\n",
+    );
+
+    const lb = generateLeaderboard(tmpDir);
+    expect(lb.entries).toHaveLength(1);
+    expect(lb.entries[0].run_id).toBe("run-current");
+    expect(lb.entries[0].best_value).toBe("12");
   });
 
   it("formats markdown output", () => {

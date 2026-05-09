@@ -17,6 +17,7 @@ export interface StructuredError {
 
 export const ERROR_CODES: Record<ErrorKind, Record<string, string>> = {
   validation: {
+    INVALID_INPUT: "Input validation failed",
     INVALID_GOAL: "Goal must be a non-empty string",
     INVALID_METRIC: "Metric must be a non-empty string",
     INVALID_DIRECTION: "Direction must be 'lower' or 'higher'",
@@ -59,14 +60,25 @@ export const ERROR_CODES: Record<ErrorKind, Record<string, string>> = {
   },
 };
 
-export function categorizeError(error: Error): StructuredError {
-  const message = error.message;
+function messageFromUnknown(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+export function categorizeError(error: unknown): StructuredError {
+  const message = messageFromUnknown(error);
+  const messageLower = message.toLowerCase();
 
   // Validation errors
   if (message.includes("Missing required") || message.includes("Invalid")) {
     const code = Object.keys(ERROR_CODES.validation).find((k) =>
       message.toLowerCase().includes(k.toLowerCase().replace(/_/g, " ")),
-    ) || "INVALID_CONFIG";
+    ) || "INVALID_INPUT";
 
     return {
       kind: "validation",
@@ -77,8 +89,8 @@ export function categorizeError(error: Error): StructuredError {
   }
 
   // State errors
-  if (message.includes("state") || message.includes("State")) {
-    if (message.includes("not found") || message.includes("No run")) {
+  if (messageLower.includes("state")) {
+    if (messageLower.includes("not found") || messageLower.includes("no run")) {
       return {
         kind: "state",
         code: "STATE_NOT_FOUND",
@@ -86,7 +98,7 @@ export function categorizeError(error: Error): StructuredError {
         recoverable: true,
       };
     }
-    if (message.includes("corrupt")) {
+    if (messageLower.includes("corrupt")) {
       return {
         kind: "state",
         code: "STATE_CORRUPTED",
@@ -97,7 +109,7 @@ export function categorizeError(error: Error): StructuredError {
   }
 
   // Filesystem errors
-  if (message.includes("ENOENT") || message.includes("not found") || message.includes("Permission")) {
+  if (message.includes("ENOENT") || messageLower.includes("not found") || message.includes("Permission")) {
     return {
       kind: "filesystem",
       code: message.includes("Permission") ? "PERMISSION_DENIED" : "FILE_NOT_FOUND",
@@ -107,13 +119,13 @@ export function categorizeError(error: Error): StructuredError {
   }
 
   // Execution errors
-  if (message.includes("failed") || message.includes("timeout") || message.includes("Timed out")) {
+  if (messageLower.includes("failed") || messageLower.includes("timeout") || messageLower.includes("timed out")) {
     const code =
-      message.includes("timeout") || message.includes("Timed out")
+      messageLower.includes("timeout") || messageLower.includes("timed out")
         ? "TIMEOUT"
-        : message.includes("guard")
+        : messageLower.includes("guard")
           ? "GUARD_FAILED"
-          : message.includes("scorer")
+          : messageLower.includes("scorer")
             ? "SCORER_FAILED"
             : "VERIFY_FAILED";
 

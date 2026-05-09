@@ -6,6 +6,7 @@ describe("Error Categories", () => {
       const error = new Error("Missing required: --goal");
       const structured = categorizeError(error);
       expect(structured.kind).toBe("validation");
+      expect(structured.code).toBe("INVALID_INPUT");
       expect(structured.recoverable).toBe(true);
     });
 
@@ -37,6 +38,12 @@ describe("Error Categories", () => {
       expect(structured.kind).toBe("unknown");
       expect(structured.code).toBe("UNKNOWN_ERROR");
       expect(structured.recoverable).toBe(false);
+    });
+
+    it("handles non-Error thrown values", () => {
+      const structured = categorizeError("Timed out waiting for process");
+      expect(structured.kind).toBe("execution");
+      expect(structured.code).toBe("TIMEOUT");
     });
   });
 
