@@ -273,6 +273,26 @@ describe("CLI Commands", () => {
     });
   });
 
+  describe("contract command", () => {
+    it("prints schema overview in text mode", () => {
+      const out = execSync(`node ${CLI} contract`, { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("Auto Research Contract Schemas");
+      expect(out).toContain("State Schema:");
+      expect(out).toContain("Goal Doc Schema:");
+    });
+
+    it("outputs full schemas in JSON mode", () => {
+      const out = execSync(`node ${CLI} contract --json`, { encoding: "utf-8", cwd: REPO_ROOT });
+      const json = JSON.parse(out);
+      expect(json.schema_version).toBe("1.0.0");
+      expect(json.state).toBeDefined();
+      expect(json.state.required).toContain("run_id");
+      expect(json.result_row).toBeDefined();
+      expect(json.goal_doc).toBeDefined();
+      expect(json.goal_doc.required).toContain("goal");
+    });
+  });
+
   describe("explain command", () => {
     it("shows human-readable run state", () => {
       const out = execSync(`node ${CLI} explain`, { encoding: "utf-8", cwd: REPO_ROOT });
