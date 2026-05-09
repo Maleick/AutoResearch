@@ -149,12 +149,22 @@ export interface SupervisorSnapshot {
   draft_pool?: DraftPoolConfig;
 }
 
+export type BranchSelectionPolicy = "best" | "roulette" | "diverse";
+
+export interface BranchSelectionPolicyInfo {
+  id: BranchSelectionPolicy;
+  label: string;
+  description: string;
+  recommended_for: string[];
+}
+
 export interface DraftBranch {
   branch_id: string;
   iteration: number;
   parent_iteration: number;
   metric_value?: string;
   status: "pending" | "running" | "completed" | "discarded";
+  policy_override?: BranchSelectionPolicy;
 }
 
 export interface MemoryProvenance {
@@ -211,9 +221,10 @@ export interface DraftPoolConfig {
   kind: "autoresearch_draft_pool";
   version: number;
   num_drafts: number;
-  branch_selection_policy: "best" | "roulette" | "diverse";
+  branch_selection_policy: BranchSelectionPolicy;
   active_drafts: DraftBranch[];
   best_branch_id?: string;
+  available_policies: BranchSelectionPolicyInfo[];
 }
 
 export interface GoalDoc {
