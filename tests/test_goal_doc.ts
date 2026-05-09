@@ -194,7 +194,8 @@ describe("CLI goal command", () => {
       encoding: "utf-8",
       cwd: REPO_ROOT,
     });
-    const parsed = JSON.parse(out);
+    const envelope = JSON.parse(out);
+    const parsed = envelope.data;
     expect(parsed.goal).toBe("Improve coverage");
     expect(parsed.metric).toBe("coverage");
     expect(parsed.direction).toBe("higher");

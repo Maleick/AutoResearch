@@ -120,6 +120,29 @@ describe("makeStatePayload", () => {
     const state = mod.makeStatePayload(config, "results.tsv", "state.json");
     expect(state.flags.stop_ready).toBe(false);
   });
+
+  it("passes branch policy overrides into draft pool state", async () => {
+    const subagentPool = await import(resolve(REPO_ROOT, "dist/subagent-pool.js"));
+    subagentPool.resetBranchIdCounter();
+    const config = {
+      goal: "test",
+      metric: "score",
+      direction: "higher",
+      verify: "npm test",
+      mode: "foreground",
+      num_drafts: 3,
+      branch_selection_policy: "best",
+      branch_policy_overrides: {
+        "draft-0": "roulette",
+        "draft-2": "diverse",
+      },
+    };
+    const state = mod.makeStatePayload(config, "results.tsv", "state.json");
+
+    expect(state.draft_pool?.active_drafts[0].policy_override).toBe("roulette");
+    expect(state.draft_pool?.active_drafts[1].policy_override).toBeUndefined();
+    expect(state.draft_pool?.active_drafts[2].policy_override).toBe("diverse");
+  });
 });
 
 describe("setStopRequested", () => {
@@ -492,6 +515,36 @@ describe("appendIteration", () => {
       stage: "stage-a",
       agent: "agent-a",
     });
+  });
+
+  it("preserves score component keys that overlap lineage fields", async () => {
+    initState();
+    const result = await mod.appendIteration(
+      stateDir,
+      "autoresearch-results.tsv",
+      "state.json",
+      "keep",
+      "90",
+      undefined,
+      "pass",
+      "pass",
+      "hyp",
+      "change",
+      ["test"],
+      "note",
+      undefined,
+      undefined,
+      undefined,
+      { branch: 0.75, stage: 1 },
+    );
+    const scoreHistory = JSON.parse(readFileSync(resolve(stateDir, ".autoresearch/score-history.jsonl"), "utf-8").trim());
+
+    expect(result.last_iteration.score_components).toEqual({ branch: 0.75, stage: 1 });
+    expect(result.last_iteration.branch).toBe("main");
+    expect(result.last_iteration.stage).toBe("experiment");
+    expect(scoreHistory.score_components).toEqual({ branch: 0.75, stage: 1 });
+    expect(scoreHistory.branch).toBe("main");
+    expect(scoreHistory.stage).toBe("experiment");
   });
 
   it("writes a provided instrument value to the results file and state", async () => {
