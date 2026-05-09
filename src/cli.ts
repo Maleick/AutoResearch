@@ -15,6 +15,7 @@ const usage = (): void => {
   console.error("");
   console.error("Commands:");
   console.error("  init       Initialize a run");
+  console.error("  goal       Manage goal definitions (subcommands: init)");
   console.error("  wizard     Generate a setup summary");
   console.error("  status     Print run status");
   console.error("  explain    Human-readable run state");
@@ -55,6 +56,8 @@ const usage = (): void => {
   console.error("  --results-path  Custom results TSV path");
   console.error("  --state-path    Custom state JSON path");
   console.error("  --fresh-start   Archive previous artifacts before starting");
+  console.error("  --goal-path     Output path for GOAL.md (used by goal init)");
+  console.error("  --template      Goal template: performance, quality, coverage, custom (used by goal init)");
   console.error("");
   console.error("Flags:");
   console.error("  -h, --help      Show this help");
@@ -65,6 +68,8 @@ const usage = (): void => {
   console.error("Examples:");
   console.error("  autoresearch wizard --goal \"optimize response time\"");
   console.error("  autoresearch init --goal \"reduce errors\" --metric errors --direction lower --verify \"npm test\"");
+  console.error("  autoresearch goal init --goal \"reduce errors\" --metric errors --direction lower --verify \"npm test\"");
+  console.error("  autoresearch goal init --template performance");
   console.error("  autoresearch status");
   console.error("  autoresearch explain");
   console.error("  autoresearch history");
@@ -826,8 +831,8 @@ const main = async (): Promise<number> => {
       }
       case "completion": {
         const shell = grouped.shell as string || "bash";
-        const commands = ["init", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
-        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
+        const commands = ["init", "goal", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
+        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell", "--goal-path", "--template"];
         
         if (shell === "bash" || shell === "zsh") {
           console.log(`# Auto Research CLI completion for ${shell}`);
@@ -1068,6 +1073,178 @@ const main = async (): Promise<number> => {
           return 1;
         }
         console.log(`\nAll ${checks.length} checks passed.`);
+        break;
+      }
+      case "goal": {
+        const subCmd = cmdArgs[0];
+        if (!subCmd || subCmd === "help" || HELP_FLAGS.includes(subCmd)) {
+          console.error("Usage: autoresearch goal <subcommand> [options]");
+          console.error("");
+          console.error("Subcommands:");
+          console.error("  init    Create a GOAL.md goal definition file");
+          console.error("");
+          console.error("Options (goal init):");
+          console.error("  --goal          Goal description");
+          console.error("  --metric        Metric name to track");
+          console.error("  --direction     lower or higher (default: lower)");
+          console.error("  --verify        Mechanical verification command");
+          console.error("  --guard         Guard command for regression catch");
+          console.error("  --mode          foreground or background (default: foreground)");
+          console.error("  --scope         In-scope files or subsystem");
+          console.error("  --iterations    Iteration cap");
+          console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
+          console.error("  --template      Preset template: performance, quality, coverage, custom");
+          console.error("  --goal-path     Output file path (default: GOAL.md)");
+          console.error("  --dry-run       Preview without writing the file");
+          console.error("  --json          Output result as JSON");
+          console.error("");
+          console.error("Examples:");
+          console.error("  autoresearch goal init --goal \"reduce errors\" --metric failures --direction lower --verify \"npm test\"");
+          console.error("  autoresearch goal init --template performance");
+          console.error("  autoresearch goal init  # interactive wizard");
+          return 0;
+        }
+        if (subCmd !== "init") {
+          console.error(`Unknown goal subcommand: ${subCmd}`);
+          console.error("Run 'autoresearch goal help' for usage.");
+          return 1;
+        }
+
+        const goalArgs = cmdArgs.slice(1);
+        const goalParsed = parseArgs(goalArgs);
+        const goalGrouped: Record<string, string | string[]> = {};
+        for (const [k, v] of Object.entries(goalParsed)) {
+          goalGrouped[k] = v;
+        }
+        const useGoalJson = goalGrouped.json === "true";
+        const isGoalDryRun = goalGrouped["dry-run"] === "true";
+
+        const { GOAL_TEMPLATES, getGoalTemplate, buildGoalDocument, buildGoalInitResult } = await import("./goal-init.js");
+        const { GOAL_DEFAULT } = await import("./constants.js");
+        const { resolvePath } = await import("./helpers.js");
+        const { writeFileSync, existsSync: goalExistsSync } = await import("fs");
+
+        const templateId = (goalGrouped.template as string | undefined) ?? "custom";
+        if (!GOAL_TEMPLATES.find((t) => t.id === templateId)) {
+          console.error(`Unknown template: ${templateId}. Valid templates: ${GOAL_TEMPLATES.map((t) => t.id).join(", ")}`);
+          return 1;
+        }
+        const template = getGoalTemplate(templateId);
+        const templateDefaults = template?.defaults ?? {};
+
+        let config: Record<string, unknown> = {
+          goal: goalGrouped.goal ?? templateDefaults.goal,
+          metric: goalGrouped.metric ?? templateDefaults.metric,
+          direction: goalGrouped.direction ?? templateDefaults.direction,
+          verify: goalGrouped.verify ?? templateDefaults.verify,
+          guard: goalGrouped.guard ?? templateDefaults.guard,
+          mode: goalGrouped.mode ?? templateDefaults.mode,
+          scope: goalGrouped.scope ?? templateDefaults.scope,
+          iterations: goalGrouped.iterations ? parsePositiveInt(goalGrouped.iterations as string, "iterations") : templateDefaults.iterations,
+          duration: goalGrouped.duration ?? templateDefaults.duration,
+          stop_condition: goalGrouped["stop-condition"] ?? templateDefaults.stop_condition,
+          rollback_strategy: goalGrouped["rollback-strategy"] ?? templateDefaults.rollback_strategy,
+          template: templateId,
+        };
+
+        const isTTY = process.stdin.isTTY === true;
+        const hasRequiredFlags = Boolean(config.goal && config.metric && config.verify);
+
+        if (!hasRequiredFlags && !isTTY) {
+          // Non-interactive stdin: try to read JSON from stdin
+          let stdinData = "";
+          try {
+            stdinData = await new Promise<string>((resolve, reject) => {
+              const chunks: Buffer[] = [];
+              process.stdin.on("data", (chunk) => chunks.push(chunk as Buffer));
+              process.stdin.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+              process.stdin.on("error", reject);
+              // Resolve immediately if stdin is closed / empty
+              setTimeout(() => resolve(""), 200);
+            });
+            stdinData = stdinData.trim();
+          } catch {
+            stdinData = "";
+          }
+          if (stdinData) {
+            try {
+              const parsed = JSON.parse(stdinData) as Record<string, unknown>;
+              config = { ...config, ...parsed, template: templateId };
+            } catch {
+              console.error("Failed to parse stdin as JSON. Provide valid JSON or use --goal, --metric, --verify flags.");
+              return 1;
+            }
+          }
+        }
+
+        if (!config.goal && isTTY) {
+          // Interactive wizard
+          const readline = await import("readline");
+          const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+          const ask = (prompt: string, defaultVal?: string): Promise<string> =>
+            new Promise((resolve) => {
+              const suffix = defaultVal ? ` [${defaultVal}]` : "";
+              rl.question(`${prompt}${suffix}: `, (answer: string) => {
+                resolve(answer.trim() || defaultVal || "");
+              });
+            });
+
+          process.stderr.write("\nAutoresearch Goal Init — Interactive Wizard\n");
+          process.stderr.write("Press Enter to accept default values shown in brackets.\n\n");
+
+          if (!config.goal) config.goal = await ask("Goal (what outcome should this run optimize?)", config.goal as string | undefined);
+          if (!config.metric) config.metric = await ask("Metric name", (config.metric as string | undefined) ?? "primary_metric");
+          if (!config.direction) config.direction = await ask("Direction (lower/higher)", (config.direction as string | undefined) ?? "lower");
+          if (!config.verify) config.verify = await ask("Verify command", config.verify as string | undefined);
+          if (!config.guard) {
+            const guard = await ask("Guard command (optional, press Enter to skip)");
+            if (guard) config.guard = guard;
+          }
+          if (!config.scope) config.scope = await ask("Scope (files or subsystem)", (config.scope as string | undefined) ?? "current repository");
+          if (!config.mode) config.mode = await ask("Mode (foreground/background)", (config.mode as string | undefined) ?? "foreground");
+
+          rl.close();
+        }
+
+        const goalPath = resolvePath(
+          goalGrouped.repo as string | undefined,
+          goalGrouped["goal-path"] as string | undefined,
+          GOAL_DEFAULT,
+        );
+
+        const document = buildGoalDocument(config as Parameters<typeof buildGoalDocument>[0]);
+        const result = buildGoalInitResult(goalPath, config as Parameters<typeof buildGoalDocument>[0], !hasRequiredFlags && isTTY);
+
+        if (isGoalDryRun) {
+          if (useGoalJson) {
+            printJson({ ...result, dry_run: true });
+          } else {
+            console.log("[dry-run] Would write GOAL.md to: " + goalPath);
+            console.log("");
+            console.log(document);
+          }
+          return 0;
+        }
+
+        if (goalExistsSync(goalPath) && !goalGrouped["force"]) {
+          // Overwrite allowed by default (like init), but warn
+          if (verbose) console.error(`[verbose] Overwriting existing ${goalPath}`);
+        }
+
+        writeFileSync(goalPath, document, "utf-8");
+
+        if (useGoalJson) {
+          printJson(result);
+        } else {
+          console.log(`✓ Goal definition written to ${goalPath}`);
+          console.log(`  Goal:    ${result.goal ?? "(unset)"}`);
+          console.log(`  Metric:  ${result.metric ?? "(unset)"} (${result.direction})`);
+          console.log(`  Verify:  ${result.verify ?? "(unset)"}`);
+          console.log(`  Mode:    ${result.mode}`);
+          if (result.template !== "custom") console.log(`  Template: ${result.template}`);
+          console.log("");
+          console.log(`Run 'autoresearch init --goal "..." --metric "..." --verify "..."' to start a run.`);
+        }
         break;
       }
       default: {

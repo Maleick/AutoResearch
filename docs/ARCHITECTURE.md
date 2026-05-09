@@ -152,6 +152,7 @@ flowchart TD
 | Command | Purpose |
 | --- | --- |
 | `autoresearch init` | Initialize a run |
+| `autoresearch goal init` | Create a `GOAL.md` goal definition file |
 | `autoresearch wizard` | Generate setup summary |
 | `autoresearch status` | Print run status |
 | `autoresearch goal` | Show the goal document |
