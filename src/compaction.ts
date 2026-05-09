@@ -3,7 +3,6 @@ import { resolve, join, basename } from "path";
 
 export interface CompactionPlan {
   filesToArchive: string[];
-  filesToRemove: string[];
   filesToPreserve: string[];
   estimatedSpaceReclaimed: number;
 }
