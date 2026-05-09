@@ -127,11 +127,48 @@ describe("run-manager", () => {
       expect(scoreHistory[0]).toMatchObject({
         iteration: 1,
         decision: "keep",
+        scorer_status: "ok",
         metric_value: "42",
         metric_name: "defects",
         metric_direction: "lower",
         verify_status: "pass",
         guard_status: "pass",
+      });
+    });
+
+    it("records scorer-broken and avoids automatic discard decisions", async () => {
+      const { initializeRun, appendIteration } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      await appendIteration(
+        tmpDir,
+        undefined,
+        undefined,
+        "discard",
+        "42",
+        undefined,
+        "pass",
+        "pass",
+        "test hypothesis",
+        "score script failed",
+        [],
+        "",
+        undefined,
+        undefined,
+        "scorer-broken",
+      );
+
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      const scoreHistory = readFileSync(scoreHistoryPath, "utf-8").trim().split("\n").map((line) => JSON.parse(line));
+      expect(scoreHistory[0]).toMatchObject({
+        decision: "needs_human",
+        scorer_status: "scorer-broken",
       });
     });
 

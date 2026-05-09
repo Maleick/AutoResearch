@@ -471,6 +471,17 @@ describe("CLI Commands", () => {
       const lines = results.trim().split("\n");
       expect(lines.length).toBeGreaterThanOrEqual(3); // header + 2 records
     });
+
+    it("records scorer-broken as needs_human and persists scorer_status", () => {
+      execSync(`node ${CLI} record --decision discard --scorer-status scorer-broken --metric-value 42 --verify-status pass --guard-status pass --change-summary "scorer failed" --repo ${tmpDir}`, { encoding: "utf-8" });
+      const state = JSON.parse(readFileSync(tmpState, "utf-8"));
+      expect(state.last_iteration.decision).toBe("needs_human");
+      expect(state.last_iteration.scorer_status).toBe("scorer-broken");
+      const historyPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      const record = JSON.parse(readFileSync(historyPath, "utf-8").trim());
+      expect(record.decision).toBe("needs_human");
+      expect(record.scorer_status).toBe("scorer-broken");
+    });
   });
 
   describe("stop and resume commands", () => {

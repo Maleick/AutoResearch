@@ -385,6 +385,31 @@ describe("appendIteration", () => {
     expect(result.flags.needs_human).toBe(true);
   });
 
+  it("maps scorer-broken decisions to needs_human", async () => {
+    initState();
+    const result = await mod.appendIteration(
+      stateDir,
+      "autoresearch-results.tsv",
+      "state.json",
+      "discard",
+      "30",
+      undefined,
+      "fail",
+      "pass",
+      "hypothesis test",
+      "scorer crashed",
+      [],
+      "note",
+      undefined,
+      undefined,
+      "scorer-broken",
+    );
+    expect(result.last_iteration.decision).toBe("needs_human");
+    expect(result.last_iteration.scorer_status).toBe("scorer-broken");
+    expect(result.stats.discarded).toBe(0);
+    expect(result.stats.needs_human).toBe(1);
+  });
+
   it("tracks consecutive discards", async () => {
     initState();
     await mod.appendIteration(stateDir, "autoresearch-results.tsv", "state.json", "discard", "", undefined, "pass", "pass", "", "bad change", [], "");

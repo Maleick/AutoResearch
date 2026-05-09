@@ -65,6 +65,7 @@ export interface RunFlags {
 export interface LastIteration {
   iteration: number;
   decision: string;
+  scorer_status?: string;
   metric_value?: string;
   instrument_value?: string;
   change_summary: string;

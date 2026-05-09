@@ -142,6 +142,27 @@ describe("normalizeResultStatus", () => {
   });
 });
 
+describe("normalizeScorerStatus", () => {
+  let mod: any;
+  beforeAll(async () => { mod = await importHelpers(); });
+
+  it("defaults to ok when missing", () => {
+    expect(mod.normalizeScorerStatus(undefined)).toBe("ok");
+  });
+
+  it("accepts ok-low-score", () => {
+    expect(mod.normalizeScorerStatus("ok-low-score")).toBe("ok-low-score");
+  });
+
+  it("accepts scorer-broken", () => {
+    expect(mod.normalizeScorerStatus("scorer-broken")).toBe("scorer-broken");
+  });
+
+  it("throws on unsupported value", () => {
+    expect(() => mod.normalizeScorerStatus("broken")).toThrow("Unsupported scorer_status");
+  });
+});
+
 describe("normalizeLabels", () => {
   let mod: any;
   beforeAll(async () => { mod = await importHelpers(); });

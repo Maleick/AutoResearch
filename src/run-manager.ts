@@ -11,6 +11,7 @@ import {
   parseDurationSeconds,
   normalizeLabels,
   missingRequiredLabels,
+  normalizeScorerStatus,
   AutoresearchError,
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT } from "./constants.js";
@@ -60,6 +61,7 @@ export async function appendIteration(
   note: string | undefined,
   iteration: number | undefined,
   scoreHistoryPathValue?: string,
+  scorerStatusValue?: string,
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
@@ -68,6 +70,10 @@ export async function appendIteration(
 
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
   const now = utcNow();
+  const scorerStatus = normalizeScorerStatus(scorerStatusValue);
+  const effectiveDecision = scorerStatus === "scorer-broken" && (decision === "keep" || decision === "discard")
+    ? "needs_human"
+    : decision;
   const labelList = normalizeLabels(labels ?? []);
   const labelReqs = state.label_requirements ?? { keep: [], stop: [] };
   const requiredKeep = normalizeLabels(labelReqs.keep ?? []);
@@ -75,14 +81,14 @@ export async function appendIteration(
   const missingKeep = missingRequiredLabels(labelList, requiredKeep);
   const missingStop = missingRequiredLabels(labelList, requiredStop);
 
-  if (decision === "keep" && missingKeep.length > 0) {
+  if (effectiveDecision === "keep" && missingKeep.length > 0) {
     throw new AutoresearchError(`Keep requires labels: ${missingKeep.join(", ")}`);
   }
 
   const resultRow = [
     now,
     String(currentIteration),
-    decision,
+    effectiveDecision,
     metricValue ?? "",
     instrumentValue ?? "",
     verifyStatus,
@@ -99,7 +105,8 @@ export async function appendIteration(
     timestamp: now,
     iteration: currentIteration,
     run_id: state.run_id,
-    decision,
+    decision: effectiveDecision,
+    scorer_status: scorerStatus,
     metric_value: metricValue ?? null,
     metric_name: state.metric.name,
     metric_direction: state.metric.direction,
@@ -118,17 +125,17 @@ export async function appendIteration(
     },
     flags: {
       ...state.flags,
-      stop_ready: decision === "keep" && missingStop.length === 0,
+      stop_ready: effectiveDecision === "keep" && missingStop.length === 0,
     },
   };
 
-  if (decision === "keep") {
+  if (effectiveDecision === "keep") {
     newState.stats.kept = newState.stats.kept + 1;
     newState.stats.consecutive_discards = 0;
-  } else if (decision === "discard") {
+  } else if (effectiveDecision === "discard") {
     newState.stats.discarded = newState.stats.discarded + 1;
     newState.stats.consecutive_discards = newState.stats.consecutive_discards + 1;
-  } else if (decision === "needs_human") {
+  } else if (effectiveDecision === "needs_human") {
     newState.stats.needs_human = newState.stats.needs_human + 1;
     newState.flags.needs_human = true;
     newState.stats.consecutive_discards = 0;
@@ -136,7 +143,8 @@ export async function appendIteration(
 
   newState.last_iteration = {
     iteration: currentIteration,
-    decision,
+    decision: effectiveDecision,
+    scorer_status: scorerStatus,
     metric_value: metricValue,
     instrument_value: instrumentValue,
     change_summary: changeSummary,
