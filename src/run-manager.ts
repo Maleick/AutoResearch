@@ -299,6 +299,7 @@ export function makeStatePayload(
     } : undefined,
     verify: config.verify,
     guard: config.guard,
+    scorer: config.scorer,
     max_no_progress: config.max_no_progress,
     iterations_cap: config.iterations,
     duration: config.duration,

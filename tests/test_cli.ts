@@ -1076,6 +1076,90 @@ describe("CLI Commands", () => {
     });
   });
 
+  describe("score command", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-score");
+    const tmpState = resolve(tmpDir, ".autoresearch", "state.json");
+    const scorerScript = resolve(tmpDir, "scorer.js");
+
+    beforeEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+      mkdirSync(resolve(tmpDir, ".autoresearch"), { recursive: true });
+    });
+
+    afterEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    it("runs scorer and outputs human-readable result", () => {
+      writeFileSync(scorerScript, `process.stdout.write(JSON.stringify({score:7,max:10}));`, "utf-8");
+      const out = execFileSync("node", [CLI, "score", "--scorer", `node ${scorerScript}`, "--repo", tmpDir], { encoding: "utf-8" });
+      expect(out).toContain("Score: 7 / 10 (70.0%)");
+    });
+
+    it("outputs JSON with --json flag", () => {
+      writeFileSync(scorerScript, `process.stdout.write(JSON.stringify({score:8,max:10,components:{a:4,b:4}}));`, "utf-8");
+      const out = execFileSync("node", [CLI, "score", "--scorer", `node ${scorerScript}`, "--json", "--repo", tmpDir], { encoding: "utf-8" });
+      const json = JSON.parse(out);
+      expect(json.score).toBe(8);
+      expect(json.max).toBe(10);
+      expect(json.normalized).toBeCloseTo(0.8);
+      expect(json.percent).toBe("80.0%");
+      expect(json.components).toEqual({ a: 4, b: 4 });
+    });
+
+    it("shows components in human-readable output", () => {
+      writeFileSync(scorerScript, `process.stdout.write(JSON.stringify({score:6,max:10,components:{accuracy:3,speed:3}}));`, "utf-8");
+      const out = execFileSync("node", [CLI, "score", "--scorer", `node ${scorerScript}`, "--repo", tmpDir], { encoding: "utf-8" });
+      expect(out).toContain("Score: 6 / 10 (60.0%)");
+      expect(out).toContain("Components:");
+      expect(out).toContain("accuracy: 3");
+      expect(out).toContain("speed: 3");
+    });
+
+    it("reads scorer from configured state when --scorer is not provided", () => {
+      writeFileSync(scorerScript, `process.stdout.write(JSON.stringify({score:5,max:10}));`, "utf-8");
+      writeFileSync(tmpState, JSON.stringify({
+        schema_version: 1,
+        run_id: "run-score-test",
+        created_at: "2026-05-08T00:00:00Z",
+        updated_at: "2026-05-08T00:01:00Z",
+        status: "running",
+        mode: "foreground",
+        goal: "score test goal",
+        scope: "tests",
+        metric: { name: "errors", direction: "lower", baseline: "10", best: "5", latest: "5" },
+        verify: "npm test",
+        scorer: `node ${scorerScript}`,
+        label_requirements: { keep: [], stop: [] },
+        artifact_paths: { results: resolve(tmpDir, "results.tsv"), state: tmpState },
+        stats: { total_iterations: 1, kept: 1, discarded: 0, needs_human: 0, consecutive_discards: 0 },
+        flags: { stop_requested: false, needs_human: false, background_active: false, stop_ready: false },
+      }, null, 2) + "\n", "utf-8");
+      const out = execFileSync("node", [CLI, "score", "--repo", tmpDir], { encoding: "utf-8" });
+      expect(out).toContain("Score: 5 / 10 (50.0%)");
+    });
+
+    it("errors when no scorer is configured and --scorer is absent", () => {
+      expect(() => {
+        execFileSync("node", [CLI, "score", "--repo", tmpDir], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      }).toThrow();
+    });
+
+    it("errors when scorer command fails", () => {
+      writeFileSync(scorerScript, `process.exit(1);`, "utf-8");
+      expect(() => {
+        execFileSync("node", [CLI, "score", "--scorer", `node ${scorerScript}`, "--repo", tmpDir], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      }).toThrow();
+    });
+
+    it("errors when scorer outputs invalid JSON", () => {
+      writeFileSync(scorerScript, `process.stdout.write("not-json");`, "utf-8");
+      expect(() => {
+        execFileSync("node", [CLI, "score", "--scorer", `node ${scorerScript}`, "--repo", tmpDir], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      }).toThrow();
+    });
+  });
+
   describe("record with hypothesis", () => {
     const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-hypothesis");
     const tmpResults = resolve(tmpDir, "autoresearch-results.tsv");
