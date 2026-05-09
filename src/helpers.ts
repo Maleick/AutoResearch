@@ -12,8 +12,31 @@ export class AutoresearchError extends Error {
   }
 }
 
+export interface JsonEnvelope {
+  ok: boolean;
+  command: string;
+  timestamp: string;
+  data?: unknown;
+  error?: {
+    kind: string;
+    code: string;
+    message: string;
+  };
+}
+
 export function printJson(payload: unknown): void {
   console.log(JSON.stringify(payload, null, 2));
+}
+
+export function printJsonEnvelope(command: string, data: unknown, ok = true, error?: JsonEnvelope["error"]): void {
+  const envelope: JsonEnvelope = {
+    ok,
+    command,
+    timestamp: new Date().toISOString(),
+    ...(ok ? { data } : {}),
+    ...(error ? { error } : {}),
+  };
+  console.log(JSON.stringify(envelope, null, 2));
 }
 
 export function sanitizeForTerminal(value: unknown): string {
@@ -39,7 +62,7 @@ export function ensureParent(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true });
 }
 
-function atomicWriteText(filePath: string, content: string): void {
+export function atomicWriteText(filePath: string, content: string): void {
   ensureParent(filePath);
   const tmp = filePath + ".tmp." + Date.now();
   writeFileSync(tmp, content, "utf-8");

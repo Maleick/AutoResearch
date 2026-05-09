@@ -9,6 +9,7 @@ Auto Research is a **subagent-first autonomous iteration engine** for **OpenCode
 | [Installation](Installation.md) | Install via npm (OpenCode) or skill files (Hermes) |
 | [Commands](Commands.md) | Command surface and mode workflows |
 | [Configuration](Configuration.md) | Core fields, artifacts, and runtime state |
+| [Model-Routing](Model-Routing.md) | Local model routing guidance and presets |
 | [Safety](Safety.md) | Safety model and artifact discipline |
 | [Contributing](Contributing.md) | Source of truth and packaging workflow |
 | [Self-Improvement](Self-Improvement.md) | Recursive loop and meta-orchestration |

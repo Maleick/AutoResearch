@@ -1,10 +1,14 @@
 import { MAX_DRAFTS } from "./constants.js";
 import { AutoresearchError } from "./helpers.js";
-import type { DraftBranch, DraftPoolConfig } from "./types.js";
+import type { BranchSelectionPolicy, BranchSelectionPolicyInfo, DraftBranch, DraftPoolConfig } from "./types.js";
 
 const ROLE_LIMIT = 6;
 let poolKeyCounter = 0;
 let branchIdCounter = 0;
+
+export function resetBranchIdCounter(): void {
+  branchIdCounter = 0;
+}
 const RESOURCE_TIERS: Record<string, string[]> = {
   lite: ["orchestrator", "scout", "verifier"],
   balanced: ["orchestrator", "scout", "analyst", "verifier"],
@@ -24,6 +28,27 @@ const BASE_ROLES: RoleTemplate[] = [
   { id: "analyst", name: "Analyst", focus: "Turn evidence into options, tradeoffs, and a clear next-step recommendation." },
   { id: "verifier", name: "Verifier", focus: "Check claims with commands, tests, or log reads before the pool settles." },
   { id: "synthesizer", name: "Synthesizer", focus: "Condense the best evidence into a stable summary the orchestrator can reuse." },
+];
+
+export const BRANCH_SELECTION_POLICIES: BranchSelectionPolicyInfo[] = [
+  {
+    id: "best",
+    label: "Greedy (Best)",
+    description: "Selects the branch with the best metric value. Exploits known good solutions.",
+    recommended_for: ["optimization", "performance tuning", "bug fixes", "refinement"],
+  },
+  {
+    id: "roulette",
+    label: "Exploratory (Roulette)",
+    description: "Randomly selects from completed branches. Explores the search space without strong exploitation.",
+    recommended_for: ["exploration", "creative tasks", "novel solutions", "broad search"],
+  },
+  {
+    id: "diverse",
+    label: "Diversity-First",
+    description: "Selects the most recently completed branch. Prioritizes exploring diverse approaches.",
+    recommended_for: ["architecture", "design decisions", "multi-objective optimization", "research"],
+  },
 ];
 
 const SPECIAL_ROLES: RoleTemplate[] = [
@@ -135,8 +160,9 @@ export function buildContinuationPolicy(mode: string): Record<string, unknown> {
 
 export interface DraftPoolConfigInput {
   num_drafts: number;
-  branch_selection_policy: "best" | "roulette" | "diverse";
+  branch_selection_policy: BranchSelectionPolicy;
   baseline_iteration?: number;
+  branch_policy_overrides?: Record<string, BranchSelectionPolicy>;
 }
 
 function selectFallbackBranch(
@@ -148,18 +174,21 @@ function selectFallbackBranch(
 }
 
 export function buildDraftPoolPlan(input: DraftPoolConfigInput): DraftPoolConfig {
-  const { num_drafts, branch_selection_policy, baseline_iteration } = input;
+  const { num_drafts, branch_selection_policy, baseline_iteration, branch_policy_overrides } = input;
   if (!Number.isSafeInteger(num_drafts) || num_drafts <= 0 || num_drafts > MAX_DRAFTS) {
     throw new AutoresearchError(`Invalid num_drafts: ${num_drafts} (must be a positive integer at most ${MAX_DRAFTS})`);
   }
   const activeDrafts: DraftBranch[] = [];
 
   for (let i = 0; i < num_drafts; i++) {
+    const draftId = `draft-${branchIdCounter++}`;
+    const policyOverride = branch_policy_overrides?.[draftId];
     activeDrafts.push({
-      branch_id: `draft-${branchIdCounter++}`,
+      branch_id: draftId,
       iteration: i + 1,
       parent_iteration: baseline_iteration ?? 0,
       status: "pending",
+      policy_override: policyOverride,
     });
   }
 
@@ -170,13 +199,15 @@ export function buildDraftPoolPlan(input: DraftPoolConfigInput): DraftPoolConfig
     branch_selection_policy,
     active_drafts: activeDrafts,
     best_branch_id: activeDrafts[0]?.branch_id,
+    available_policies: BRANCH_SELECTION_POLICIES,
   };
 }
 
 export function selectNextBranch(
   activeDrafts: DraftBranch[],
-  policy: "best" | "roulette" | "diverse",
+  policy: BranchSelectionPolicy,
   direction: "lower" | "higher",
+  poolPolicy?: BranchSelectionPolicy,
 ): string | undefined {
   const completedDrafts = activeDrafts.filter((d) => d.status === "completed");
   const pendingBranchId = activeDrafts.find((d) => d.status === "pending")?.branch_id;
@@ -184,6 +215,7 @@ export function selectNextBranch(
     return pendingBranchId;
   }
 
+  const effectivePolicy = poolPolicy ?? policy;
   const sortDirection =
     direction === "lower" || direction === "higher"
       ? direction
@@ -191,7 +223,7 @@ export function selectNextBranch(
           throw new Error(`Invalid branch selection direction: ${String(direction)}`);
         })();
 
-  switch (policy) {
+  switch (effectivePolicy) {
     case "best": {
       const scoredDrafts = completedDrafts
         .map((draft) => ({

@@ -352,7 +352,7 @@ describe("appendIteration", () => {
     if (!existsSync(resultsFile)) {
       const resultsDir = dirname(resultsFile);
       if (!existsSync(resultsDir)) mkdirSync(resultsDir, { recursive: true });
-      const header = "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n";
+      const header = "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\tid\tparent_id\tbranch\tstage\tagent\n";
       writeFileSync(resultsFile, header, "utf-8");
     }
   }
@@ -452,6 +452,48 @@ describe("appendIteration", () => {
     expect(lines[1]).toContain("\tkeep\t90\t\tpass\tpass\t");
   });
 
+  it("writes lineage fields in the same order as the results header", async () => {
+    initState();
+    await mod.appendIteration(
+      stateDir,
+      "autoresearch-results.tsv",
+      "state.json",
+      "keep",
+      "90",
+      "95",
+      "pass",
+      "pass",
+      "hyp",
+      "change",
+      ["test"],
+      "note",
+      undefined,
+      undefined,
+      { id: "lineage-1", parent_id: "lineage-0", branch: "branch-a", stage: "stage-a", agent: "agent-a" },
+    );
+    const [headerLine, rowLine] = readFileSync(resultsFile, "utf-8").trim().split("\n");
+    const headers = headerLine.split("\t");
+    const values = rowLine.split("\t");
+    const record = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+
+    expect(record).toMatchObject({
+      decision: "keep",
+      metric_value: "90",
+      instrument_value: "95",
+      verify_status: "pass",
+      guard_status: "pass",
+      hypothesis: "hyp",
+      change_summary: "change",
+      labels: "test",
+      note: "note",
+      id: "lineage-1",
+      parent_id: "lineage-0",
+      branch: "branch-a",
+      stage: "stage-a",
+      agent: "agent-a",
+    });
+  });
+
   it("writes a provided instrument value to the results file and state", async () => {
     initState();
     const instrumentValue = "instrument-123";
@@ -503,5 +545,53 @@ describe("appendIteration", () => {
     await expect(mod.appendIteration(stateDir, "autoresearch-results.tsv", "state.json", "keep", "10", undefined, "pass", "pass", "", "blocked symlink", [], ""))
       .rejects.toThrow("Refusing to write symlinked score history file");
     expect(readFileSync(outsideFile, "utf-8")).toBe("ORIGINAL\n");
+  });
+});
+
+
+describe("parseResultRow", () => {
+  let mod: any;
+  beforeAll(async () => { mod = await importRunManager(); });
+
+  it("parses legacy rows without lineage", () => {
+    const row = mod.parseResultRow("2026-01-01T00:00:00Z\t1\tkeep\t90\t95\tpass\tpass\thyp\tchange\ttest\tnote");
+
+    expect(row).toMatchObject({
+      decision: "keep",
+      metric_value: "90",
+      instrument_value: "95",
+      verify_status: "pass",
+      guard_status: "pass",
+      hypothesis: "hyp",
+      change_summary: "change",
+      labels: "test",
+      note: "note",
+      id: "",
+      parent_id: "",
+      branch: "main",
+      stage: "",
+      agent: "",
+    });
+  });
+
+  it("parses lineage rows in results header order", () => {
+    const row = mod.parseResultRow("2026-01-01T00:00:00Z\t1\tkeep\t90\t95\tpass\tpass\thyp\tchange\ttest\tnote\tlineage-1\tlineage-0\tbranch-a\tstage-a\tagent-a");
+
+    expect(row).toMatchObject({
+      decision: "keep",
+      metric_value: "90",
+      instrument_value: "95",
+      verify_status: "pass",
+      guard_status: "pass",
+      hypothesis: "hyp",
+      change_summary: "change",
+      labels: "test",
+      note: "note",
+      id: "lineage-1",
+      parent_id: "lineage-0",
+      branch: "branch-a",
+      stage: "stage-a",
+      agent: "agent-a",
+    });
   });
 });

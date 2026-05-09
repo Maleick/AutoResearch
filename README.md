@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v3.6.0-58a6ff?style=flat" alt="v3.6.0">
+  <img src="https://img.shields.io/badge/version-v3.13.1-58a6ff?style=flat" alt="v3.13.1">
   <a href="https://github.com/Maleick/AutoResearch/stargazers"><img src="https://img.shields.io/github/stars/Maleick/AutoResearch?style=flat&color=58a6ff" alt="Stars"></a>
   <a href="https://github.com/Maleick/AutoResearch/commits/main"><img src="https://img.shields.io/github/last-commit/Maleick/AutoResearch?style=flat" alt="Last Commit"></a>
   <a href="https://github.com/Maleick/AutoResearch/releases"><img src="https://img.shields.io/github/v/release/Maleick/AutoResearch?style=flat" alt="Version"></a>
@@ -99,10 +99,10 @@ See [`skills/autoresearch/references/self-improve-loop.md`](skills/autoresearch/
 
 ### OpenCode
 
-For OpenCode, paste this one-line install prompt into your agent. This URL is pinned to the immutable `v3.6.1` release instructions:
+For OpenCode, paste this one-line install prompt into your agent. This URL is pinned to the immutable `v3.13.1` release instructions:
 
 ```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.6.1/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.13.1/INSTALL.md
 ```
 
 Recommended plugin install in `opencode.json`:
@@ -112,6 +112,8 @@ Recommended plugin install in `opencode.json`:
   "plugin": ["opencode-autoresearch@latest"]
 }
 ```
+
+For reproducible/pinned installs, see [INSTALL.md](INSTALL.md#pinned-installation-reproducible).
 
 Restart OpenCode, then run the setup wizard:
 
@@ -310,6 +312,10 @@ flowchart LR
 | `autoresearch-report.md` | End-of-run report |
 | `autoresearch-memory.md` | Reusable memory for later runs |
 | `.autoresearch/launch.json` | Background launch manifest |
+
+## Examples
+
+See [docs/examples/README.md](docs/examples/README.md) for reproducible run examples with complete state, results, and report artifacts.
 
 ## Self-Improvement Mode
 

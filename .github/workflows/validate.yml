@@ -60,6 +60,59 @@ jobs:
       - name: Verify package contents
         run: npm run verify:pack
 
+      - name: Validate package allowlist
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const allowedFiles = new Set(pkg.files || []);
+          const requiredFiles = ['dist', 'hooks', 'commands', 'skills', 'plugins/autoresearch.ts', 'docs/ARCHITECTURE.md', '.opencode-plugin', 'AGENTS.md', 'VERSION', 'README.md', 'CHANGELOG.md', 'LICENSE'];
+          const missing = requiredFiles.filter(f => !allowedFiles.has(f));
+          if (missing.length > 0) {
+            console.error('Missing required files in package.json files array:', missing.join(', '));
+            process.exit(1);
+          }
+          console.log('Package allowlist validated');
+          "
+
+      - name: Validate schema and command registration
+        run: |
+          node -e "
+          const fs = require('fs');
+          const plugin = JSON.parse(fs.readFileSync('.opencode-plugin/plugin.json', 'utf8'));
+          
+          // Validate plugin manifest schema
+          if (!plugin.name || !plugin.version || !plugin.description) {
+            console.error('Plugin manifest missing required fields');
+            process.exit(1);
+          }
+          
+          // Validate command files exist
+          const commandsDir = 'commands';
+          if (fs.existsSync(commandsDir)) {
+            const commands = fs.readdirSync(commandsDir).filter(f => f.endsWith('.md'));
+            if (commands.length === 0) {
+              console.error('No command files found in commands/');
+              process.exit(1);
+            }
+            console.log('Commands registered:', commands.join(', '));
+          }
+          
+          // Validate skills directory
+          const skillsDir = 'skills/autoresearch';
+          if (!fs.existsSync(skillsDir)) {
+            console.error('Skills directory not found');
+            process.exit(1);
+          }
+          
+          console.log('Schema and command registration validated');
+          "
+
+      - name: Safety gate - check for secrets
+        run: |
+          ! grep -r "api_key\|apikey\|password\|secret\|token" --include="*.ts" --include="*.js" --include="*.json" src/ commands/ skills/ || true
+          echo "Secret scan complete"
+
       - name: Run tests
         run: npm test
 

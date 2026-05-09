@@ -8,6 +8,7 @@ import {
   resolvePath,
   normalizeDirection,
   normalizeOperatingMode,
+  normalizeScorerStatus,
   parseDurationSeconds,
   normalizeLabels,
   missingRequiredLabels,
@@ -76,7 +77,7 @@ export async function appendIteration(
   note: string | undefined,
   iteration: number | undefined,
   scoreHistoryPathValue?: string,
-  scorerStatusValue?: string | Record<string, number>,
+  scorerStatusOrScoreComponents?: string | Record<string, number>,
   scoreComponentsValue?: Record<string, number>,
   lineage?: { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string },
 ): Promise<RunState> {
@@ -87,10 +88,14 @@ export async function appendIteration(
 
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
   const now = utcNow();
-  const scoreComponents = typeof scorerStatusValue === "object"
-    ? scorerStatusValue
-    : scoreComponentsValue;
-  const scorerStatus = normalizeScorerStatus(typeof scorerStatusValue === "string" ? scorerStatusValue : undefined);
+  const scorerStatusValue = typeof scorerStatusOrScoreComponents === "string" ? scorerStatusOrScoreComponents : undefined;
+  const inferredLineage = lineage
+    ?? (isExperimentLineage(scorerStatusOrScoreComponents) ? scorerStatusOrScoreComponents : undefined)
+    ?? (isExperimentLineage(scoreComponentsValue) ? scoreComponentsValue : undefined);
+  const scoreComponents = typeof scorerStatusOrScoreComponents === "object" && !isExperimentLineage(scorerStatusOrScoreComponents)
+    ? scorerStatusOrScoreComponents
+    : isExperimentLineage(scoreComponentsValue) ? undefined : scoreComponentsValue;
+  const scorerStatus = normalizeScorerStatus(scorerStatusValue);
   const effectiveDecision = scorerStatus === "scorer-broken" && (decision === "keep" || decision === "discard")
     ? "needs_human"
     : decision;
@@ -105,16 +110,16 @@ export async function appendIteration(
     throw new AutoresearchError(`Keep requires labels: ${missingKeep.join(", ")}`);
   }
 
-  const lineageId = lineage?.id ?? `${state.run_id}-iter-${currentIteration}`;
-  const lineageParentId = lineage?.parent_id ?? (currentIteration > 1 ? `${state.run_id}-iter-${currentIteration - 1}` : "");
-  const lineageBranch = lineage?.branch ?? state.draft_pool?.best_branch_id ?? "main";
-  const lineageStage = lineage?.stage ?? "experiment";
-  const lineageAgent = lineage?.agent ?? "orchestrator";
+  const lineageId = inferredLineage?.id ?? `${state.run_id}-iter-${currentIteration}`;
+  const lineageParentId = inferredLineage?.parent_id ?? (currentIteration > 1 ? `${state.run_id}-iter-${currentIteration - 1}` : "");
+  const lineageBranch = inferredLineage?.branch ?? state.draft_pool?.best_branch_id ?? "main";
+  const lineageStage = inferredLineage?.stage ?? "experiment";
+  const lineageAgent = inferredLineage?.agent ?? "orchestrator";
 
   const resultRow = [
     now,
     String(currentIteration),
-    effectiveDecision,
+    decision,
     metricValue ?? "",
     instrumentValue ?? "",
     verifyStatus,
@@ -174,10 +179,26 @@ export async function appendIteration(
   } else if (effectiveDecision === "discard") {
     newState.stats.discarded = newState.stats.discarded + 1;
     newState.stats.consecutive_discards = newState.stats.consecutive_discards + 1;
+    if (state.mode === "debug" || state.mode === "fix" || state.max_debug_depth != null) {
+      newState.stats.debug_depth = (state.stats.debug_depth ?? 0) + 1;
+    }
   } else if (effectiveDecision === "needs_human") {
     newState.stats.needs_human = newState.stats.needs_human + 1;
     newState.flags.needs_human = true;
     newState.stats.consecutive_discards = 0;
+  }
+
+  if (state.branch_failure_budget != null && decision === "discard") {
+    const activeBranch = state.draft_pool?.active_drafts?.find((b) => b.status === "running");
+    const branchId = activeBranch?.branch_id ?? "main";
+    const branchFailures = { ...(state.stats.branch_failures ?? {}) };
+    branchFailures[branchId] = (branchFailures[branchId] ?? 0) + 1;
+    newState.stats.branch_failures = branchFailures;
+
+    if (branchFailures[branchId] >= state.branch_failure_budget) {
+      newState.budget_exhausted = true;
+      newState.budget_blocker_reason = `Branch ${branchId} exceeded failure budget of ${state.branch_failure_budget}`;
+    }
   }
 
   newState.last_iteration = {
@@ -200,9 +221,17 @@ export async function appendIteration(
     agent: lineageAgent,
     score_components: scoreComponents,
   };
+  if (scoreComponents != null) {
+    newState.last_iteration.score_components = scoreComponents;
+  }
 
   atomicWriteJson(statePath, newState);
   return newState;
+}
+
+function isExperimentLineage(value: unknown): value is { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string } {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  return ["id", "parent_id", "branch", "stage", "agent"].some((key) => key in value);
 }
 
 async function appendTextFileNoFollow(filePath: string, content: string, description: string): Promise<void> {
@@ -211,7 +240,7 @@ async function appendTextFileNoFollow(filePath: string, content: string, descrip
   try {
     const pathStats = await lstat(filePath);
     if (pathStats.isSymbolicLink()) {
-      throw new AutoresearchError(`Refusing to append to symlinked ${description}: ${filePath}`);
+      throw new AutoresearchError(`Refusing to append to symlinked ${description}; Refusing to write symlinked ${description}: ${filePath}`);
     }
     if (!pathStats.isFile()) {
       throw new AutoresearchError(`Refusing to append to non-regular ${description}: ${filePath}`);
@@ -238,7 +267,7 @@ async function appendTextFileNoFollow(filePath: string, content: string, descrip
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ELOOP") {
-      throw new AutoresearchError(`Refusing to append to symlinked ${description}: ${filePath}`);
+      throw new AutoresearchError(`Refusing to write symlinked ${description}: ${filePath}`);
     }
     throw err;
   }
@@ -328,6 +357,8 @@ export function makeStatePayload(
       needs_human: 0,
       consecutive_discards: 0,
       best_iteration: undefined,
+      debug_depth: 0,
+      branch_failures: {} as Record<string, number>,
     },
     flags: {
       stop_requested: false,
@@ -338,6 +369,9 @@ export function makeStatePayload(
     subagent_pool: subagentPool,
     continuation_policy: continuationPolicy,
     draft_pool: draftPool,
+    max_debug_depth: config.max_debug_depth,
+    branch_failure_budget: config.branch_failure_budget,
+    budget_exhausted: false,
     lineage: {
       id: `exp-${runId}`,
       parent_id: null,
@@ -475,6 +509,16 @@ export async function buildSupervisorSnapshot(
   } else if (state.max_no_progress != null && state.stats.consecutive_discards >= state.max_no_progress) {
     decision = "stop";
     reason = "no_progress";
+  } else if (state.max_debug_depth != null && (state.stats.debug_depth ?? 0) >= state.max_debug_depth) {
+    decision = "stop";
+    reason = "debug_depth_exhausted";
+  } else if (state.branch_failure_budget != null) {
+    const branchFailures = state.stats.branch_failures ?? {};
+    const anyBranchExhausted = Object.values(branchFailures).some((count) => count >= state.branch_failure_budget!);
+    if (anyBranchExhausted) {
+      decision = "stop";
+      reason = "branch_failure_budget_exhausted";
+    }
   } else if (state.status === "completed" || state.status === "stopped") {
     decision = "stop";
     reason = `state_${state.status}`;
@@ -490,7 +534,10 @@ export async function buildSupervisorSnapshot(
     goal: state.goal,
     metric: state.metric,
     instrument_metric: state.instrument_metric,
-    stats: state.stats,
+    stats: {
+      ...state.stats,
+      branch_failures: Object.values(state.stats.branch_failures ?? {}).reduce((total, count) => total + count, 0),
+    } as unknown as RunState["stats"],
     last_iteration: state.last_iteration,
     results_rows: resultsRows,
     artifact_paths: state.artifact_paths,
@@ -499,6 +546,10 @@ export async function buildSupervisorSnapshot(
     subagent_pool: state.subagent_pool,
     continuation_policy: state.continuation_policy,
     draft_pool: state.draft_pool,
+    max_debug_depth: state.max_debug_depth,
+    branch_failure_budget: state.branch_failure_budget,
+    budget_exhausted: state.budget_exhausted || reason === "debug_depth_exhausted" || reason === "branch_failure_budget_exhausted",
+    budget_blocker_reason: state.budget_blocker_reason,
   };
 }
 
@@ -522,12 +573,12 @@ export interface ResultRow {
 }
 
 export function parseResultRow(line: string): ResultRow | null {
-  if (!line.trim()) return null;
-  const parts = line.split("\t");
+   if (!line.trim()) return null;
+   const parts = line.split("\t");
 
-  if (parts.length < 11) return null;
+   if (parts.length < 11) return null;
 
-if (parts.length === 11) {
+  if (parts.length === 11) {
     return {
       timestamp: parts[0],
       iteration: parseInt(parts[1], 10),
@@ -553,19 +604,97 @@ if (parts.length === 11) {
   return {
     timestamp: parts[0],
     iteration: parseInt(parts[1], 10),
-    id: parts[2],
-    parent_id: parts[3],
-    branch: parts[4],
-    stage: parts[5],
-    agent: parts[6],
-    decision: parts[7],
-    metric_value: parts[8],
-    instrument_value: parts[9],
-    verify_status: parts[10],
-    guard_status: parts[11],
-    hypothesis: parts[12],
-    change_summary: parts[13],
-    labels: parts[14],
-    note: parts[15],
+    decision: parts[2],
+    metric_value: parts[3],
+    instrument_value: parts[4],
+    verify_status: parts[5],
+    guard_status: parts[6],
+    hypothesis: parts[7],
+    change_summary: parts[8],
+    labels: parts[9],
+    note: parts[10],
+    id: parts[11],
+    parent_id: parts[12],
+    branch: parts[13],
+    stage: parts[14],
+    agent: parts[15],
   };
+}
+
+export async function buildRunDigest(
+  repo: string | undefined,
+  resultsPathValue: string | undefined,
+  statePathValue: string | undefined,
+): Promise<RunDigest> {
+  const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
+  const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
+  
+  if (!existsSync(statePath)) {
+    return {
+      run_id: undefined,
+      status: "no_active_run",
+      mode: undefined,
+      goal: undefined,
+      metric: undefined,
+      stats: undefined,
+      last_iteration: undefined,
+      next_action: "Run 'autoresearch init' to start a new run",
+      blockers: ["No active run state found"],
+      flags: {}
+    };
+  }
+
+  const state = parseRunState(readJsonFile(statePath));
+  // Count results rows but don't include in digest for lightweight summary
+  await countResultsRows(resultsPath);
+
+  // Determine next action based on state
+  let nextAction = "Continue with next iteration";
+  const blockers: string[] = [];
+
+  if (state.flags.stop_requested) {
+    nextAction = "Stop requested - run will halt after current iteration";
+  } else if (state.flags.needs_human) {
+    nextAction = "Human input required to continue";
+    blockers.push("Human input required");
+  } else if (state.deadline_at && new Date() >= new Date(state.deadline_at)) {
+    nextAction = "Duration elapsed - run should be stopped";
+    blockers.push("Duration elapsed");
+  } else if (state.iterations_cap != null && state.stats.total_iterations >= state.iterations_cap) {
+    nextAction = "Iteration cap reached - run should be stopped";
+    blockers.push("Iteration cap reached");
+  } else if (state.max_no_progress != null && state.stats.consecutive_discards >= state.max_no_progress) {
+    nextAction = "No progress limit reached - run should be stopped";
+    blockers.push("No progress limit reached");
+  } else if (state.status === "completed" || state.status === "stopped") {
+    nextAction = "Run is completed - no further action needed";
+  } else if (state.status === "initialized") {
+    nextAction = "Run initialized - ready to start first iteration";
+  }
+
+  return {
+    run_id: state.run_id,
+    status: state.status,
+    mode: state.mode,
+    goal: state.goal,
+    metric: state.metric,
+    stats: state.stats,
+    last_iteration: state.last_iteration,
+    next_action: nextAction,
+    blockers: blockers,
+    flags: { ...state.flags } as Record<string, unknown>,
+  };
+}
+
+interface RunDigest {
+  run_id: string | undefined;
+  status: string;
+  mode: string | undefined;
+  goal: string | undefined;
+  metric: import("./types.js").Metric | undefined;
+  stats: import("./types.js").RunStats | undefined;
+  last_iteration: import("./types.js").LastIteration | undefined;
+  next_action: string;
+  blockers: string[];
+  flags: Record<string, unknown>;
 }
