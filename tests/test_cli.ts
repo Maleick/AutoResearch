@@ -353,7 +353,7 @@ describe("CLI Commands", () => {
           throw new Error("validate unexpectedly succeeded");
         } catch (error) {
           const stdout = (error as { stdout?: string }).stdout ?? "";
-          const json = JSON.parse(stdout) as { valid: boolean; errors: string[] };
+          const json = JSON.parse(stdout) as { data: { valid: boolean; errors: string[] } };
           expect(json.data.valid).toBe(false);
           expect(json.data.errors).toContain("Missing required: --verify");
         }
