@@ -43,6 +43,7 @@ const usage = (): void => {
   console.error("  --instrument-metric Measurement quality/risk metric (surfaced separately)");
   console.error("  --instrument-direction Direction for instrument metric");
   console.error("  --instrument-value  Recorded value for the instrument metric");
+  console.error("  --scorer-status     ok, ok-low-score, or scorer-broken (default: ok)");
   console.error("  --verify        Mechanical verification command");
   console.error("  --guard         Guard command for regression catch");
   console.error("  --mode          foreground or background");
@@ -938,9 +939,10 @@ const main = async (): Promise<number> => {
         break;
       }
       case "record": {
-        const { normalizeResultStatus } = await import("./helpers.js");
+        const { normalizeResultStatus, normalizeScorerStatus } = await import("./helpers.js");
         const vs = (grouped["verify-status"] as string) || "pass";
         const gs = (grouped["guard-status"] as string) || "skip";
+        const scorerStatus = normalizeScorerStatus(grouped["scorer-status"] as string | undefined);
         const iteration = parsePositiveInt(grouped.iteration as string | undefined, "iteration");
         if (dryRun) {
           console.log("[dry-run] Would record experiment result:");
@@ -948,6 +950,7 @@ const main = async (): Promise<number> => {
             decision: grouped.decision,
             metric_value: grouped["metric-value"],
             instrument_value: grouped["instrument-value"],
+            scorer_status: scorerStatus,
             verify_status: normalizeResultStatus(vs, "verify_status"),
             guard_status: normalizeResultStatus(gs, "guard_status"),
             hypothesis: grouped.hypothesis,
@@ -971,9 +974,11 @@ const main = async (): Promise<number> => {
           grouped.hypothesis as string | undefined,
           grouped["change-summary"] as string,
           grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined,
-          grouped.note as string | undefined,
-          iteration,
-        );
+            grouped.note as string | undefined,
+            iteration,
+            undefined,
+            scorerStatus,
+          );
         printJson(state);
         break;
       }
