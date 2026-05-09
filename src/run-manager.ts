@@ -533,10 +533,10 @@ export interface ResultRow {
 }
 
 export function parseResultRow(line: string): ResultRow | null {
-  if (!line.trim()) return null;
-  const parts = line.split("\t");
+   if (!line.trim()) return null;
+   const parts = line.split("\t");
 
-  if (parts.length < 11) return null;
+   if (parts.length < 11) return null;
 
   if (parts.length === 11) {
     return {
