@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
+import { closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { execSync } from "child_process";
 import { MAX_DRAFTS } from "./constants.js";
@@ -1458,11 +1458,8 @@ const main = async (): Promise<number> => {
           scorerStatus,
           scoreComponents,
           );
-        if (useJson) {
-          printJsonEnvelope("record", state);
-        } else {
-          printJson(state);
-        }
+
+        printJsonEnvelope("record", state);
         break;
       }
        case "digest": {
