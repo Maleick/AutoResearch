@@ -806,6 +806,91 @@ describe("CLI Commands", () => {
     });
   });
 
+  describe("scores --top-components", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-scores-components");
+    const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+
+    beforeEach(() => {
+      mkdirSync(resolve(tmpDir, ".autoresearch"), { recursive: true });
+      writeFileSync(scoreHistoryPath, [
+        JSON.stringify({ timestamp: "2026-05-08T10:00:00Z", iteration: 1, run_id: "run-1", decision: "keep", metric_value: "10", metric_name: "errors", metric_direction: "lower", verify_status: "pass", guard_status: "pass", score_components: { accuracy: 0.5, coverage: 0.8, speed: 1.0 } }),
+        JSON.stringify({ timestamp: "2026-05-08T10:01:00Z", iteration: 2, run_id: "run-1", decision: "keep", metric_value: "8", metric_name: "errors", metric_direction: "lower", verify_status: "pass", guard_status: "pass", score_components: { accuracy: 0.9, coverage: 0.6, speed: 1.0 } }),
+      ].join("\n") + "\n", "utf-8");
+    });
+
+    afterEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    it("shows component values inline in human-readable scores output", () => {
+      const out = execFileSync("node", [CLI, "scores", "--limit", "3", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("[accuracy:");
+      expect(out).toContain("coverage:");
+    });
+
+    it("shows component rankings with --top-components flag", () => {
+      const out = execFileSync("node", [CLI, "scores", "--top-components", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("Component Rankings:");
+      expect(out).toContain("accuracy");
+      expect(out).toContain("coverage");
+    });
+
+    it("shows top-components ranking as json", () => {
+      const out = execFileSync("node", [CLI, "scores", "--top-components", "--json", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+      const json = JSON.parse(out);
+      expect(json.ranking).toBeDefined();
+      expect(Array.isArray(json.ranking.top_positive)).toBe(true);
+      expect(Array.isArray(json.ranking.top_negative)).toBe(true);
+      expect(json.ranking.top_positive.some((c: { name: string }) => c.name === "accuracy")).toBe(true);
+      expect(json.ranking.top_negative.some((c: { name: string }) => c.name === "coverage")).toBe(true);
+    });
+
+    it("reports no component data when no records have components", () => {
+      writeFileSync(scoreHistoryPath, JSON.stringify({ timestamp: "2026-05-08T10:00:00Z", iteration: 1, run_id: "run-1", decision: "keep", metric_value: "10", metric_name: "errors", metric_direction: "lower", verify_status: "pass", guard_status: "pass" }) + "\n", "utf-8");
+      const out = execFileSync("node", [CLI, "scores", "--top-components", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+      expect(out).toContain("No component data found");
+    });
+  });
+
+  describe("record command with score-components", () => {
+    const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-record-components");
+    const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+
+    beforeEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+      execFileSync("node", [CLI, "init", "--goal", "test", "--metric", "errors", "--direction", "lower", "--verify", "echo ok", "--repo", tmpDir], { encoding: "utf-8" });
+    });
+
+    afterEach(() => {
+      try { rmSync(tmpDir, { recursive: true }); } catch {}
+    });
+
+    it("stores score_components in score history and state", () => {
+      const components = JSON.stringify({ accuracy: 0.8, coverage: 0.6 });
+      const stateJson = execFileSync(
+        "node",
+        [CLI, "record", "--decision", "keep", "--metric-value", "5", "--verify-status", "pass", "--change-summary", "test", "--score-components", components, "--repo", tmpDir],
+        { encoding: "utf-8" },
+      );
+      const state = JSON.parse(stateJson);
+      expect(state.last_iteration.score_components).toEqual({ accuracy: 0.8, coverage: 0.6 });
+
+      const records = readFileSync(scoreHistoryPath, "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+      expect(records[0].score_components).toEqual({ accuracy: 0.8, coverage: 0.6 });
+    });
+
+    it("shows score-components in dry-run output", () => {
+      const components = JSON.stringify({ accuracy: 0.9 });
+      const out = execFileSync(
+        "node",
+        [CLI, "record", "--decision", "keep", "--metric-value", "5", "--verify-status", "pass", "--change-summary", "test", "--score-components", components, "--dry-run", "--repo", tmpDir],
+        { encoding: "utf-8" },
+      );
+      expect(out).toContain("score_components");
+      expect(out).toContain("0.9");
+    });
+  });
+
   describe("summary command", () => {
     it("shows summary with json", () => {
       const out = execSync(`node ${CLI} summary --json`, { encoding: "utf-8", cwd: REPO_ROOT });

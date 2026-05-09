@@ -384,6 +384,12 @@ const main = async (): Promise<number> => {
           const lastIter = s.last_iteration;
           if (lastIter && lastIter.iteration) {
             console.log(`Last:    iter ${formatDisplayValue(lastIter.iteration)} — ${formatDisplayValue(lastIter.decision)} (${formatMetricValue(lastIter.metric_value)})`);
+            if (lastIter.score_components != null && typeof lastIter.score_components === "object") {
+              const parts = Object.entries(lastIter.score_components as Record<string, number>)
+                .map(([k, v]) => `${formatDisplayValue(k)}:${typeof v === "number" ? v.toFixed(4) : formatDisplayValue(v)}`)
+                .join(", ");
+              if (parts.length > 0) console.log(`  Components: [${parts}]`);
+            }
           }
           const flags = s.flags;
           if (flags?.needs_human) console.log("⚠  Needs human input");
@@ -431,6 +437,12 @@ const main = async (): Promise<number> => {
         if (lastIter && lastIter.iteration) {
           console.log(`   Last iter: #${formatDisplayValue(lastIter.iteration)} — ${formatDisplayValue(lastIter.decision)}`);
           if (lastIter.change_summary) console.log(`   Change:    ${formatDisplayValue(lastIter.change_summary)}`);
+          if (lastIter.score_components != null && typeof lastIter.score_components === "object") {
+            const parts = Object.entries(lastIter.score_components as Record<string, number>)
+              .map(([k, v]) => `${formatDisplayValue(k)}:${typeof v === "number" ? v.toFixed(4) : formatDisplayValue(v)}`)
+              .join(", ");
+            if (parts.length > 0) console.log(`   Components: [${parts}]`);
+          }
         }
         if (flags?.needs_human) console.log("   ⚠  Needs human review");
         if (flags?.stop_requested) console.log("   ⏹  Stop was requested");
@@ -508,6 +520,44 @@ const main = async (): Promise<number> => {
           break;
         }
         const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
+        const showTopComponents = grouped["top-components"] === "true";
+        if (showTopComponents) {
+          const allLines = readFileSync(scoreHistoryPath, "utf-8")
+            .split("\n")
+            .map((l: string) => l.trim())
+            .filter(Boolean);
+          const allParsed = allLines.map((r: string) => {
+            try { return JSON.parse(r); } catch { return null; }
+          }).filter(Boolean);
+          if (allParsed.length === 0) {
+            console.log("No score records yet.");
+            break;
+          }
+          const { rankComponents } = await import("./score-parser.js");
+          const ranking = rankComponents(allParsed);
+          if (useJson) {
+            printJson({ count: allParsed.length, scores: allParsed.slice(-limit), ranking });
+            break;
+          }
+          console.log("Component Rankings:");
+          if (ranking.top_positive.length > 0) {
+            console.log("  Top improving components:");
+            for (const c of ranking.top_positive) {
+              console.log(`    + ${formatDisplayValue(c.name)}  Δ+${c.delta.toFixed(4)}`);
+            }
+          }
+          if (ranking.top_negative.length > 0) {
+            console.log("  Top declining components:");
+            for (const c of ranking.top_negative) {
+              console.log(`    - ${formatDisplayValue(c.name)}  Δ${c.delta.toFixed(4)}`);
+            }
+          }
+          if (ranking.top_positive.length === 0 && ranking.top_negative.length === 0) {
+            console.log("  No component data found in score history.");
+          }
+          console.log(`\nAnalyzed ${allParsed.length} score records.`);
+          break;
+        }
         const records = readTailLines(scoreHistoryPath, limit);
         if (records.length === 0) {
           console.log("No score records yet.");
@@ -559,7 +609,35 @@ const main = async (): Promise<number> => {
                 trend = "";
               }
             }
-            console.log(`  #${rec.iteration}  ${trend}  ${rec.metric_value ?? "—"}  (${rec.decision})  ${rec.verify_status}`);
+            let componentLine = "";
+            if (rec.score_components != null && typeof rec.score_components === "object") {
+              const parts = Object.entries(rec.score_components as Record<string, number>)
+                .map(([k, v]) => `${formatDisplayValue(k)}:${typeof v === "number" ? v.toFixed(4) : formatDisplayValue(v)}`)
+                .join(", ");
+              if (parts.length > 0) componentLine = `  [${parts}]`;
+            }
+            let componentDeltaLine = "";
+            if (componentLine && i + 1 < recordsOrdered.length) {
+              try {
+                const prevRec = JSON.parse(recordsOrdered[i + 1]);
+                if (prevRec.score_components != null && typeof prevRec.score_components === "object") {
+                  const deltas: string[] = [];
+                  for (const [k, v] of Object.entries(rec.score_components as Record<string, number>)) {
+                    const prev = (prevRec.score_components as Record<string, number>)[k];
+                    if (typeof prev === "number" && typeof v === "number") {
+                      const d = v - prev;
+                      if (d !== 0) {
+                        deltas.push(`${formatDisplayValue(k)}:${d > 0 ? "+" : ""}${d.toFixed(4)}`);
+                      }
+                    }
+                  }
+                  if (deltas.length > 0) componentDeltaLine = `  Δ[${deltas.join(", ")}]`;
+                }
+              } catch {
+                // ignore delta parse errors
+              }
+            }
+            console.log(`  #${rec.iteration}  ${trend}  ${rec.metric_value ?? "—"}  (${rec.decision})  ${rec.verify_status}${componentLine}${componentDeltaLine}`);
           } catch {
             console.log(`  [parse error]`);
           }
@@ -944,6 +1022,19 @@ const main = async (): Promise<number> => {
         const gs = (grouped["guard-status"] as string) || "skip";
         const scorerStatus = normalizeScorerStatus(grouped["scorer-status"] as string | undefined);
         const iteration = parsePositiveInt(grouped.iteration as string | undefined, "iteration");
+        let scoreComponents: Record<string, number> | undefined;
+        if (grouped["score-components"]) {
+          try {
+            const parsed = JSON.parse(grouped["score-components"] as string);
+            if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+              throw new Error('score-components must be a JSON object with string keys and numeric values, e.g., {"accuracy": 0.8, "coverage": 0.6}');
+            }
+            scoreComponents = parsed as Record<string, number>;
+          } catch (e) {
+            console.error(`Invalid --score-components: ${(e as Error).message}`);
+            return 1;
+          }
+        }
         if (dryRun) {
           console.log("[dry-run] Would record experiment result:");
           console.log(JSON.stringify({
@@ -958,6 +1049,7 @@ const main = async (): Promise<number> => {
             labels: grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined,
             note: grouped.note,
             iteration,
+            score_components: scoreComponents,
           }, null, 2));
           return 0;
         }

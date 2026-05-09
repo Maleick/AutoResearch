@@ -228,6 +228,61 @@ describe("run-manager", () => {
         .rejects.toThrow("Refusing to append to symlinked score history file");
       expect(readFileSync(targetPath, "utf-8")).toBe("original");
     });
+
+    it("stores score_components in score history and last_iteration when provided", async () => {
+      const { initializeRun, appendIteration } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      const components = { accuracy: 0.8, coverage: 0.6 };
+      const state = await appendIteration(
+        tmpDir, undefined, undefined,
+        "keep", "5", undefined,
+        "pass", "pass",
+        "", "with components",
+        [], "",
+        undefined, undefined,
+        components,
+      );
+
+      // Components in last_iteration
+      expect(state.last_iteration?.score_components).toEqual(components);
+
+      // Components in score history JSONL
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      const records = readFileSync(scoreHistoryPath, "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+      expect(records[0].score_components).toEqual(components);
+    });
+
+    it("omits score_components from score history when not provided", async () => {
+      const { initializeRun, appendIteration } = await import(resolve(REPO_ROOT, "dist/run-manager.js"));
+      const config = {
+        goal: "Test goal",
+        metric: "defects",
+        direction: "lower",
+        verify: "echo 0",
+        mode: "foreground",
+      };
+      await initializeRun(tmpDir, undefined, undefined, config, false);
+      const state = await appendIteration(
+        tmpDir, undefined, undefined,
+        "keep", "5", undefined,
+        "pass", "pass",
+        "", "no components",
+        [], "",
+      );
+
+      expect(state.last_iteration?.score_components).toBeUndefined();
+
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      const records = readFileSync(scoreHistoryPath, "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+      expect(records[0]).not.toHaveProperty("score_components");
+    });
   });
 
   describe("completeRun", () => {

@@ -126,7 +126,7 @@ export async function appendIteration(
 
   appendFileSync(resultsPath, resultRow, "utf-8");
 
-  const scoreRecord = {
+  const scoreRecord: Record<string, unknown> = {
     timestamp: now,
     iteration: currentIteration,
     run_id: state.run_id,
@@ -143,6 +143,9 @@ export async function appendIteration(
     stage: lineageStage,
     agent: lineageAgent,
   };
+  if (scoreComponents != null) {
+    scoreRecord.score_components = scoreComponents;
+  }
   await appendTextFileNoFollow(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "score history file");
 
   const newState: RunState = {
