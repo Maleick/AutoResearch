@@ -110,10 +110,21 @@ jobs:
 
       - name: Safety gate - check for secrets
         run: |
-          if grep -rqiE "[\"']?(api[_-]?key|apikey|password|secret|token)[\"']?[[:space:]]*[:=][[:space:]]*[\"'][^\"']{8,}" --include="*.ts" --include="*.js" --include="*.json" src/ commands/ skills/; then
+          set +e
+          grep -rqiE "[\"']?(api[_-]?key|apikey|password|secret|token)[\"']?[[:space:]]*[:=][[:space:]]*[\"'][^\"']{8,}" --include="*.ts" --include="*.js" --include="*.json" src/ commands/ skills/
+          grep_status=$?
+          set -e
+
+          if [ "$grep_status" -eq 0 ]; then
             echo "::error::Potential hard-coded secret found in scanned source files"
             exit 1
           fi
+
+          if [ "$grep_status" -ne 1 ]; then
+            echo "::error::Secret scan failed (grep exit code $grep_status)"
+            exit 1
+          fi
+
           echo "Secret scan complete"
 
       - name: Run tests
