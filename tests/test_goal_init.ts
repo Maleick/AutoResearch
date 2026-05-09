@@ -169,7 +169,7 @@ describe("goal-init module", () => {
 
 describe("CLI: goal command", () => {
   const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-goal-init");
-  const goalPath = resolve(tmpDir, "GOAL.md");
+  const goalPath = resolve(tmpDir, ".autoresearch", "goal.md");
 
   afterEach(() => {
     try { rmSync(tmpDir, { recursive: true }); } catch {}
@@ -196,7 +196,7 @@ describe("CLI: goal command", () => {
   });
 
   describe("goal init non-interactive", () => {
-    it("creates GOAL.md from flags", () => {
+    it("creates default goal document under .autoresearch from flags", () => {
       mkdirSync(tmpDir, { recursive: true });
       runCLI(["goal", "init", "--goal", "reduce errors", "--metric", "failures", "--direction", "lower", "--verify", "npm test", "--repo", tmpDir]);
       expect(existsSync(goalPath)).toBe(true);
