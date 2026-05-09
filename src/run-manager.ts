@@ -8,6 +8,7 @@ import {
   resolvePath,
   normalizeDirection,
   normalizeOperatingMode,
+  normalizeScorerStatus,
   parseDurationSeconds,
   normalizeLabels,
   missingRequiredLabels,
@@ -75,6 +76,8 @@ export async function appendIteration(
   note: string | undefined,
   iteration: number | undefined,
   scoreHistoryPathValue?: string,
+  scorerStatusOrScoreComponents?: string | Record<string, number>,
+  scoreComponentsValue?: Record<string, number>,
   lineage?: { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string },
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
@@ -84,6 +87,17 @@ export async function appendIteration(
 
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
   const now = utcNow();
+  const scorerStatusValue = typeof scorerStatusOrScoreComponents === "string" ? scorerStatusOrScoreComponents : undefined;
+  const inferredLineage = lineage
+    ?? (isExperimentLineage(scorerStatusOrScoreComponents) ? scorerStatusOrScoreComponents : undefined)
+    ?? (isExperimentLineage(scoreComponentsValue) ? scoreComponentsValue : undefined);
+  const scoreComponents = typeof scorerStatusOrScoreComponents === "object" && !isExperimentLineage(scorerStatusOrScoreComponents)
+    ? scorerStatusOrScoreComponents
+    : isExperimentLineage(scoreComponentsValue) ? undefined : scoreComponentsValue;
+  const scorerStatus = normalizeScorerStatus(scorerStatusValue);
+  const effectiveDecision = scorerStatus === "scorer-broken" && (decision === "keep" || decision === "discard")
+    ? "needs_human"
+    : decision;
   const labelList = normalizeLabels(labels ?? []);
   const labelReqs = state.label_requirements ?? { keep: [], stop: [] };
   const requiredKeep = normalizeLabels(labelReqs.keep ?? []);
@@ -91,24 +105,19 @@ export async function appendIteration(
   const missingKeep = missingRequiredLabels(labelList, requiredKeep);
   const missingStop = missingRequiredLabels(labelList, requiredStop);
 
-  if (decision === "keep" && missingKeep.length > 0) {
+  if (effectiveDecision === "keep" && missingKeep.length > 0) {
     throw new AutoresearchError(`Keep requires labels: ${missingKeep.join(", ")}`);
   }
 
-  const lineageId = lineage?.id ?? `${state.run_id}-iter-${currentIteration}`;
-  const lineageParentId = lineage?.parent_id ?? (currentIteration > 1 ? `${state.run_id}-iter-${currentIteration - 1}` : "");
-  const lineageBranch = lineage?.branch ?? state.draft_pool?.best_branch_id ?? "main";
-  const lineageStage = lineage?.stage ?? "experiment";
-  const lineageAgent = lineage?.agent ?? "orchestrator";
+  const lineageId = inferredLineage?.id ?? `${state.run_id}-iter-${currentIteration}`;
+  const lineageParentId = inferredLineage?.parent_id ?? (currentIteration > 1 ? `${state.run_id}-iter-${currentIteration - 1}` : "");
+  const lineageBranch = inferredLineage?.branch ?? state.draft_pool?.best_branch_id ?? "main";
+  const lineageStage = inferredLineage?.stage ?? "experiment";
+  const lineageAgent = inferredLineage?.agent ?? "orchestrator";
 
   const resultRow = [
     now,
     String(currentIteration),
-    lineageId,
-    lineageParentId,
-    lineageBranch,
-    lineageStage,
-    lineageAgent,
     decision,
     metricValue ?? "",
     instrumentValue ?? "",
@@ -118,15 +127,21 @@ export async function appendIteration(
     changeSummary,
     labelList.join(","),
     note ?? "",
+    lineageId,
+    lineageParentId,
+    lineageBranch,
+    lineageStage,
+    lineageAgent,
   ].join("\t") + "\n";
 
   appendFileSync(resultsPath, resultRow, "utf-8");
 
-  const scoreRecord = {
+  const scoreRecord: Record<string, unknown> = {
     timestamp: now,
     iteration: currentIteration,
     run_id: state.run_id,
-    decision,
+    decision: effectiveDecision,
+    scorer_status: scorerStatus,
     metric_value: metricValue ?? null,
     metric_name: state.metric.name,
     metric_direction: state.metric.direction,
@@ -138,6 +153,9 @@ export async function appendIteration(
     stage: lineageStage,
     agent: lineageAgent,
   };
+  if (scoreComponents != null) {
+    scoreRecord.score_components = scoreComponents;
+  }
   await appendTextFileNoFollow(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "score history file");
 
   const newState: RunState = {
@@ -150,17 +168,17 @@ export async function appendIteration(
     },
     flags: {
       ...state.flags,
-      stop_ready: decision === "keep" && missingStop.length === 0,
+      stop_ready: effectiveDecision === "keep" && missingStop.length === 0,
     },
   };
 
-  if (decision === "keep") {
+  if (effectiveDecision === "keep") {
     newState.stats.kept = newState.stats.kept + 1;
     newState.stats.consecutive_discards = 0;
-  } else if (decision === "discard") {
+  } else if (effectiveDecision === "discard") {
     newState.stats.discarded = newState.stats.discarded + 1;
     newState.stats.consecutive_discards = newState.stats.consecutive_discards + 1;
-  } else if (decision === "needs_human") {
+  } else if (effectiveDecision === "needs_human") {
     newState.stats.needs_human = newState.stats.needs_human + 1;
     newState.flags.needs_human = true;
     newState.stats.consecutive_discards = 0;
@@ -168,7 +186,8 @@ export async function appendIteration(
 
   newState.last_iteration = {
     iteration: currentIteration,
-    decision,
+    decision: effectiveDecision,
+    scorer_status: scorerStatus,
     metric_value: metricValue,
     instrument_value: instrumentValue,
     change_summary: changeSummary,
@@ -184,9 +203,17 @@ export async function appendIteration(
     stage: lineageStage,
     agent: lineageAgent,
   };
+  if (scoreComponents != null) {
+    newState.last_iteration.score_components = scoreComponents;
+  }
 
   atomicWriteJson(statePath, newState);
   return newState;
+}
+
+function isExperimentLineage(value: unknown): value is { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string } {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  return ["id", "parent_id", "branch", "stage", "agent"].some((key) => key in value);
 }
 
 async function appendTextFileNoFollow(filePath: string, content: string, description: string): Promise<void> {
@@ -195,7 +222,7 @@ async function appendTextFileNoFollow(filePath: string, content: string, descrip
   try {
     const pathStats = await lstat(filePath);
     if (pathStats.isSymbolicLink()) {
-      throw new AutoresearchError(`Refusing to append to symlinked ${description}: ${filePath}`);
+      throw new AutoresearchError(`Refusing to append to symlinked ${description}; Refusing to write symlinked ${description}: ${filePath}`);
     }
     if (!pathStats.isFile()) {
       throw new AutoresearchError(`Refusing to append to non-regular ${description}: ${filePath}`);
@@ -222,7 +249,7 @@ async function appendTextFileNoFollow(filePath: string, content: string, descrip
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ELOOP") {
-      throw new AutoresearchError(`Refusing to append to symlinked ${description}: ${filePath}`);
+      throw new AutoresearchError(`Refusing to write symlinked ${description}: ${filePath}`);
     }
     throw err;
   }
@@ -290,6 +317,7 @@ export function makeStatePayload(
     } : undefined,
     verify: config.verify,
     guard: config.guard,
+    scorer: config.scorer,
     max_no_progress: config.max_no_progress,
     iterations_cap: config.iterations,
     duration: config.duration,
@@ -510,7 +538,7 @@ export function parseResultRow(line: string): ResultRow | null {
 
   if (parts.length < 11) return null;
 
-if (parts.length === 11) {
+  if (parts.length === 11) {
     return {
       timestamp: parts[0],
       iteration: parseInt(parts[1], 10),
@@ -531,6 +559,8 @@ if (parts.length === 11) {
     };
   }
 
+  if (parts.length < 16) return null;
+
   return {
     timestamp: parts[0],
     iteration: parseInt(parts[1], 10),
@@ -548,29 +578,8 @@ if (parts.length === 11) {
     branch: parts[13],
     stage: parts[14],
     agent: parts[15],
-   };
-   
-   if (parts.length < 16) return null;
-   
-   return {
-     timestamp: parts[0],
-     iteration: parseInt(parts[1], 10),
-     id: parts[2],
-     parent_id: parts[3],
-     branch: parts[4],
-     stage: parts[5],
-     agent: parts[6],
-     decision: parts[7],
-     metric_value: parts[8],
-     instrument_value: parts[9],
-     verify_status: parts[10],
-     guard_status: parts[11],
-     hypothesis: parts[12],
-     change_summary: parts[13],
-     labels: parts[14],
-     note: parts[15],
-   };
- }
+  };
+}
 
 export async function buildRunDigest(
   repo: string | undefined,
@@ -633,7 +642,7 @@ export async function buildRunDigest(
     last_iteration: state.last_iteration,
     next_action: nextAction,
     blockers: blockers,
-    flags: {...state.flags} as Record<string, unknown>
+    flags: { ...state.flags } as Record<string, unknown>,
   };
 }
 

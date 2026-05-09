@@ -69,6 +69,7 @@ See [`skills/hermes/INTEGRATION.md`](https://github.com/Maleick/AutoResearch/blo
 
 - **Score trend artifacts** — `.autoresearch/score-history.jsonl` logs each iteration's metric score
 - `autoresearch scores` command — Export latest N score snapshots
+- `autoresearch score` command — Run the configured scorer and display normalized output
 
 ### Score History Format
 
@@ -103,6 +104,60 @@ The score history is stored as JSON Lines (one JSON object per line):
 - `autoresearch scores --json` — Output as a JSON object with `count` and `scores`
 - `autoresearch scores --score-history-path <path>` — Custom score history path
 
+## `autoresearch score`
+
+Runs the configured scorer command and displays a normalized result. The scorer must output a JSON object with `score` and `max` fields.
+
+### Usage
+
+```bash
+autoresearch score --scorer "node score.js"
+autoresearch score --scorer "node score.js" --json
+autoresearch score                           # uses scorer configured in state.json
+autoresearch score --repo <path>             # custom repo root
+```
+
+The scorer is configured at run-init time with `--scorer <cmd>`:
+
+```bash
+autoresearch init --goal "improve accuracy" --metric errors --verify "npm test" --scorer "node score.js"
+```
+
+### Output (human-readable)
+
+```
+Score: 7 / 10 (70.0%)
+Components:
+  accuracy: 8
+  speed: 6
+```
+
+### Output (--json)
+
+```json
+{
+  "score": 7,
+  "max": 10,
+  "normalized": 0.7,
+  "percent": "70.0%",
+  "components": { "accuracy": 8, "speed": 6 },
+  "diagnostics": null,
+  "details": null
+}
+```
+
+### Scorer Contract
+
+The scorer command must write a JSON object to stdout:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `score` | number | ✓ | Current score value |
+| `max` | number | ✓ | Maximum possible score (must be > 0) |
+| `components` | object | — | Optional per-component breakdown |
+| `diagnostics` | object | — | Optional diagnostic metadata |
+| `details` | object | — | Optional additional detail |
+
 ## CLI
 
 The `autoresearch` CLI provides background and foreground run control:
@@ -119,7 +174,8 @@ flowchart LR
     A --> G[resume]
     A --> H[complete]
     A --> I[record]
-    A --> J[doctor]
+    A --> J[score]
+    A --> K[doctor]
 ```
 
 - `autoresearch init` — Initialize a run
@@ -131,6 +187,7 @@ flowchart LR
 - `autoresearch resume` — Resume background run
 - `autoresearch complete` — Mark run complete
 - `autoresearch record` — Record iteration result
+- `autoresearch score` — Run the configured scorer and show normalized output
 - `autoresearch doctor` — Verify installation
 
 ## Mode Routing
