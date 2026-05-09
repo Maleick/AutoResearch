@@ -1,6 +1,39 @@
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
-import { parseMetricValue } from "./metric-comparator.js";
+import { sanitizeForTerminal } from "./helpers.js";
+
+function escapeMarkdownHtmlChar(char: string): string {
+  switch (char) {
+    case "&":
+      return "&amp;";
+    case "<":
+      return "&lt;";
+    case ">":
+      return "&gt;";
+    case '"':
+      return "&quot;";
+    default:
+      return char;
+  }
+}
+
+function escapeMarkdownInlineChar(char: string): string {
+  return `\\${char}`;
+}
+
+function escapeMarkdownInline(value: unknown): string {
+  return sanitizeForTerminal(value ?? "")
+    .replace(/[&<>"]/g, escapeMarkdownHtmlChar)
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .replace(/[\\`*_{}\[\]()#+\-.!|]/g, escapeMarkdownInlineChar);
+}
+
+function escapeMarkdownTableCell(value: unknown): string {
+  const escaped = escapeMarkdownInline(value);
+  return escaped.length > 0 ? escaped : "—";
+}
 
 export interface LeaderboardEntry {
   run_id: string;
@@ -27,10 +60,7 @@ export interface Leaderboard {
   };
 }
 
-function parseResultsFile(
-  resultsPath: string,
-  direction: "lower" | "higher",
-): { kept: number; discarded: number; bestValue: string | null; latestValue: string | null } {
+function parseResultsFile(resultsPath: string): { kept: number; discarded: number; bestValue: string | null; latestValue: string | null } {
   if (!existsSync(resultsPath)) {
     return { kept: 0, discarded: 0, bestValue: null, latestValue: null };
   }
@@ -51,7 +81,6 @@ function parseResultsFile(
   let kept = 0;
   let discarded = 0;
   let bestValue: string | null = null;
-  let bestNumericValue: number | null = null;
   let latestValue: string | null = null;
 
   for (let i = 1; i < lines.length; i++) {
@@ -66,18 +95,7 @@ function parseResultsFile(
 
     if (metricValue) {
       latestValue = metricValue;
-      const parsed = parseMetricValue(metricValue);
-      if (parsed === null) {
-        if (bestValue === null) {
-          bestValue = metricValue;
-        }
-        continue;
-      }
-      if (
-        bestNumericValue === null ||
-        (direction === "lower" ? parsed < bestNumericValue : parsed > bestNumericValue)
-      ) {
-        bestNumericValue = parsed;
+      if (bestValue === null || metricValue < bestValue) {
         bestValue = metricValue;
       }
     }
@@ -122,19 +140,18 @@ export function generateLeaderboard(repoPath: string): Leaderboard {
 
     try {
       const state = JSON.parse(readFileSync(statePath, "utf-8"));
-      const direction = state.metric?.direction === "higher" ? "higher" : "lower";
-      const results = parseResultsFile(resultsPath, direction);
+      const results = parseResultsFile(resultsPath);
       const runtime = calculateRuntime(state);
 
       entries.push({
         run_id: state.run_id || dir.name,
         goal: state.goal || "Unknown",
         metric: state.metric?.name || "Unknown",
-        direction,
+        direction: state.metric?.direction || "lower",
         total_iterations: results.kept + results.discarded,
         kept: results.kept,
         discarded: results.discarded,
-        success_rate: results.kept + results.discarded > 0
+        success_rate: entries.length > 0
           ? `${((results.kept / (results.kept + results.discarded)) * 100).toFixed(1)}%`
           : "0%",
         best_value: results.bestValue,
@@ -173,6 +190,28 @@ export function generateLeaderboard(repoPath: string): Leaderboard {
   };
 }
 
+export function formatLeaderboardText(leaderboard: Leaderboard): string {
+  const lines: string[] = [
+    "Auto Research Leaderboard",
+    "=========================",
+    "",
+  ];
+
+  for (const entry of leaderboard.entries) {
+    lines.push(`Run:      ${sanitizeForTerminal(entry.run_id)}`);
+    lines.push(`Goal:     ${sanitizeForTerminal(entry.goal)}`);
+    lines.push(`Metric:   ${sanitizeForTerminal(entry.metric)} (${sanitizeForTerminal(entry.direction)})`);
+    lines.push(`Results:  ${entry.total_iterations} iterations (${entry.kept} kept, ${entry.discarded} discarded)`);
+    lines.push(`Success:  ${sanitizeForTerminal(entry.success_rate)}`);
+    if (entry.best_value) lines.push(`Best:     ${sanitizeForTerminal(entry.best_value)}`);
+    if (entry.runtime_seconds) lines.push(`Runtime:  ${Math.round(entry.runtime_seconds / 60)}m`);
+    lines.push("");
+  }
+
+  lines.push(`Total: ${leaderboard.summary.total_runs} runs, ${leaderboard.summary.total_iterations} iterations, ${leaderboard.summary.overall_success_rate} success rate`);
+  return lines.join("\n");
+}
+
 export function formatLeaderboardMarkdown(leaderboard: Leaderboard): string {
   const lines: string[] = [
     "# Auto Research Leaderboard",
@@ -188,7 +227,7 @@ export function formatLeaderboardMarkdown(leaderboard: Leaderboard): string {
       ? `${Math.round(entry.runtime_seconds / 60)}m`
       : "—";
     lines.push(
-      `| ${entry.run_id} | ${entry.goal} | ${entry.metric} (${entry.direction}) | ${entry.total_iterations} | ${entry.kept} | ${entry.success_rate} | ${entry.best_value ?? "—"} | ${runtime} |`,
+      `| ${escapeMarkdownTableCell(entry.run_id)} | ${escapeMarkdownTableCell(entry.goal)} | ${escapeMarkdownTableCell(entry.metric)} (${escapeMarkdownTableCell(entry.direction)}) | ${entry.total_iterations} | ${entry.kept} | ${escapeMarkdownTableCell(entry.success_rate)} | ${escapeMarkdownTableCell(entry.best_value)} | ${runtime} |`,
     );
   }
 

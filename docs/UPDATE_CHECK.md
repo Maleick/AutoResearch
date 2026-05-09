@@ -1,26 +1,56 @@
-# Update Check Cache Notes
+# Update Check Policy
 
-Auto Research currently exposes update-check information through cache inspection in the `doctor` command. There is no automatic startup update probe yet.
+Auto Research includes an automatic update check that runs at startup for most commands. This document describes when the check is performed, when it is skipped, and how to opt out.
 
-## Current Behavior
+## Behavior
 
-- **Read-only cache inspection**: `autoresearch doctor` reads update metadata when cache data exists.
+The update check verifies whether a newer version of `opencode-autoresearch` is available on npm. It caches the result to avoid repeated network requests.
+
 - **Cache location**: `~/.cache/opencode-autoresearch/update-check.json`
-- **No startup probe**: command startup does not contact npm for update checks today.
-- **No TTL enforcement in CLI runtime**: cache freshness rules are not enforced by the current implementation.
+- **Cache TTL**: 24 hours (`86400000` ms)
+- **Default**: Enabled for all users (opt-out, not opt-in)
+
+## Skip Matrix
+
+The update check is explicitly skipped in the following scenarios:
+
+| Scenario | Skip Reason | Rationale |
+|----------|-------------|-----------|
+| `--version` or `-v` | Version flags | Fast path for version queries |
+| `--help` or `-h` or `help` | Help flags | Fast path for help queries |
+| `AUTORESEARCH_NO_UPDATE=1` | Environment opt-out | User-configurable disable |
+| `CI=true` (detected) | CI environment | Avoid noise in automated pipelines |
+
+## Opt-Out
+
+To permanently disable update checks, set the environment variable:
+
+```bash
+export AUTORESEARCH_NO_UPDATE=1
+```
+
+Or for a single invocation:
+
+```bash
+AUTORESEARCH_NO_UPDATE=1 autoresearch status
+```
 
 ## Verification
 
-Run:
+The `autoresearch doctor` command reports the update check status:
 
 ```bash
 autoresearch doctor
+# Output includes:
+#   Disabled:   no
+#   Last check: 2026-05-09T14:32:00Z
+#   Latest:     3.13.1
+#   Available:  no
 ```
-
-If cache data exists, output includes fields such as last check time, latest version, and whether an update is available.
 
 ## Implementation Notes
 
-- Cache access is implemented in `src/helpers.ts` via `readUpdateCache`.
-- Runtime reporting is surfaced by the `doctor` command in `src/cli.ts`.
-- Automatic network probing may be added later; until then this document intentionally reflects the current read-only behavior.
+- The update check runs **after** command parsing but **before** command execution.
+- Skip decisions are made at the CLI entry point (`src/cli.ts`) before any subcommand logic.
+- The actual network probe (npm registry fetch) is not yet implemented; only the cache read/write infrastructure exists.
+- When implemented, the probe will run asynchronously and report via stderr without blocking command execution.

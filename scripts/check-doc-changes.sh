@@ -36,6 +36,10 @@ for file in $CHANGED_FILES; do
       BEHAVIOR_CHANGES=true
       BEHAVIOR_FILES+=("$file")
       ;;
+    src/*.ts)
+      BEHAVIOR_CHANGES=true
+      BEHAVIOR_FILES+=("$file")
+      ;;
     commands/*.md|skills/*/*.md)
       BEHAVIOR_CHANGES=true
       BEHAVIOR_FILES+=("$file")

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
+import { closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { execSync } from "child_process";
 import { MAX_DRAFTS } from "./constants.js";
@@ -53,7 +53,6 @@ const usage = (): void => {
   console.error("  resume     Resume a background run");
   console.error("  record     Record an experiment result");
   console.error("  leaderboard Show local leaderboard across runs");
-  console.error("  compact    Compact .autoresearch history (archive old runs)");
   console.error("  doctor     Verify package installation and version");
   console.error("  help       Show this help");
   console.error("");
@@ -80,6 +79,7 @@ const usage = (): void => {
   console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
   console.error(`  --num-drafts    Number of parallel drafts (default: 1, max: ${MAX_DRAFTS})`);
   console.error("  --branch-policy Branch selection policy: best, roulette, diverse");
+  console.error('  --branch-policy-overrides JSON object mapping draft IDs to policies (e.g. {"draft-0":"diverse"})');
   console.error("  --max-debug-depth   Max debug experiment depth before stop");
   console.error("  --branch-failure-budget  Per-branch failure budget before stop");
   console.error("  --json          Output raw JSON (default: human-readable)");
@@ -217,6 +217,41 @@ const formatTimestamp = (ts: string): string => {
   }
 };
 
+const MAX_SCORE_HISTORY_BYTES = 10 * 1024 * 1024;
+
+const assertRegularBoundedFile = (filePath: string): void => {
+  const linkStats = lstatSync(filePath);
+  if (linkStats.isSymbolicLink()) {
+    throw new Error(`Refusing to read score history symlink: ${filePath}`);
+  }
+  if (!linkStats.isFile()) {
+    throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
+  }
+  if (linkStats.size > MAX_SCORE_HISTORY_BYTES) {
+    throw new Error(`Score history is too large to read safely (${linkStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
+  }
+};
+
+const readScoreHistoryFile = (filePath: string): string => {
+  assertRegularBoundedFile(filePath);
+  if (typeof fsConstants.O_NOFOLLOW !== "number") {
+    throw new Error(`Refusing to read score history because this platform does not support O_NOFOLLOW: ${filePath}`);
+  }
+  const fd = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  try {
+    const fileStats = fstatSync(fd);
+    if (!fileStats.isFile()) {
+      throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
+    }
+    if (fileStats.size > MAX_SCORE_HISTORY_BYTES) {
+      throw new Error(`Score history is too large to read safely (${fileStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
+    }
+    return readFileSync(fd, "utf-8");
+  } finally {
+    closeSync(fd);
+  }
+};
+
 const readTailLines = (filePath: string, limit: number): string[] => {
   if (limit <= 0) return [];
 
@@ -283,6 +318,44 @@ const normalizeBranchPolicy = (value: string | undefined): BranchPolicy => {
   throw new Error(`Invalid branch policy: ${value}. Expected one of: ${BRANCH_POLICIES.join(", ")}`);
 };
 
+const PROTO_POISON_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+const normalizeOverrideBranchPolicy = (branchId: string, value: string): BranchPolicy => {
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    throw new Error(`Invalid branch policy override for ${branchId}: value must not be empty`);
+  }
+  if ((BRANCH_POLICIES as readonly string[]).includes(trimmed)) return trimmed as BranchPolicy;
+  throw new Error(`Invalid branch policy override for ${branchId}: "${trimmed}" is not one of: ${BRANCH_POLICIES.join(", ")}`);
+};
+
+const parseBranchPolicyOverrides = (value: string | undefined): Record<string, BranchPolicy> | undefined => {
+  if (value == null || value === "") return undefined;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Invalid branch policy overrides: expected a JSON object mapping draft IDs to branch policies");
+  }
+
+  if (parsed == null || Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error("Invalid branch policy overrides: expected a JSON object mapping draft IDs to branch policies");
+  }
+
+  const overrides = Object.create(null) as Record<string, BranchPolicy>;
+  for (const [branchId, branchPolicy] of Object.entries(parsed)) {
+    if (PROTO_POISON_KEYS.has(branchId)) {
+      throw new Error(`Invalid branch policy override key: "${branchId}" is not a valid draft ID`);
+    }
+    if (typeof branchPolicy !== "string") {
+      throw new Error(`Invalid branch policy override for ${branchId}: expected a string policy`);
+    }
+    overrides[branchId] = normalizeOverrideBranchPolicy(branchId, branchPolicy);
+  }
+  return overrides;
+};
+
 const main = async (): Promise<number> => {
   const args = process.argv.slice(2);
 
@@ -340,7 +413,7 @@ const main = async (): Promise<number> => {
           stop_condition: grouped["stop-condition"] as string | undefined,
           rollback_strategy: grouped["rollback-strategy"] as string | undefined,
         };
-        printJson(buildSetupSummary(grouped.repo as string | undefined, config));
+        printJsonEnvelope("wizard", buildSetupSummary(grouped.repo as string | undefined, config));
         break;
       }
       case "init": {
@@ -376,6 +449,7 @@ const main = async (): Promise<number> => {
           baseline: grouped.baseline as string | undefined,
           num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts", { max: MAX_DRAFTS }) ?? 1,
           branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
+          branch_policy_overrides: parseBranchPolicyOverrides(grouped["branch-policy-overrides"] as string | undefined),
           outcome_metric: grouped["outcome-metric"] as string | undefined,
           outcome_direction: grouped["outcome-direction"] as string | undefined,
           instrument_metric: grouped["instrument-metric"] as string | undefined,
@@ -541,7 +615,7 @@ const main = async (): Promise<number> => {
         const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
         const showTopComponents = grouped["top-components"] === "true";
         if (showTopComponents) {
-          const allLines = readFileSync(scoreHistoryPath, "utf-8")
+          const allLines = readScoreHistoryFile(scoreHistoryPath)
             .split("\n")
             .map((l: string) => l.trim())
             .filter(Boolean);
@@ -665,21 +739,12 @@ const main = async (): Promise<number> => {
         break;
       }
       case "score": {
-        const { resolvePath, readJsonFile, AutoresearchError: AErr } = await import("./helpers.js");
-        const { STATE_DEFAULT } = await import("./constants.js");
+        const { AutoresearchError: AErr } = await import("./helpers.js");
         const { parseScoreOutput } = await import("./score-parser.js");
 
-        // Resolve scorer: --scorer flag takes priority, else use state.scorer
-        let scorerCmd = grouped.scorer as string | undefined;
+        const scorerCmd = grouped.scorer as string | undefined;
         if (!scorerCmd) {
-          const statePath = resolvePath(grouped.repo as string | undefined, grouped["state-path"] as string | undefined, STATE_DEFAULT);
-          if (existsSync(statePath)) {
-            const state = parseRunState(readJsonFile(statePath));
-            scorerCmd = state.scorer;
-          }
-        }
-        if (!scorerCmd) {
-          throw new AErr("No scorer configured. Provide --scorer <cmd> or configure a scorer via autoresearch init --scorer <cmd>.");
+          throw new AErr("No scorer provided. Pass --scorer <cmd> to run a scorer explicitly.");
         }
 
         const repoBase = resolveRepo(grouped.repo as string | undefined);
@@ -768,34 +833,18 @@ const main = async (): Promise<number> => {
         break;
       }
       case "contract": {
-        const contractSchemaVersion = "1.0.0";
         const schemas = {
-          schema_version: contractSchemaVersion,
+          schema_version: "1.0.0",
           description: "Auto Research runtime contract schemas",
           state: {
             type: "object",
-            required: [
-              "schema_version",
-              "run_id",
-              "created_at",
-              "updated_at",
-              "status",
-              "mode",
-              "goal",
-              "scope",
-              "metric",
-              "verify",
-              "label_requirements",
-              "artifact_paths",
-              "stats",
-              "flags",
-            ],
+            required: ["schema_version", "run_id", "created_at", "updated_at", "status", "mode", "operating_mode", "goal", "scope", "metric", "verify", "label_requirements", "artifact_paths", "stats", "flags"],
             properties: {
               schema_version: { type: "number", description: "State schema version" },
               run_id: { type: "string", description: "Unique run identifier" },
               created_at: { type: "string", format: "date-time", description: "Run creation timestamp" },
               updated_at: { type: "string", format: "date-time", description: "Last update timestamp" },
-              status: { type: "string", enum: ["running", "stopped", "completed", "needs_human"], description: "Run status" },
+              status: { type: "string", enum: ["initialized", "running", "stopping", "stopped", "completed", "needs_human"], description: "Run status" },
               mode: { type: "string", enum: ["foreground", "background"], description: "Execution mode" },
               operating_mode: { type: "string", enum: ["converge", "continuous", "supervised"], description: "Operating mode" },
               goal: { type: "string", description: "Run goal description" },
@@ -915,7 +964,7 @@ const main = async (): Promise<number> => {
         console.log("==============================");
         console.log("");
         console.log("State Schema:");
-        console.log(`  Version:    ${contractSchemaVersion}`);
+        console.log(`  Version:    ${schemas.state.properties.schema_version.type}`);
         console.log(`  Required:   ${schemas.state.required.join(", ")}`);
         console.log("");
         console.log("Result Row Schema:");
@@ -1084,9 +1133,13 @@ const main = async (): Promise<number> => {
             console.log(`- **Cap:** ${total} / ${state.iterations_cap} iterations (${progressPct}% of cap)`);
           }
           
-          if (state.duration_seconds) {
-            const elapsedMin = Math.round(state.duration_seconds / 60);
-            console.log(`- **Elapsed:** ${elapsedMin} minutes`);
+          if (state.created_at) {
+            const startedAtMs = Date.parse(state.created_at);
+            const endedAtMs = state.updated_at ? Date.parse(state.updated_at) : Date.now();
+            if (!Number.isNaN(startedAtMs) && !Number.isNaN(endedAtMs) && endedAtMs >= startedAtMs) {
+              const elapsedMin = Math.round((endedAtMs - startedAtMs) / 1000 / 60);
+              console.log(`- **Elapsed:** ${elapsedMin} minutes`);
+            }
           }
           
           // Next candidate
@@ -1171,7 +1224,7 @@ const main = async (): Promise<number> => {
           break;
         }
         const memory = readFileSync(memoryPath, "utf-8");
-        const patterns = memory.match(/### Pattern: [^\n]+/g) ?? [];
+        const patterns = memory.match(/^### Pattern: [^\n]+/gm) ?? [];
         const suggestions = patterns.map(parseMemoryPatternHeading);
         if (useJson) {
           printJson({ patterns_found: suggestions.length, suggestions });
@@ -1221,7 +1274,7 @@ const main = async (): Promise<number> => {
         };
         
         if (format === "json") {
-          console.log(JSON.stringify(exportData, null, 2));
+          printJsonEnvelope("export", exportData);
         } else if (format === "md" || format === "markdown") {
           console.log(`# Auto Research Export`);
           console.log(`\n**Run:** ${escapeMarkdownInline(exportData.state.run_id) || "—"}`);
@@ -1246,7 +1299,7 @@ const main = async (): Promise<number> => {
       case "completion": {
         const shell = grouped.shell as string || "bash";
         const commands = ["init", "goal", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
-        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell", "--goal-path", "--template"];
+        const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--branch-policy-overrides", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell", "--goal-path", "--template"];
         
         if (shell === "bash" || shell === "zsh") {
           console.log(`# Auto Research CLI completion for ${shell}`);
@@ -1300,6 +1353,7 @@ const main = async (): Promise<number> => {
           baseline: grouped.baseline as string | undefined,
           num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts", { max: MAX_DRAFTS }) ?? 1,
           branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
+          branch_policy_overrides: parseBranchPolicyOverrides(grouped["branch-policy-overrides"] as string | undefined),
           outcome_metric: grouped["outcome-metric"] as string | undefined,
           outcome_direction: grouped["outcome-direction"] as string | undefined,
           instrument_metric: grouped["instrument-metric"] as string | undefined,
@@ -1410,7 +1464,8 @@ const main = async (): Promise<number> => {
           scorerStatus,
           scoreComponents,
           );
-        printJson(state);
+
+        printJsonEnvelope("record", state);
         break;
       }
        case "digest": {
@@ -1467,7 +1522,7 @@ const main = async (): Promise<number> => {
            if (digest.flags && Object.keys(digest.flags).length > 0) {
              console.log(`\n## Flags`);
              for (const [key, value] of Object.entries(digest.flags)) {
-               console.log(`- ${key}: ${formatMarkdownField(value)}`);
+               console.log(`- ${formatMarkdownField(key)}: ${formatMarkdownField(value)}`);
              }
            }
          }
@@ -1511,7 +1566,7 @@ const main = async (): Promise<number> => {
         };
 
         if (useJson) {
-          printJson({
+          printJsonEnvelope("doctor", {
             version: VERSION,
             skill_name: SKILL_NAME,
             runtime: `Node.js ${process.version}`,
@@ -1616,7 +1671,7 @@ const main = async (): Promise<number> => {
           }
           const doc = readGoalDoc(goalPath);
           if (useJson) {
-            printJson(doc);
+            printJsonEnvelope("goal", doc);
             break;
           }
           console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
@@ -1741,7 +1796,7 @@ const main = async (): Promise<number> => {
 
         if (isGoalDryRun) {
           if (useGoalJson) {
-            printJson({ ...result, dry_run: true });
+            printJsonEnvelope("goal", { ...result, dry_run: true });
           } else {
             console.log("[dry-run] Would write goal document to: " + goalPath);
             console.log("");
@@ -1758,7 +1813,7 @@ const main = async (): Promise<number> => {
         atomicWriteTextInRepo(goalGrouped.repo as string | undefined, goalPath, document);
 
         if (useGoalJson) {
-          printJson(result);
+          printJsonEnvelope("goal", result);
         } else {
           console.log(`✓ Goal definition written to ${goalPath}`);
           console.log(`  Goal:    ${result.goal ?? "(unset)"}`);
@@ -1772,7 +1827,7 @@ const main = async (): Promise<number> => {
         break;
       }
       case "leaderboard": {
-        const { generateLeaderboard, formatLeaderboardMarkdown } = await import("./leaderboard.js");
+        const { generateLeaderboard, formatLeaderboardMarkdown, formatLeaderboardText } = await import("./leaderboard.js");
         const { resolveRepo } = await import("./helpers.js");
         const repo = resolveRepo(grouped.repo as string | undefined);
         const leaderboard = generateLeaderboard(repo);
@@ -1790,74 +1845,7 @@ const main = async (): Promise<number> => {
         if (grouped.format === "markdown") {
           console.log(formatLeaderboardMarkdown(leaderboard));
         } else {
-          console.log("Auto Research Leaderboard");
-          console.log("=========================");
-          console.log("");
-          for (const entry of leaderboard.entries) {
-            console.log(`Run:      ${entry.run_id}`);
-            console.log(`Goal:     ${entry.goal}`);
-            console.log(`Metric:   ${entry.metric} (${entry.direction})`);
-            console.log(`Results:  ${entry.total_iterations} iterations (${entry.kept} kept, ${entry.discarded} discarded)`);
-            console.log(`Success:  ${entry.success_rate}`);
-            if (entry.best_value) console.log(`Best:     ${entry.best_value}`);
-            if (entry.runtime_seconds) console.log(`Runtime:  ${Math.round(entry.runtime_seconds / 60)}m`);
-            console.log("");
-          }
-          console.log(`Total: ${leaderboard.summary.total_runs} runs, ${leaderboard.summary.total_iterations} iterations, ${leaderboard.summary.overall_success_rate} success rate`);
-        }
-        break;
-      }
-      case "compact": {
-        const { planCompaction, executeCompaction } = await import("./compaction.js");
-        const { resolveRepo } = await import("./helpers.js");
-        const repo = resolveRepo(grouped.repo as string | undefined);
-        const preserveCount = parsePositiveInt(grouped["preserve-iterations"] as string | undefined, "preserve-iterations") ?? 5;
-
-        if (dryRun) {
-          console.log("[dry-run] Would compact .autoresearch history");
-        }
-
-        const plan = planCompaction(repo, preserveCount);
-
-        if (plan.filesToArchive.length === 0) {
-          console.log("No files to compact. History is already minimal.");
-          break;
-        }
-
-        console.log(`Compaction plan for ${repo}:`);
-        console.log(`  Preserve: ${plan.filesToPreserve.length} files/directories`);
-        console.log(`  Archive:  ${plan.filesToArchive.length} files/directories`);
-        console.log(`  Space:    ${(plan.estimatedSpaceReclaimed / 1024).toFixed(1)} KB estimated`);
-
-        if (useJson) {
-          printJson({ plan });
-          break;
-        }
-
-        if (dryRun) {
-          console.log("\n[dry-run] Would archive:");
-          for (const f of plan.filesToArchive) {
-            console.log(`  - ${f}`);
-          }
-          break;
-        }
-
-        // Warning before destructive operation
-        console.error("\nWARNING: This will archive old run data. Recent runs will be preserved.");
-        console.error("Use --dry-run to preview. Use --preserve-iterations N (or --preserve-iterations=N) to adjust retention.");
-        console.error("");
-
-        const result = executeCompaction(repo, plan, false);
-
-        if (result.success) {
-          console.log(`\nCompacted successfully:`);
-          console.log(`  Archived: ${result.archived.length} items`);
-          console.log(`  Space reclaimed: ${(result.spaceReclaimed / 1024).toFixed(1)} KB`);
-          if (result.rollbackPath) {
-            console.log(`  Rollback: ${result.rollbackPath}`);
-          }
-        } else {
-          console.error("Compaction completed with errors. Some files may not have been archived.");
+          console.log(formatLeaderboardText(leaderboard));
         }
         break;
       }
@@ -1869,7 +1857,7 @@ const main = async (): Promise<number> => {
     }
   } catch (exc) {
     const { categorizeError, formatStructuredError } = await import("./error-categories.js");
-    const structured = categorizeError(exc as Error);
+    const structured = categorizeError(exc);
     if (useJson) {
       console.error(formatStructuredError(structured, true));
     } else {

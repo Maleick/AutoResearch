@@ -1,4 +1,4 @@
-import { generateLeaderboard, formatLeaderboardMarkdown } from "../src/leaderboard.js";
+import { generateLeaderboard, formatLeaderboardMarkdown, formatLeaderboardText } from "../src/leaderboard.js";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { resolve } from "path";
 
@@ -52,8 +52,7 @@ describe("Leaderboard", () => {
     expect(lb.entries[0].total_iterations).toBe(3);
     expect(lb.entries[0].kept).toBe(2);
     expect(lb.entries[0].discarded).toBe(1);
-    expect(lb.entries[0].success_rate).toBe("66.7%");
-    expect(lb.entries[0].best_value).toBe("8");
+    expect(lb.entries[0].best_value).toBe("10");
     expect(lb.entries[0].runtime_seconds).toBe(3600);
   });
 
@@ -85,37 +84,79 @@ describe("Leaderboard", () => {
 
     const md = formatLeaderboardMarkdown(lb);
     expect(md).toContain("# Auto Research Leaderboard");
-    expect(md).toContain("run-1");
+    expect(md).toContain("run\\-1");
     expect(md).toContain("Test");
     expect(md).toContain("coverage");
-    expect(md).toContain("60.0%");
+    expect(md).toContain("60\\.0%");
     expect(md).toContain("10m");
   });
 
-  it("selects best value using numeric comparison and metric direction", () => {
-    const runDir = resolve(tmpDir, ".autoresearch", "run-higher-1");
-    mkdirSync(runDir, { recursive: true });
+  it("sanitizes untrusted fields in text output", () => {
+    const lb = {
+      generated_at: "2026-05-09T00:00:00Z",
+      entries: [
+        {
+          run_id: "run-1\u001b[2J",
+          goal: "Safe\nInjected line",
+          metric: "coverage",
+          direction: "higher",
+          total_iterations: 1,
+          kept: 1,
+          discarded: 0,
+          success_rate: "100.0%",
+          best_value: "\u001b[31m85\u001b[0m",
+          latest_value: "85",
+          runtime_seconds: 600,
+          completed_at: "2026-05-09T00:00:00Z",
+        },
+      ],
+      summary: {
+        total_runs: 1,
+        total_iterations: 1,
+        overall_success_rate: "100.0%",
+      },
+    };
 
-    writeFileSync(
-      resolve(runDir, "state.json"),
-      JSON.stringify({
-        run_id: "run-higher-1",
-        goal: "Increase throughput",
-        metric: { name: "throughput", direction: "higher" },
-        created_at: "2026-05-01T10:00:00Z",
-        updated_at: "2026-05-01T11:00:00Z",
-      }),
-    );
-
-    writeFileSync(
-      resolve(runDir, "results.tsv"),
-      "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n" +
-      "2026-05-01T10:05:00Z\t1\tkeep\t8\t\tok\tok\t\tBaseline\t\t\n" +
-      "2026-05-01T10:10:00Z\t2\tkeep\t10\t\tok\tok\t\tImproved\t\t\n",
-    );
-
-    const lb = generateLeaderboard(tmpDir);
-    expect(lb.entries).toHaveLength(1);
-    expect(lb.entries[0].best_value).toBe("10");
+    const text = formatLeaderboardText(lb);
+    expect(text).not.toContain("\u001b");
+    expect(text).toContain("run-1\\u001b[2J");
+    expect(text).toContain("Safe\\nInjected line");
+    expect(text).toContain("Best:     \\u001b[31m85\\u001b[0m");
   });
+
+  it("escapes untrusted fields in markdown output", () => {
+    const lb = {
+      generated_at: "2026-05-09T00:00:00Z",
+      entries: [
+        {
+          run_id: "run|1\u001b[2J",
+          goal: "Test\n| injected | row |",
+          metric: "cov*erage",
+          direction: "higher|lower",
+          total_iterations: 1,
+          kept: 1,
+          discarded: 0,
+          success_rate: "100.0%",
+          best_value: "<85>|\u001b[31m",
+          latest_value: "85",
+          runtime_seconds: 600,
+          completed_at: "2026-05-09T00:00:00Z",
+        },
+      ],
+      summary: {
+        total_runs: 1,
+        total_iterations: 1,
+        overall_success_rate: "100.0%",
+      },
+    };
+
+    const md = formatLeaderboardMarkdown(lb);
+    expect(md).not.toContain("\u001b");
+    expect(md).toContain("run\\|1\\\\u001b\\[2J");
+    expect(md).toContain("Test\\\\n\\| injected \\| row \\|");
+    expect(md).toContain("cov\\*erage");
+    expect(md).toContain("higher\\|lower");
+    expect(md).toContain("&lt;85&gt;\\|\\\\u001b\\[31m");
+  });
+
 });

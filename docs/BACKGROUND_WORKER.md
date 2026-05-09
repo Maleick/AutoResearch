@@ -64,7 +64,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=~/projects/AutoResearch
+WorkingDirectory=/home/user/projects/AutoResearch
 ExecStart=/usr/bin/npx opencode-autoresearch worker --once
 User=user
 
@@ -180,7 +180,7 @@ Background workers append to `.autoresearch/logs/worker.log`. Rotate logs to pre
 
 ```
 # /etc/logrotate.d/autoresearch
-~/projects/AutoResearch/.autoresearch/logs/worker.log {
+/home/user/projects/AutoResearch/.autoresearch/logs/worker.log {
   daily
   rotate 7
   compress

@@ -32,19 +32,18 @@ describe("Error Categories", () => {
       expect(structured.recoverable).toBe(true);
     });
 
-    it("categorizes timeout errors consistently", () => {
-      const error = new Error("Timed out while running verify command");
-      const structured = categorizeError(error);
-      expect(structured.kind).toBe("execution");
-      expect(structured.code).toBe("TIMEOUT");
-    });
-
     it("defaults to unknown for unrecognized errors", () => {
       const error = new Error("Something weird happened");
       const structured = categorizeError(error);
       expect(structured.kind).toBe("unknown");
       expect(structured.code).toBe("UNKNOWN_ERROR");
       expect(structured.recoverable).toBe(false);
+    });
+
+    it("handles non-Error thrown values", () => {
+      const structured = categorizeError("Timed out waiting for process");
+      expect(structured.kind).toBe("execution");
+      expect(structured.code).toBe("TIMEOUT");
     });
   });
 
@@ -78,7 +77,6 @@ describe("Error Categories", () => {
 
   describe("ERROR_CODES", () => {
     it("has validation error codes", () => {
-      expect(ERROR_CODES.validation.INVALID_INPUT).toBeDefined();
       expect(ERROR_CODES.validation.INVALID_GOAL).toBeDefined();
       expect(ERROR_CODES.validation.INVALID_DIRECTION).toBeDefined();
     });

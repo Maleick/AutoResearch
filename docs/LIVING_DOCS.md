@@ -48,14 +48,12 @@ When behavior-changing code is modified, corresponding documentation must be upd
 
 ## CI Integration
 
-This check can be wired into CI on pull requests. Example step:
+The check runs in CI on pull requests:
 
 ```yaml
 - name: Check documentation changes
   run: ./scripts/check-doc-changes.sh --dry-run origin/main
 ```
-
-At the time of writing, this step is not enabled in `.github/workflows/validate.yml`.
 
 ## Dry-Run Mode
 
