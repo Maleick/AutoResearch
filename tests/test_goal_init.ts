@@ -217,10 +217,10 @@ describe("CLI: goal command", () => {
       mkdirSync(tmpDir, { recursive: true });
       const out = runCLI(["goal", "init", "--goal", "reduce errors", "--metric", "failures", "--verify", "npm test", "--repo", tmpDir, "--json"]);
       const json = JSON.parse(out);
-      expect(json.goal).toBe("reduce errors");
-      expect(json.metric).toBe("failures");
-      expect(json.goal_path).toBeDefined();
-      expect(json.template).toBe("custom");
+      expect(json.data.goal).toBe("reduce errors");
+      expect(json.data.metric).toBe("failures");
+      expect(json.data.goal_path).toBeDefined();
+      expect(json.data.template).toBe("custom");
     });
 
     it("supports --dry-run without creating file", () => {
@@ -234,7 +234,7 @@ describe("CLI: goal command", () => {
       mkdirSync(tmpDir, { recursive: true });
       const out = runCLI(["goal", "init", "--goal", "reduce errors", "--metric", "failures", "--verify", "npm test", "--repo", tmpDir, "--dry-run", "--json"]);
       const json = JSON.parse(out);
-      expect(json.dry_run).toBe(true);
+      expect(json.data.dry_run).toBe(true);
       expect(existsSync(goalPath)).toBe(false);
     });
 
@@ -325,8 +325,8 @@ describe("CLI: goal command", () => {
         input: stdinPayload,
       });
       const json = JSON.parse(result.stdout);
-      expect(json.goal).toBe("stdin goal");
-      expect(json.metric).toBe("errs");
+      expect(json.data.goal).toBe("stdin goal");
+      expect(json.data.metric).toBe("errs");
       rmSync(goalPath, { force: true });
     });
   });
