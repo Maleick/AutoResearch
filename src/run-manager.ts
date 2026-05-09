@@ -60,6 +60,7 @@ export async function appendIteration(
   note: string | undefined,
   iteration: number | undefined,
   scoreHistoryPathValue?: string,
+  scoreComponents?: Record<string, number>,
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
@@ -95,7 +96,7 @@ export async function appendIteration(
 
   appendFileSync(resultsPath, resultRow, "utf-8");
 
-  const scoreRecord = {
+  const scoreRecord: Record<string, unknown> = {
     timestamp: now,
     iteration: currentIteration,
     run_id: state.run_id,
@@ -106,6 +107,9 @@ export async function appendIteration(
     verify_status: verifyStatus,
     guard_status: guardStatus,
   };
+  if (scoreComponents != null) {
+    scoreRecord.score_components = scoreComponents;
+  }
   await appendTextFileNoFollow(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "score history file");
 
   const newState: RunState = {
@@ -146,6 +150,7 @@ export async function appendIteration(
     stop_labels_satisfied: missingStop.length === 0,
     missing_keep_labels: missingKeep,
     missing_stop_labels: missingStop,
+    score_components: scoreComponents,
   };
 
   atomicWriteJson(statePath, newState);
