@@ -17,6 +17,7 @@ export interface RunConfig {
   operating_mode?: string;
   scope?: string;
   guard?: string;
+  scorer?: string;
   iterations?: number;
   max_no_progress?: number;
   duration?: string;
@@ -92,6 +93,7 @@ export interface RunState {
   instrument_metric?: Metric;
   verify: string;
   guard?: string;
+  scorer?: string;
   max_no_progress?: number;
   iterations_cap?: number;
   duration?: string;

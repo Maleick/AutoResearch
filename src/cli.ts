@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
 import { resolve } from "path";
+import { execSync } from "child_process";
 import { MAX_DRAFTS } from "./constants.js";
 import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix } from "./helpers.js";
 
@@ -20,6 +21,7 @@ const usage = (): void => {
   console.error("  explain    Human-readable run state");
   console.error("  history    Show recent iteration log");
   console.error("  scores     Show score trend history");
+  console.error("  score      Run the configured scorer and show normalized output");
   console.error("  config     Show runtime configuration");
   console.error("  summary    Aggregate stats across runs");
   console.error("  suggest    Suggest next goal from memory");
@@ -43,6 +45,7 @@ const usage = (): void => {
   console.error("  --instrument-value  Recorded value for the instrument metric");
   console.error("  --verify        Mechanical verification command");
   console.error("  --guard         Guard command for regression catch");
+  console.error("  --scorer        Scorer command (outputs JSON with score and max fields)");
   console.error("  --mode          foreground or background");
   console.error("  --scope         In-scope files or subsystem");
   console.error("  --iterations    Iteration cap");
@@ -67,6 +70,7 @@ const usage = (): void => {
   console.error("  autoresearch status");
   console.error("  autoresearch explain");
   console.error("  autoresearch history");
+  console.error("  autoresearch score --scorer \"node score.js\"");
 };
 
 const parseArgs = (args: string[]): Record<string, string> => {
@@ -321,6 +325,7 @@ const main = async (): Promise<number> => {
           mode: grouped.mode as string || "foreground",
           scope: grouped.scope as string | undefined,
           guard: grouped.guard as string | undefined,
+          scorer: grouped.scorer as string | undefined,
           iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
           max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
           duration: grouped.duration as string | undefined,
@@ -538,6 +543,67 @@ const main = async (): Promise<number> => {
         console.log(`\nShowing ${records.length} score records.`);
         break;
       }
+      case "score": {
+        const { resolvePath, readJsonFile, AutoresearchError: AErr } = await import("./helpers.js");
+        const { STATE_DEFAULT } = await import("./constants.js");
+        const { parseScoreOutput } = await import("./score-parser.js");
+
+        // Resolve scorer: --scorer flag takes priority, else use state.scorer
+        let scorerCmd = grouped.scorer as string | undefined;
+        if (!scorerCmd) {
+          const statePath = resolvePath(grouped.repo as string | undefined, grouped["state-path"] as string | undefined, STATE_DEFAULT);
+          if (existsSync(statePath)) {
+            const state = parseRunState(readJsonFile(statePath));
+            scorerCmd = state.scorer;
+          }
+        }
+        if (!scorerCmd) {
+          throw new AErr("No scorer configured. Provide --scorer <cmd> or configure a scorer via autoresearch init --scorer <cmd>.");
+        }
+
+        const repoBase = resolveRepo(grouped.repo as string | undefined);
+        let rawOutput: string;
+        try {
+          rawOutput = execSync(scorerCmd, { encoding: "utf-8", cwd: repoBase, stdio: ["ignore", "pipe", "pipe"] });
+        } catch (err) {
+          const e = err as { message?: string; stderr?: Buffer | string };
+          const stderr = typeof e.stderr === "string" ? e.stderr.trim() : (Buffer.isBuffer(e.stderr) ? e.stderr.toString("utf-8").trim() : "");
+          const errMsg = stderr || (err instanceof Error ? err.message : String(err));
+          throw new AErr(`Scorer command failed: ${errMsg}`);
+        }
+
+        const scored = parseScoreOutput(rawOutput);
+        const normalized = scored.score / scored.max;
+        const percent = (normalized * 100).toFixed(1) + "%";
+
+        if (useJson) {
+          printJson({
+            score: scored.score,
+            max: scored.max,
+            normalized,
+            percent,
+            components: scored.components ?? null,
+            diagnostics: scored.diagnostics ?? null,
+            details: scored.details ?? null,
+          });
+          break;
+        }
+
+        console.log(`Score: ${scored.score} / ${scored.max} (${percent})`);
+        if (scored.components && Object.keys(scored.components).length > 0) {
+          console.log("Components:");
+          for (const [key, val] of Object.entries(scored.components)) {
+            console.log(`  ${formatDisplayValue(key)}: ${formatDisplayValue(val)}`);
+          }
+        }
+        if (scored.diagnostics && Object.keys(scored.diagnostics).length > 0) {
+          console.log("Diagnostics:");
+          for (const [key, val] of Object.entries(scored.diagnostics)) {
+            console.log(`  ${formatDisplayValue(key)}: ${formatDisplayValue(val)}`);
+          }
+        }
+        break;
+      }
       case "config": {
         const { resolvePath, readJsonFile } = await import("./helpers.js");
         const { STATE_DEFAULT } = await import("./constants.js");
@@ -557,6 +623,7 @@ const main = async (): Promise<number> => {
             deadline_at: state.deadline_at,
             verify: state.verify,
             guard: state.guard,
+            scorer: state.scorer ?? null,
             subagent_pool: state.subagent_pool ? "configured" : "none",
             label_requirements: state.label_requirements,
           });
@@ -575,6 +642,7 @@ const main = async (): Promise<number> => {
         console.log(`  Deadline: ${formatDisplayValue(state.deadline_at ? formatTimestamp(state.deadline_at as string) : "—")}`);
         console.log(`  Verify:   ${formatDisplayValue(state.verify)}`);
         console.log(`  Guard:    ${formatDisplayValue(state.guard)}`);
+        console.log(`  Scorer:   ${formatDisplayValue(state.scorer ?? "—")}`);
         console.log(`  Pool:     ${state.subagent_pool ? "configured" : "none"}`);
         break;
       }
@@ -844,9 +912,9 @@ const main = async (): Promise<number> => {
           mode: "background",
           scope: grouped.scope as string | undefined,
           guard: grouped.guard as string | undefined,
+          scorer: grouped.scorer as string | undefined,
           iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
           max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
-          duration: grouped.duration as string | undefined,
           memory_path: grouped["memory-path"] as string | undefined,
           required_keep_labels: grouped["required-keep-labels"] as string[] | undefined,
           required_stop_labels: grouped["required-stop-labels"] as string[] | undefined,
