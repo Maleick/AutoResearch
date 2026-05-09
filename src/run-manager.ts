@@ -533,27 +533,5 @@ if (parts.length === 11) {
     branch: parts[13],
     stage: parts[14],
     agent: parts[15],
-  };
-  }
-
-  if (parts.length < 16) return null;
-
-  return {
-    timestamp: parts[0],
-    iteration: parseInt(parts[1], 10),
-    id: parts[2],
-    parent_id: parts[3],
-    branch: parts[4],
-    stage: parts[5],
-    agent: parts[6],
-    decision: parts[7],
-    metric_value: parts[8],
-    instrument_value: parts[9],
-    verify_status: parts[10],
-    guard_status: parts[11],
-    hypothesis: parts[12],
-    change_summary: parts[13],
-    labels: parts[14],
-    note: parts[15],
-  };
-}
+   };
+   }
