@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "run_id": "cov-2026-0512-a8b3",
+  "created_at": "2026-05-12T10:30:00.000Z",
+  "updated_at": "2026-05-12T14:22:18.000Z",
+  "status": "running",
+  "mode": "background",
+  "operating_mode": "converge",
+  "goal": "Increase test coverage from 65% to 80%",
+  "scope": "src/",
+  "metric": {
+    "name": "coverage_pct",
+    "direction": "higher",
+    "baseline": "65.0",
+    "best": "81.2",
+    "latest": "78.4"
+  },
+  "verify": "npm run test:coverage",
+  "guard": "npm run typecheck",
+  "max_no_progress": 5,
+  "iterations_cap": 20,
+  "duration_seconds": 14400,
+  "deadline_at": "2026-05-12T18:30:00.000Z",
+  "label_requirements": {
+    "keep": ["coverage_improved"],
+    "stop": ["goal_reached", "max_iterations"]
+  },
+  "artifact_paths": {
+    "results": "autoresearch-results.tsv",
+    "state": ".autoresearch/state.json"
+  },
+  "stats": {
+    "total_iterations": 8,
+    "kept": 5,
+    "discarded": 3,
+    "needs_human": 0,
+    "consecutive_discards": 1,
+    "best_iteration": 6
+  },
+  "flags": {
+    "stop_requested": false,
+    "needs_human": false,
+    "background_active": true,
+    "stop_ready": false
+  },
+  "last_iteration": {
+    "iteration": 8,
+    "decision": "discard",
+    "metric_value": "78.4",
+    "change_summary": "Added tests for utils/parser.ts — coverage dropped due to test infrastructure overhead",
+    "labels": [],
+    "timestamp": "2026-05-12T14:22:18.000Z",
+    "keep_labels_satisfied": false,
+    "stop_labels_satisfied": false,
+    "missing_keep_labels": ["coverage_improved"],
+    "missing_stop_labels": ["goal_reached", "max_iterations"]
+  }
+}

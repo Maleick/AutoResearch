@@ -17,6 +17,7 @@ export interface RunConfig {
   operating_mode?: string;
   scope?: string;
   guard?: string;
+  scorer?: string;
   iterations?: number;
   max_no_progress?: number;
   duration?: string;
@@ -97,6 +98,7 @@ export interface RunFlags {
 export interface LastIteration {
   iteration: number;
   decision: string;
+  scorer_status?: string;
   metric_value?: string;
   instrument_value?: string;
   change_summary: string;
@@ -106,9 +108,23 @@ export interface LastIteration {
   stop_labels_satisfied: boolean;
   missing_keep_labels: string[];
   missing_stop_labels: string[];
+  id?: string;
+  parent_id?: string;
+  branch?: string;
+  stage?: string;
+  agent?: string;
+  score_components?: Record<string, number>;
 }
 
 export type OperatingMode = "converge" | "continuous" | "supervised";
+
+export interface ExperimentLineage {
+  id: string;
+  parent_id: string | null;
+  branch: string;
+  stage: string;
+  agent: string;
+}
 
 export interface RunState {
   schema_version: number;
@@ -124,6 +140,7 @@ export interface RunState {
   instrument_metric?: Metric;
   verify: string;
   guard?: string;
+  scorer?: string;
   max_no_progress?: number;
   max_debug_depth?: number;
   branch_failure_budget?: number;
@@ -143,6 +160,7 @@ export interface RunState {
   draft_pool?: DraftPoolConfig;
   budget_exhausted?: boolean;
   budget_blocker_reason?: string;
+  lineage?: ExperimentLineage;
 }
 
 export interface SupervisorSnapshot {
@@ -171,6 +189,15 @@ export interface SupervisorSnapshot {
   budget_blocker_reason?: string;
 }
 
+export type BranchSelectionPolicy = "best" | "roulette" | "diverse";
+
+export interface BranchSelectionPolicyInfo {
+  id: BranchSelectionPolicy;
+  label: string;
+  description: string;
+  recommended_for: string[];
+}
+
 export interface DraftBranch {
   branch_id: string;
   iteration: number;
@@ -178,6 +205,7 @@ export interface DraftBranch {
   metric_value?: string;
   status: "pending" | "running" | "completed" | "discarded";
   failure_count?: number;
+  policy_override?: BranchSelectionPolicy;
 }
 
 export interface MemoryProvenance {
@@ -234,7 +262,19 @@ export interface DraftPoolConfig {
   kind: "autoresearch_draft_pool";
   version: number;
   num_drafts: number;
-  branch_selection_policy: "best" | "roulette" | "diverse";
+  branch_selection_policy: BranchSelectionPolicy;
   active_drafts: DraftBranch[];
   best_branch_id?: string;
+  available_policies: BranchSelectionPolicyInfo[];
+}
+
+export interface GoalDoc {
+  goal: string;
+  metric: string;
+  direction: string;
+  verify: string;
+  guard?: string;
+  constraints?: string;
+  file_map?: string;
+  stop_conditions?: string;
 }

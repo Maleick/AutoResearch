@@ -352,7 +352,7 @@ describe("appendIteration", () => {
     if (!existsSync(resultsFile)) {
       const resultsDir = dirname(resultsFile);
       if (!existsSync(resultsDir)) mkdirSync(resultsDir, { recursive: true });
-      const header = "timestamp\titeration\tdecision\tmetric_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\n";
+      const header = "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\tid\tparent_id\tbranch\tstage\tagent\n";
       writeFileSync(resultsFile, header, "utf-8");
     }
   }
@@ -383,6 +383,31 @@ describe("appendIteration", () => {
     const result = await mod.appendIteration(stateDir, "autoresearch-results.tsv", "state.json", "needs_human", "", undefined, "skip", "skip", "", "needs review", [], "");
     expect(result.stats.needs_human).toBe(1);
     expect(result.flags.needs_human).toBe(true);
+  });
+
+  it("maps scorer-broken decisions to needs_human", async () => {
+    initState();
+    const result = await mod.appendIteration(
+      stateDir,
+      "autoresearch-results.tsv",
+      "state.json",
+      "discard",
+      "30",
+      undefined,
+      "fail",
+      "pass",
+      "hypothesis test",
+      "scorer crashed",
+      [],
+      "note",
+      undefined,
+      undefined,
+      "scorer-broken",
+    );
+    expect(result.last_iteration.decision).toBe("needs_human");
+    expect(result.last_iteration.scorer_status).toBe("scorer-broken");
+    expect(result.stats.discarded).toBe(0);
+    expect(result.stats.needs_human).toBe(1);
   });
 
   it("tracks consecutive discards", async () => {
@@ -427,6 +452,48 @@ describe("appendIteration", () => {
     expect(lines[1]).toContain("\tkeep\t90\t\tpass\tpass\t");
   });
 
+  it("writes lineage fields in the same order as the results header", async () => {
+    initState();
+    await mod.appendIteration(
+      stateDir,
+      "autoresearch-results.tsv",
+      "state.json",
+      "keep",
+      "90",
+      "95",
+      "pass",
+      "pass",
+      "hyp",
+      "change",
+      ["test"],
+      "note",
+      undefined,
+      undefined,
+      { id: "lineage-1", parent_id: "lineage-0", branch: "branch-a", stage: "stage-a", agent: "agent-a" },
+    );
+    const [headerLine, rowLine] = readFileSync(resultsFile, "utf-8").trim().split("\n");
+    const headers = headerLine.split("\t");
+    const values = rowLine.split("\t");
+    const record = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+
+    expect(record).toMatchObject({
+      decision: "keep",
+      metric_value: "90",
+      instrument_value: "95",
+      verify_status: "pass",
+      guard_status: "pass",
+      hypothesis: "hyp",
+      change_summary: "change",
+      labels: "test",
+      note: "note",
+      id: "lineage-1",
+      parent_id: "lineage-0",
+      branch: "branch-a",
+      stage: "stage-a",
+      agent: "agent-a",
+    });
+  });
+
   it("writes a provided instrument value to the results file and state", async () => {
     initState();
     const instrumentValue = "instrument-123";
@@ -465,5 +532,66 @@ describe("appendIteration", () => {
     const diskState = JSON.parse(readFileSync(stateFile, "utf-8"));
     expect(diskState.stats.kept).toBe(1);
     expect(diskState.stats.total_iterations).toBe(1);
+  });
+
+  it("refuses to append score history through a symlink", async () => {
+    initState();
+    const outsideFile = resolve(TMP_DIR, "outside-score-history.jsonl");
+    writeFileSync(outsideFile, "ORIGINAL\n", "utf-8");
+    const scoreHistoryDir = resolve(stateDir, ".autoresearch");
+    mkdirSync(scoreHistoryDir, { recursive: true });
+    symlinkSync(outsideFile, resolve(scoreHistoryDir, "score-history.jsonl"));
+
+    await expect(mod.appendIteration(stateDir, "autoresearch-results.tsv", "state.json", "keep", "10", undefined, "pass", "pass", "", "blocked symlink", [], ""))
+      .rejects.toThrow("Refusing to write symlinked score history file");
+    expect(readFileSync(outsideFile, "utf-8")).toBe("ORIGINAL\n");
+  });
+});
+
+
+describe("parseResultRow", () => {
+  let mod: any;
+  beforeAll(async () => { mod = await importRunManager(); });
+
+  it("parses legacy rows without lineage", () => {
+    const row = mod.parseResultRow("2026-01-01T00:00:00Z\t1\tkeep\t90\t95\tpass\tpass\thyp\tchange\ttest\tnote");
+
+    expect(row).toMatchObject({
+      decision: "keep",
+      metric_value: "90",
+      instrument_value: "95",
+      verify_status: "pass",
+      guard_status: "pass",
+      hypothesis: "hyp",
+      change_summary: "change",
+      labels: "test",
+      note: "note",
+      id: "",
+      parent_id: "",
+      branch: "main",
+      stage: "",
+      agent: "",
+    });
+  });
+
+  it("parses lineage rows in results header order", () => {
+    const row = mod.parseResultRow("2026-01-01T00:00:00Z\t1\tkeep\t90\t95\tpass\tpass\thyp\tchange\ttest\tnote\tlineage-1\tlineage-0\tbranch-a\tstage-a\tagent-a");
+
+    expect(row).toMatchObject({
+      decision: "keep",
+      metric_value: "90",
+      instrument_value: "95",
+      verify_status: "pass",
+      guard_status: "pass",
+      hypothesis: "hyp",
+      change_summary: "change",
+      labels: "test",
+      note: "note",
+      id: "lineage-1",
+      parent_id: "lineage-0",
+      branch: "branch-a",
+      stage: "stage-a",
+      agent: "agent-a",
+    });
   });
 });
