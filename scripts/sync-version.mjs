@@ -31,5 +31,16 @@ await writeText(
   readmePath,
   readme
     .replace(/version-v\d+\.\d+\.\d+-/g, `version-v${version}-`)
-    .replace(/alt="v\d+\.\d+\.\d+"/g, `alt="v${version}"`),
+    .replace(/alt="v\d+\.\d+\.\d+"/g, `alt="v${version}"`)
+    .replace(/refs\/tags\/v\d+\.\d+\.\d+\/INSTALL\.md/g, `refs/tags/v${version}/INSTALL.md`)
+    .replace(/`v\d+\.\d+\.\d+`/g, `\`v${version}\``),
+);
+
+const installPath = "../INSTALL.md";
+const install = await readText(installPath);
+await writeText(
+  installPath,
+  install
+    .replace(/refs\/tags\/v\d+\.\d+\.\d+\/INSTALL\.md/g, `refs/tags/v${version}/INSTALL.md`)
+    .replace(/`v\d+\.\d+\.\d+`/g, `\`v${version}\``),
 );
