@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v3.6.0-58a6ff?style=flat" alt="v3.6.0">
+  <img src="https://img.shields.io/badge/version-v3.6.1-58a6ff?style=flat" alt="v3.6.1">
   <a href="https://github.com/Maleick/AutoResearch/stargazers"><img src="https://img.shields.io/github/stars/Maleick/AutoResearch?style=flat&color=58a6ff" alt="Stars"></a>
   <a href="https://github.com/Maleick/AutoResearch/commits/main"><img src="https://img.shields.io/github/last-commit/Maleick/AutoResearch?style=flat" alt="Last Commit"></a>
   <a href="https://github.com/Maleick/AutoResearch/releases"><img src="https://img.shields.io/github/v/release/Maleick/AutoResearch?style=flat" alt="Version"></a>
@@ -99,10 +99,10 @@ See [`skills/autoresearch/references/self-improve-loop.md`](skills/autoresearch/
 
 ### OpenCode
 
-For OpenCode, paste this one-line install prompt into your agent. This URL is pinned to the immutable `v3.6.0` release instructions:
+For OpenCode, paste this one-line install prompt into your agent. This URL is pinned to the immutable `v3.6.1` release instructions:
 
 ```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.6.0/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Maleick/AutoResearch/refs/tags/v3.6.1/INSTALL.md
 ```
 
 Recommended plugin install in `opencode.json`:
@@ -226,10 +226,13 @@ cat .autoresearch/state.json | jq .
 | Command | Purpose |
 | --- | --- |
 | `autoresearch init` | Initialize a run |
+| `autoresearch goal init` | Create a `GOAL.md` goal definition file (interactive or from flags) |
 | `autoresearch wizard` | Generate setup summary |
 | `autoresearch status` | Print run status |
 | `autoresearch explain` | Human-readable run state |
 | `autoresearch history` | Show recent iteration log |
+| `autoresearch scores` | Show score trend history |
+| `autoresearch badge` | Generate score/component badge markdown + SVG |
 | `autoresearch config` | Show runtime configuration |
 | `autoresearch report` | Generate markdown report |
 | `autoresearch summary` | Aggregate stats across runs |
@@ -243,6 +246,43 @@ cat .autoresearch/state.json | jq .
 | `autoresearch completion` | Generate shell completions |
 | `autoresearch doctor` | Verify installation |
 | `autoresearch help` | Show usage |
+
+### `autoresearch goal init`
+
+Create a `GOAL.md` goal definition file. Supports interactive wizard, CLI flags, and stdin JSON.
+
+**Interactive (TTY):**
+```bash
+autoresearch goal init
+```
+
+**From flags (non-interactive):**
+```bash
+autoresearch goal init \
+  --goal "Reduce test failures" \
+  --metric failures \
+  --direction lower \
+  --verify "npm test" \
+  --guard "npm run lint"
+```
+
+**From a preset template:**
+```bash
+autoresearch goal init --template performance   # benchmark_ms / lower / npm run bench
+autoresearch goal init --template quality       # test_failures / lower / npm test
+autoresearch goal init --template coverage      # coverage_pct / higher / npm run coverage
+```
+
+**From stdin JSON (CI / scripted use):**
+```bash
+echo '{"goal":"reduce latency","metric":"p99_ms","direction":"lower","verify":"npm run bench"}' \
+  | autoresearch goal init
+```
+
+**Dry-run preview:**
+```bash
+autoresearch goal init --template performance --dry-run
+```
 
 ## Architecture
 

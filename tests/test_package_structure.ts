@@ -285,14 +285,13 @@ describe("release workflow", () => {
 });
 
 describe("semantic-release config", () => {
-  it("syncs all version surfaces during release prepare", () => {
+  it("syncs package version surfaces without pushing to protected main", () => {
     const content = readFileSync(resolve(REPO_ROOT, ".releaserc.json"), "utf-8");
+    const config = JSON.parse(content) as { plugins: Array<string | [string, unknown]> };
+    const plugins = config.plugins.map((plugin) => Array.isArray(plugin) ? plugin[0] : plugin);
     expect(content).toContain("@semantic-release/exec");
     expect(content).toContain("node scripts/sync-version.mjs");
-    expect(content).toContain("VERSION");
-    expect(content).toContain("src/constants.ts");
-    expect(content).toContain(".opencode-plugin/plugin.json");
-    expect(content).toContain("README.md");
+    expect(plugins).not.toContain("@semantic-release/git");
   });
 });
 
