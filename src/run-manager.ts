@@ -53,7 +53,7 @@ export async function initializeRun(
     verify: config.verify ?? "",
     guard: config.guard,
     constraints: undefined,
-    file_map: config.scope ? config.scope : undefined,
+    file_map: config.scope || undefined,
     stop_conditions: config.stop_condition,
   });
 
