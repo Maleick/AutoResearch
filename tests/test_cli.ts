@@ -473,7 +473,7 @@ describe("CLI Commands", () => {
     });
 
     it("records scorer-broken as needs_human and persists scorer_status", () => {
-      execSync(`node ${CLI} record --decision discard --scorer-status scorer-broken --metric-value 42 --verify-status pass --guard-status pass --change-summary "scorer failed" --repo ${tmpDir}`, { encoding: "utf-8" });
+      execFileSync("node", [CLI, "record", "--decision", "discard", "--scorer-status", "scorer-broken", "--metric-value", "42", "--verify-status", "pass", "--guard-status", "pass", "--change-summary", "scorer failed", "--repo", tmpDir], { encoding: "utf-8" });
       const state = JSON.parse(readFileSync(tmpState, "utf-8"));
       expect(state.last_iteration.decision).toBe("needs_human");
       expect(state.last_iteration.scorer_status).toBe("scorer-broken");
