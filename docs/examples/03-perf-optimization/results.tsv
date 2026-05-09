@@ -1,0 +1,13 @@
+iteration	decision	metric_value	instrument_value	change_summary	labels	timestamp
+1	keep	412	0.0	Added Redis caching layer for user lookups	latency_improved	2026-05-20T08:24:11.000Z
+2	discard	425	0.0	Increased Node.js memory limit - no measurable improvement		2026-05-20T08:52:33.000Z
+3	discard	418	0.0	HTTP compression optimization - already enabled, no effect		2026-05-20T09:18:45.000Z
+4	keep	380	0.0	Database query result caching with TTL	latency_improved	2026-05-20T09:45:22.000Z
+5	discard	395	0.0	Added N+1 query detection - infrastructure only, no immediate gains		2026-05-20T10:12:08.000Z
+6	discard	388	0.0	Switched to connection pooling - minor regression in cold starts		2026-05-20T10:38:55.000Z
+7	keep	310	0.0	Added composite index on users(email, organization_id)	latency_improved	2026-05-20T11:05:33.000Z
+8	discard	305	0.0	Redis pipeline for batch fetches - diminishing returns from cache		2026-05-20T11:32:19.000Z
+9	keep	245	0.0	Eliminated redundant JOIN in user-organization query	latency_improved	2026-05-20T12:18:44.000Z
+10	keep	187	0.0	Connection pooling with prepared statements - hit target	latency_improved,goal_reached	2026-05-20T13:45:12.000Z
+11	keep	189	0.0	Query result memoization for repeated requests - maintained gain	latency_improved	2026-05-20T15:22:33.000Z
+12	keep	187	0.0	Connection pooling with prepared statements - final optimization	latency_improved,goal_reached	2026-05-20T18:30:45.000Z

@@ -33,6 +33,36 @@ export interface RunConfig {
   outcome_direction?: string;
   instrument_metric?: string;
   instrument_direction?: string;
+  max_debug_depth?: number;
+  branch_failure_budget?: number;
+  budget_exhausted?: boolean;
+  budget_blocker_reason?: string;
+}
+
+export interface SupervisorSnapshot {
+  decision: string;
+  reason: string;
+  run_id: string;
+  status: string;
+  mode: string;
+  operating_mode: OperatingMode;
+  goal: string;
+  metric: Metric;
+  instrument_metric?: Metric;
+  stats: RunStats;
+  last_iteration?: LastIteration;
+  results_rows: number;
+  artifact_paths: ArtifactPaths;
+  flags: RunFlags;
+  label_requirements: LabelRequirements;
+  subagent_pool?: Record<string, unknown>;
+  continuation_policy?: Record<string, unknown>;
+  subagent_guidance?: Record<string, unknown>;
+  draft_pool?: DraftPoolConfig;
+  max_debug_depth?: number;
+  branch_failure_budget?: number;
+  budget_exhausted?: boolean;
+  budget_blocker_reason?: string;
 }
 
 export type WizardConfig = Partial<Omit<RunConfig, 'baseline'>> & {
@@ -54,6 +84,8 @@ export interface RunStats {
   needs_human: number;
   consecutive_discards: number;
   best_iteration?: number;
+  debug_depth?: number;
+  branch_failures?: Record<string, number>;
 }
 
 export interface RunFlags {
@@ -76,6 +108,7 @@ export interface LastIteration {
   stop_labels_satisfied: boolean;
   missing_keep_labels: string[];
   missing_stop_labels: string[];
+  note?: string;
   id?: string;
   parent_id?: string;
   branch?: string;
@@ -110,6 +143,8 @@ export interface RunState {
   guard?: string;
   scorer?: string;
   max_no_progress?: number;
+  max_debug_depth?: number;
+  branch_failure_budget?: number;
   iterations_cap?: number;
   duration?: string;
   duration_seconds?: number;
@@ -124,6 +159,8 @@ export interface RunState {
   flags: RunFlags;
   last_iteration?: LastIteration;
   draft_pool?: DraftPoolConfig;
+  budget_exhausted?: boolean;
+  budget_blocker_reason?: string;
   lineage?: ExperimentLineage;
 }
 
@@ -147,6 +184,19 @@ export interface SupervisorSnapshot {
   continuation_policy?: Record<string, unknown>;
   subagent_guidance?: Record<string, unknown>;
   draft_pool?: DraftPoolConfig;
+  max_debug_depth?: number;
+  branch_failure_budget?: number;
+  budget_exhausted?: boolean;
+  budget_blocker_reason?: string;
+}
+
+export type BranchSelectionPolicy = "best" | "roulette" | "diverse";
+
+export interface BranchSelectionPolicyInfo {
+  id: BranchSelectionPolicy;
+  label: string;
+  description: string;
+  recommended_for: string[];
 }
 
 export interface DraftBranch {
@@ -155,6 +205,8 @@ export interface DraftBranch {
   parent_iteration: number;
   metric_value?: string;
   status: "pending" | "running" | "completed" | "discarded";
+  failure_count?: number;
+  policy_override?: BranchSelectionPolicy;
 }
 
 export interface MemoryProvenance {
@@ -211,9 +263,10 @@ export interface DraftPoolConfig {
   kind: "autoresearch_draft_pool";
   version: number;
   num_drafts: number;
-  branch_selection_policy: "best" | "roulette" | "diverse";
+  branch_selection_policy: BranchSelectionPolicy;
   active_drafts: DraftBranch[];
   best_branch_id?: string;
+  available_policies: BranchSelectionPolicyInfo[];
 }
 
 export interface GoalDoc {

@@ -311,6 +311,10 @@ flowchart LR
 | `autoresearch-memory.md` | Reusable memory for later runs |
 | `.autoresearch/launch.json` | Background launch manifest |
 
+## Examples
+
+See [docs/examples/README.md](docs/examples/README.md) for reproducible run examples with complete state, results, and report artifacts.
+
 ## Self-Improvement Mode
 
 Run Auto Research on its own codebase:

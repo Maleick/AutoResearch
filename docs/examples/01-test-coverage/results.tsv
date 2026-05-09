@@ -1,0 +1,9 @@
+iteration	decision	metric_value	instrument_value	change_summary	labels	timestamp
+1	keep	67.2	0.0	Added unit tests for src/models/user.ts - baseline improvement	coverage_improved	2026-05-12T10:45:12.000Z
+2	keep	69.8	0.0	Added integration tests for src/services/auth.ts	coverage_improved	2026-05-12T11:12:34.000Z
+3	keep	72.1	0.0	Added tests for src/utils/date-helper.ts with mocking	coverage_improved	2026-05-12T11:38:56.000Z
+4	discard	71.5	0.0	Added tests for src/api/routes.ts - tests failed on CI		2026-05-12T12:05:12.000Z
+5	keep	75.3	0.0	Added component tests for src/components/Button.tsx	coverage_improved	2026-05-12T12:42:33.000Z
+6	keep	81.2	0.0	Added edge case tests for src/validators/email.ts - achieved target	coverage_improved,goal_reached	2026-05-12T13:18:45.000Z
+7	discard	80.1	0.0	Added tests for src/database/connection.ts - connection mocking complex		2026-05-12T13:55:22.000Z
+8	discard	78.4	0.0	Added tests for src/utils/parser.ts - coverage dropped due to test infra overhead		2026-05-12T14:22:18.000Z

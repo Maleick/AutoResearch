@@ -24,6 +24,7 @@ const usage = (): void => {
   console.error("  history    Show recent iteration log");
   console.error("  scores     Show score trend history");
   console.error("  score      Run the configured scorer and show normalized output");
+  console.error("  digest     Generate re-entry digest for operator handoff");
   console.error("  config     Show runtime configuration");
   console.error("  summary    Aggregate stats across runs");
   console.error("  suggest    Suggest next goal from memory");
@@ -53,9 +54,13 @@ const usage = (): void => {
   console.error("  --scope         In-scope files or subsystem");
   console.error("  --iterations    Iteration cap");
   console.error("  --max-no-progress  Max consecutive discards before stop");
+  console.error("  --max-debug-depth  Max debug loop depth before stop");
+  console.error("  --branch-failure-budget  Max failures per branch before stop");
   console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
   console.error(`  --num-drafts    Number of parallel drafts (default: 1, max: ${MAX_DRAFTS})`);
   console.error("  --branch-policy Branch selection policy: best, roulette, diverse");
+  console.error("  --max-debug-depth   Max debug experiment depth before stop");
+  console.error("  --branch-failure-budget  Per-branch failure budget before stop");
   console.error("  --json          Output raw JSON (default: human-readable)");
   console.error("  --results-path  Custom results TSV path");
   console.error("  --state-path    Custom state JSON path");
@@ -348,6 +353,8 @@ const main = async (): Promise<number> => {
           outcome_direction: grouped["outcome-direction"] as string | undefined,
           instrument_metric: grouped["instrument-metric"] as string | undefined,
           instrument_direction: grouped["instrument-direction"] as string | undefined,
+          max_debug_depth: parsePositiveInt(grouped["max-debug-depth"] as string | undefined, "max_debug_depth"),
+          branch_failure_budget: parsePositiveInt(grouped["branch-failure-budget"] as string | undefined, "branch_failure_budget"),
         };
         const state = await initializeRun(
           grouped.repo as string | undefined,
@@ -862,7 +869,64 @@ const main = async (): Promise<number> => {
           console.log(`- Kept: ${formatMarkdownField(s.kept)}`);
           console.log(`- Discarded: ${formatMarkdownField(s.discarded)}`);
           console.log(`- Needs human: ${formatMarkdownField(s.needs_human)}`);
+          
+          // Best attempt details
+          if (s.best_iteration !== undefined && results.length > 0) {
+            const bestIterationResults = results.filter(r => {
+              const cols = r.split("\t");
+              return cols[1] === String(s.best_iteration);
+            });
+            if (bestIterationResults.length > 0) {
+              const bestCols = bestIterationResults[0].split("\t");
+              const bestChangeSummary = tsvField(resultHeaders, bestCols, "change_summary", 7);
+              console.log(`- Best attempt: iteration ${formatMarkdownField(String(s.best_iteration))} — ${formatMarkdownField(bestChangeSummary.substring(0, 60))}`);
+            }
+          }
         }
+        
+        // Failed branches information
+        if (state.draft_pool && state.draft_pool.active_drafts) {
+          const failedBranches = state.draft_pool.active_drafts.filter(draft => draft.status === "discarded");
+          if (failedBranches.length > 0) {
+            console.log(`\n## Failed Branches`);
+            for (const branch of failedBranches.slice(0, 5)) { // Limit to 5 branches
+              console.log(`- Branch ${formatMarkdownField(branch.branch_id)}: iteration ${formatMarkdownField(String(branch.iteration))} (parent: ${formatMarkdownField(String(branch.parent_iteration))}) — ${formatMarkdownField(branch.metric_value ?? "no metric")}`);
+            }
+            if (failedBranches.length > 5) {
+              console.log(`  ... and ${formatMarkdownField(String(failedBranches.length - 5))} more failed branches`);
+            }
+          }
+        }
+        
+        // Blockers information
+        if (state.flags.needs_human) {
+          console.log(`\n## Blockers`);
+          console.log(`- Human input required: ${formatMarkdownField(state.last_iteration?.change_summary ?? "awaiting user decision")}`);
+          
+          // Add more blocker details if available in note
+          if (state.last_iteration?.note) {
+            console.log(`- Details: ${formatMarkdownField(state.last_iteration.note.substring(0, 100))}${state.last_iteration.note.length > 100 ? "..." : ""}`);
+          }
+        }
+        
+        // Next actions information
+        console.log(`\n## Next Actions`);
+        if (state.status === "running") {
+          if (state.flags.needs_human) {
+            console.log(`- Awaiting human input to continue`);
+          } else if (state.flags.stop_requested) {
+            console.log(`- Stop requested, will complete current iteration then stop`);
+          } else {
+            console.log(`- Continue with next iteration`);
+          }
+        } else if (state.status === "completed") {
+          console.log(`- Run completed successfully`);
+        } else if (state.status === "stopped" || state.status === "stopping") {
+          console.log(`- Run stopped; use 'autoresearch resume' to continue`);
+        } else {
+          console.log(`- Initialize a new run with 'autoresearch init'`);
+        }
+        
         if (results.length > 0) {
           console.log(`\n## Iterations`);
           for (const r of results) {
@@ -1004,6 +1068,8 @@ const main = async (): Promise<number> => {
           scorer: grouped.scorer as string | undefined,
           iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
           max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
+          max_debug_depth: parsePositiveInt(grouped["max-debug-depth"] as string | undefined, "max_debug_depth"),
+          branch_failure_budget: parsePositiveInt(grouped["branch-failure-budget"] as string | undefined, "branch_failure_budget"),
           duration: grouped.duration as string | undefined,
           memory_path: grouped["memory-path"] as string | undefined,
           required_keep_labels: grouped["required-keep-labels"] as string[] | undefined,
@@ -1126,7 +1192,67 @@ const main = async (): Promise<number> => {
         printJson(state);
         break;
       }
-      case "doctor": {
+       case "digest": {
+         if (dryRun) {
+           console.log("[dry-run] Would generate run digest");
+           return 0;
+         }
+         const { buildRunDigest } = await import("./run-manager.js");
+         const digest = await buildRunDigest(
+           grouped.repo as string | undefined,
+           grouped["results-path"] as string | undefined,
+           grouped["state-path"] as string | undefined,
+         );
+         if (useJson) {
+           printJson(digest);
+         } else {
+           console.log(`# Auto Research Digest`);
+           console.log(`\n**Run ID:** ${formatMarkdownField(digest.run_id || "—")}`);
+            console.log(`**Status:** ${sanitizeForTerminal(digest.status || "—")}`);
+           console.log(`**Mode:** ${formatMarkdownField(digest.mode || "—")}`);
+           console.log(`**Goal:** ${formatMarkdownField(digest.goal || "—")}`);
+           if (digest.metric) {
+             const m = digest.metric;
+              console.log(`**Metric:** ${sanitizeForTerminal(m.name)} (${sanitizeForTerminal(m.direction)})`);
+             console.log(`  Best: ${formatMarkdownField(m.best || "—")} | Latest: ${formatMarkdownField(m.latest || "—")}`);
+           }
+           if (digest.stats) {
+             const s = digest.stats;
+             console.log(`\n## Stats`);
+             console.log(`- Iterations: ${formatMarkdownField(s.total_iterations || "—")}`);
+             console.log(`- Kept: ${formatMarkdownField(s.kept || "—")}`);
+             console.log(`- Discarded: ${formatMarkdownField(s.discarded || "—")}`);
+             console.log(`- Needs human: ${formatMarkdownField(s.needs_human || "—")}`);
+           }
+           if (digest.last_iteration) {
+             const li = digest.last_iteration;
+             console.log(`\n## Last Iteration`);
+             console.log(`- #${formatMarkdownField(li.iteration || "—")}: ${formatMarkdownField(li.decision || "—")} (${formatMarkdownField(li.metric_value || "—")})`);
+             if (li.change_summary) {
+               console.log(`- Change: ${formatMarkdownField(li.change_summary.substring(0, 100))}${li.change_summary.length > 100 ? "..." : ""}`);
+             }
+           }
+           console.log(`\n## Next Action`);
+            console.log(`${sanitizeForTerminal(digest.next_action || "No specific next action recommended")}`);
+           if (digest.blockers && digest.blockers.length > 0) {
+             console.log(`\n## Blockers`);
+             for (const blocker of digest.blockers) {
+               console.log(`- ${formatMarkdownField(blocker)}`);
+             }
+           } else {
+             console.log(`\n## Blockers`);
+             console.log(`None identified`);
+           }
+           if (digest.flags && Object.keys(digest.flags).length > 0) {
+             console.log(`\n## Flags`);
+             for (const [key, value] of Object.entries(digest.flags)) {
+               console.log(`- ${key}: ${formatMarkdownField(value)}`);
+             }
+           }
+         }
+         break;
+       }
+       case "doctor": {
         const { VERSION, PACKAGE_NAME, SKILL_NAME } = await import("./constants.js");
 
         const base = resolveRepo(grouped.repo as string | undefined);
