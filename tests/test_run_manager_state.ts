@@ -385,6 +385,31 @@ describe("appendIteration", () => {
     expect(result.flags.needs_human).toBe(true);
   });
 
+  it("maps scorer-broken decisions to needs_human", async () => {
+    initState();
+    const result = await mod.appendIteration(
+      stateDir,
+      "autoresearch-results.tsv",
+      "state.json",
+      "discard",
+      "30",
+      undefined,
+      "fail",
+      "pass",
+      "hypothesis test",
+      "scorer crashed",
+      [],
+      "note",
+      undefined,
+      undefined,
+      "scorer-broken",
+    );
+    expect(result.last_iteration.decision).toBe("needs_human");
+    expect(result.last_iteration.scorer_status).toBe("scorer-broken");
+    expect(result.stats.discarded).toBe(0);
+    expect(result.stats.needs_human).toBe(1);
+  });
+
   it("tracks consecutive discards", async () => {
     initState();
     await mod.appendIteration(stateDir, "autoresearch-results.tsv", "state.json", "discard", "", undefined, "pass", "pass", "", "bad change", [], "");
@@ -507,6 +532,19 @@ describe("appendIteration", () => {
     const diskState = JSON.parse(readFileSync(stateFile, "utf-8"));
     expect(diskState.stats.kept).toBe(1);
     expect(diskState.stats.total_iterations).toBe(1);
+  });
+
+  it("refuses to append score history through a symlink", async () => {
+    initState();
+    const outsideFile = resolve(TMP_DIR, "outside-score-history.jsonl");
+    writeFileSync(outsideFile, "ORIGINAL\n", "utf-8");
+    const scoreHistoryDir = resolve(stateDir, ".autoresearch");
+    mkdirSync(scoreHistoryDir, { recursive: true });
+    symlinkSync(outsideFile, resolve(scoreHistoryDir, "score-history.jsonl"));
+
+    await expect(mod.appendIteration(stateDir, "autoresearch-results.tsv", "state.json", "keep", "10", undefined, "pass", "pass", "", "blocked symlink", [], ""))
+      .rejects.toThrow("Refusing to write symlinked score history file");
+    expect(readFileSync(outsideFile, "utf-8")).toBe("ORIGINAL\n");
   });
 });
 

@@ -16,8 +16,9 @@ import {
 } from "./helpers.js";
 import { RESULTS_DEFAULT, STATE_DEFAULT, SCORE_HISTORY_DEFAULT, GOAL_DEFAULT } from "./constants.js";
 import { buildSubagentPoolPlan, buildContinuationPolicy, buildDraftPoolPlan } from "./subagent-pool.js";
-import { writeFileSync, appendFileSync, existsSync, constants } from "fs";
+import { writeFileSync, appendFileSync, existsSync, constants, lstatSync, openSync, fstatSync, closeSync, writeSync } from "fs";
 import { lstat, open } from "fs/promises";
+import { dirname } from "path";
 
 const MAX_RESULTS_BYTES = 10 * 1024 * 1024;
 
@@ -84,6 +85,10 @@ export async function appendIteration(
 
   const currentIteration = iteration ?? state.stats.total_iterations + 1;
   const now = utcNow();
+  const scorerStatus = normalizeScorerStatus(scorerStatusValue);
+  const effectiveDecision = scorerStatus === "scorer-broken" && (decision === "keep" || decision === "discard")
+    ? "needs_human"
+    : decision;
   const labelList = normalizeLabels(labels ?? []);
   const labelReqs = state.label_requirements ?? { keep: [], stop: [] };
   const requiredKeep = normalizeLabels(labelReqs.keep ?? []);
@@ -91,7 +96,7 @@ export async function appendIteration(
   const missingKeep = missingRequiredLabels(labelList, requiredKeep);
   const missingStop = missingRequiredLabels(labelList, requiredStop);
 
-  if (decision === "keep" && missingKeep.length > 0) {
+  if (effectiveDecision === "keep" && missingKeep.length > 0) {
     throw new AutoresearchError(`Keep requires labels: ${missingKeep.join(", ")}`);
   }
 
@@ -122,11 +127,12 @@ export async function appendIteration(
 
   appendFileSync(resultsPath, resultRow, "utf-8");
 
-  const scoreRecord = {
+  const scoreRecord: Record<string, unknown> = {
     timestamp: now,
     iteration: currentIteration,
     run_id: state.run_id,
-    decision,
+    decision: effectiveDecision,
+    scorer_status: scorerStatus,
     metric_value: metricValue ?? null,
     metric_name: state.metric.name,
     metric_direction: state.metric.direction,
@@ -138,6 +144,9 @@ export async function appendIteration(
     stage: lineageStage,
     agent: lineageAgent,
   };
+  if (scoreComponents != null) {
+    scoreRecord.score_components = scoreComponents;
+  }
   await appendTextFileNoFollow(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "score history file");
 
   const newState: RunState = {
@@ -150,17 +159,17 @@ export async function appendIteration(
     },
     flags: {
       ...state.flags,
-      stop_ready: decision === "keep" && missingStop.length === 0,
+      stop_ready: effectiveDecision === "keep" && missingStop.length === 0,
     },
   };
 
-  if (decision === "keep") {
+  if (effectiveDecision === "keep") {
     newState.stats.kept = newState.stats.kept + 1;
     newState.stats.consecutive_discards = 0;
-  } else if (decision === "discard") {
+  } else if (effectiveDecision === "discard") {
     newState.stats.discarded = newState.stats.discarded + 1;
     newState.stats.consecutive_discards = newState.stats.consecutive_discards + 1;
-  } else if (decision === "needs_human") {
+  } else if (effectiveDecision === "needs_human") {
     newState.stats.needs_human = newState.stats.needs_human + 1;
     newState.flags.needs_human = true;
     newState.stats.consecutive_discards = 0;
@@ -168,7 +177,8 @@ export async function appendIteration(
 
   newState.last_iteration = {
     iteration: currentIteration,
-    decision,
+    decision: effectiveDecision,
+    scorer_status: scorerStatus,
     metric_value: metricValue,
     instrument_value: instrumentValue,
     change_summary: changeSummary,
@@ -290,6 +300,7 @@ export function makeStatePayload(
     } : undefined,
     verify: config.verify,
     guard: config.guard,
+    scorer: config.scorer,
     max_no_progress: config.max_no_progress,
     iterations_cap: config.iterations,
     duration: config.duration,

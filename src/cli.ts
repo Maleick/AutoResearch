@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "fs";
+import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync, writeFileSync } from "fs";
 import { resolve } from "path";
+import { execSync } from "child_process";
 import { MAX_DRAFTS } from "./constants.js";
-import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc } from "./helpers.js";
+import { printJson, resolveRepo, parseRunState, parsePositiveInt, sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo, readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo } from "./helpers.js";
 
 
 const VERSION_FLAGS = ["--version", "-v"];
@@ -22,6 +23,7 @@ const usage = (): void => {
   console.error("  goal       Show or validate the goal document");
   console.error("  history    Show recent iteration log");
   console.error("  scores     Show score trend history");
+  console.error("  score      Run the configured scorer and show normalized output");
   console.error("  config     Show runtime configuration");
   console.error("  summary    Aggregate stats across runs");
   console.error("  suggest    Suggest next goal from memory");
@@ -43,8 +45,10 @@ const usage = (): void => {
   console.error("  --instrument-metric Measurement quality/risk metric (surfaced separately)");
   console.error("  --instrument-direction Direction for instrument metric");
   console.error("  --instrument-value  Recorded value for the instrument metric");
+  console.error("  --scorer-status     ok, ok-low-score, or scorer-broken (default: ok)");
   console.error("  --verify        Mechanical verification command");
   console.error("  --guard         Guard command for regression catch");
+  console.error("  --scorer        Scorer command (outputs JSON with score and max fields)");
   console.error("  --mode          foreground or background");
   console.error("  --scope         In-scope files or subsystem");
   console.error("  --iterations    Iteration cap");
@@ -73,6 +77,7 @@ const usage = (): void => {
   console.error("  autoresearch status");
   console.error("  autoresearch explain");
   console.error("  autoresearch history");
+  console.error("  autoresearch score --scorer \"node score.js\"");
 };
 
 const parseArgs = (args: string[]): Record<string, string> => {
@@ -327,6 +332,7 @@ const main = async (): Promise<number> => {
           mode: grouped.mode as string || "foreground",
           scope: grouped.scope as string | undefined,
           guard: grouped.guard as string | undefined,
+          scorer: grouped.scorer as string | undefined,
           iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
           max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
           duration: grouped.duration as string | undefined,
@@ -383,6 +389,12 @@ const main = async (): Promise<number> => {
           const lastIter = s.last_iteration;
           if (lastIter && lastIter.iteration) {
             console.log(`Last:    iter ${formatDisplayValue(lastIter.iteration)} — ${formatDisplayValue(lastIter.decision)} (${formatMetricValue(lastIter.metric_value)})`);
+            if (lastIter.score_components != null && typeof lastIter.score_components === "object") {
+              const parts = Object.entries(lastIter.score_components as Record<string, number>)
+                .map(([k, v]) => `${formatDisplayValue(k)}:${typeof v === "number" ? v.toFixed(4) : formatDisplayValue(v)}`)
+                .join(", ");
+              if (parts.length > 0) console.log(`  Components: [${parts}]`);
+            }
           }
           const flags = s.flags;
           if (flags?.needs_human) console.log("⚠  Needs human input");
@@ -430,32 +442,16 @@ const main = async (): Promise<number> => {
         if (lastIter && lastIter.iteration) {
           console.log(`   Last iter: #${formatDisplayValue(lastIter.iteration)} — ${formatDisplayValue(lastIter.decision)}`);
           if (lastIter.change_summary) console.log(`   Change:    ${formatDisplayValue(lastIter.change_summary)}`);
+          if (lastIter.score_components != null && typeof lastIter.score_components === "object") {
+            const parts = Object.entries(lastIter.score_components as Record<string, number>)
+              .map(([k, v]) => `${formatDisplayValue(k)}:${typeof v === "number" ? v.toFixed(4) : formatDisplayValue(v)}`)
+              .join(", ");
+            if (parts.length > 0) console.log(`   Components: [${parts}]`);
+          }
         }
         if (flags?.needs_human) console.log("   ⚠  Needs human review");
         if (flags?.stop_requested) console.log("   ⏹  Stop was requested");
         if (flags?.background_active) console.log("   📡  Background active — `autoresearch status` to check");
-        break;
-      }
-      case "goal": {
-        const { resolvePath } = await import("./helpers.js");
-        const { GOAL_DEFAULT } = await import("./constants.js");
-        const goalPath = resolvePath(grouped.repo as string | undefined, grouped["goal-path"] as string | undefined, GOAL_DEFAULT);
-        if (!existsSync(goalPath)) {
-          console.log("No goal document found. Run 'autoresearch init' first.");
-          break;
-        }
-        const doc = readGoalDoc(goalPath);
-        if (useJson) {
-          printJson(doc);
-          break;
-        }
-        console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
-        console.log(`Metric:           ${formatDisplayValue(doc.metric)} (${formatDisplayValue(doc.direction)})`);
-        console.log(`Verify:           ${formatDisplayValue(doc.verify)}`);
-        if (doc.guard) console.log(`Guard:            ${formatDisplayValue(doc.guard)}`);
-        if (doc.file_map) console.log(`File map:         ${formatDisplayValue(doc.file_map)}`);
-        if (doc.constraints) console.log(`Constraints:      ${formatDisplayValue(doc.constraints)}`);
-        if (doc.stop_conditions) console.log(`Stop conditions:  ${formatDisplayValue(doc.stop_conditions)}`);
         break;
       }
       case "history": {
@@ -507,6 +503,44 @@ const main = async (): Promise<number> => {
           break;
         }
         const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
+        const showTopComponents = grouped["top-components"] === "true";
+        if (showTopComponents) {
+          const allLines = readFileSync(scoreHistoryPath, "utf-8")
+            .split("\n")
+            .map((l: string) => l.trim())
+            .filter(Boolean);
+          const allParsed = allLines.map((r: string) => {
+            try { return JSON.parse(r); } catch { return null; }
+          }).filter(Boolean);
+          if (allParsed.length === 0) {
+            console.log("No score records yet.");
+            break;
+          }
+          const { rankComponents } = await import("./score-parser.js");
+          const ranking = rankComponents(allParsed);
+          if (useJson) {
+            printJson({ count: allParsed.length, scores: allParsed.slice(-limit), ranking });
+            break;
+          }
+          console.log("Component Rankings:");
+          if (ranking.top_positive.length > 0) {
+            console.log("  Top improving components:");
+            for (const c of ranking.top_positive) {
+              console.log(`    + ${formatDisplayValue(c.name)}  Δ+${c.delta.toFixed(4)}`);
+            }
+          }
+          if (ranking.top_negative.length > 0) {
+            console.log("  Top declining components:");
+            for (const c of ranking.top_negative) {
+              console.log(`    - ${formatDisplayValue(c.name)}  Δ${c.delta.toFixed(4)}`);
+            }
+          }
+          if (ranking.top_positive.length === 0 && ranking.top_negative.length === 0) {
+            console.log("  No component data found in score history.");
+          }
+          console.log(`\nAnalyzed ${allParsed.length} score records.`);
+          break;
+        }
         const records = readTailLines(scoreHistoryPath, limit);
         if (records.length === 0) {
           console.log("No score records yet.");
@@ -558,12 +592,101 @@ const main = async (): Promise<number> => {
                 trend = "";
               }
             }
-            console.log(`  #${rec.iteration}  ${trend}  ${rec.metric_value ?? "—"}  (${rec.decision})  ${rec.verify_status}`);
+            let componentLine = "";
+            if (rec.score_components != null && typeof rec.score_components === "object") {
+              const parts = Object.entries(rec.score_components as Record<string, number>)
+                .map(([k, v]) => `${formatDisplayValue(k)}:${typeof v === "number" ? v.toFixed(4) : formatDisplayValue(v)}`)
+                .join(", ");
+              if (parts.length > 0) componentLine = `  [${parts}]`;
+            }
+            let componentDeltaLine = "";
+            if (componentLine && i + 1 < recordsOrdered.length) {
+              try {
+                const prevRec = JSON.parse(recordsOrdered[i + 1]);
+                if (prevRec.score_components != null && typeof prevRec.score_components === "object") {
+                  const deltas: string[] = [];
+                  for (const [k, v] of Object.entries(rec.score_components as Record<string, number>)) {
+                    const prev = (prevRec.score_components as Record<string, number>)[k];
+                    if (typeof prev === "number" && typeof v === "number") {
+                      const d = v - prev;
+                      if (d !== 0) {
+                        deltas.push(`${formatDisplayValue(k)}:${d > 0 ? "+" : ""}${d.toFixed(4)}`);
+                      }
+                    }
+                  }
+                  if (deltas.length > 0) componentDeltaLine = `  Δ[${deltas.join(", ")}]`;
+                }
+              } catch {
+                // ignore delta parse errors
+              }
+            }
+            console.log(`  #${rec.iteration}  ${trend}  ${rec.metric_value ?? "—"}  (${rec.decision})  ${rec.verify_status}${componentLine}${componentDeltaLine}`);
           } catch {
             console.log(`  [parse error]`);
           }
         }
         console.log(`\nShowing ${records.length} score records.`);
+        break;
+      }
+      case "score": {
+        const { resolvePath, readJsonFile, AutoresearchError: AErr } = await import("./helpers.js");
+        const { STATE_DEFAULT } = await import("./constants.js");
+        const { parseScoreOutput } = await import("./score-parser.js");
+
+        // Resolve scorer: --scorer flag takes priority, else use state.scorer
+        let scorerCmd = grouped.scorer as string | undefined;
+        if (!scorerCmd) {
+          const statePath = resolvePath(grouped.repo as string | undefined, grouped["state-path"] as string | undefined, STATE_DEFAULT);
+          if (existsSync(statePath)) {
+            const state = parseRunState(readJsonFile(statePath));
+            scorerCmd = state.scorer;
+          }
+        }
+        if (!scorerCmd) {
+          throw new AErr("No scorer configured. Provide --scorer <cmd> or configure a scorer via autoresearch init --scorer <cmd>.");
+        }
+
+        const repoBase = resolveRepo(grouped.repo as string | undefined);
+        let rawOutput: string;
+        try {
+          rawOutput = execSync(scorerCmd, { encoding: "utf-8", cwd: repoBase, stdio: ["ignore", "pipe", "pipe"] });
+        } catch (err) {
+          const e = err as { message?: string; stderr?: Buffer | string };
+          const stderr = typeof e.stderr === "string" ? e.stderr.trim() : (Buffer.isBuffer(e.stderr) ? e.stderr.toString("utf-8").trim() : "");
+          const errMsg = stderr || (err instanceof Error ? err.message : String(err));
+          throw new AErr(`Scorer command failed: ${errMsg}`);
+        }
+
+        const scored = parseScoreOutput(rawOutput);
+        const normalized = scored.score / scored.max;
+        const percent = (normalized * 100).toFixed(1) + "%";
+
+        if (useJson) {
+          printJson({
+            score: scored.score,
+            max: scored.max,
+            normalized,
+            percent,
+            components: scored.components ?? null,
+            diagnostics: scored.diagnostics ?? null,
+            details: scored.details ?? null,
+          });
+          break;
+        }
+
+        console.log(`Score: ${scored.score} / ${scored.max} (${percent})`);
+        if (scored.components && Object.keys(scored.components).length > 0) {
+          console.log("Components:");
+          for (const [key, val] of Object.entries(scored.components)) {
+            console.log(`  ${formatDisplayValue(key)}: ${formatDisplayValue(val)}`);
+          }
+        }
+        if (scored.diagnostics && Object.keys(scored.diagnostics).length > 0) {
+          console.log("Diagnostics:");
+          for (const [key, val] of Object.entries(scored.diagnostics)) {
+            console.log(`  ${formatDisplayValue(key)}: ${formatDisplayValue(val)}`);
+          }
+        }
         break;
       }
       case "config": {
@@ -585,6 +708,7 @@ const main = async (): Promise<number> => {
             deadline_at: state.deadline_at,
             verify: state.verify,
             guard: state.guard,
+            scorer: state.scorer ?? null,
             subagent_pool: state.subagent_pool ? "configured" : "none",
             label_requirements: state.label_requirements,
           });
@@ -603,6 +727,7 @@ const main = async (): Promise<number> => {
         console.log(`  Deadline: ${formatDisplayValue(state.deadline_at ? formatTimestamp(state.deadline_at as string) : "—")}`);
         console.log(`  Verify:   ${formatDisplayValue(state.verify)}`);
         console.log(`  Guard:    ${formatDisplayValue(state.guard)}`);
+        console.log(`  Scorer:   ${formatDisplayValue(state.scorer ?? "—")}`);
         console.log(`  Pool:     ${state.subagent_pool ? "configured" : "none"}`);
         break;
       }
@@ -872,6 +997,7 @@ const main = async (): Promise<number> => {
           mode: "background",
           scope: grouped.scope as string | undefined,
           guard: grouped.guard as string | undefined,
+          scorer: grouped.scorer as string | undefined,
           iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
           max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
           duration: grouped.duration as string | undefined,
@@ -938,16 +1064,31 @@ const main = async (): Promise<number> => {
         break;
       }
       case "record": {
-        const { normalizeResultStatus } = await import("./helpers.js");
+        const { normalizeResultStatus, normalizeScorerStatus } = await import("./helpers.js");
         const vs = (grouped["verify-status"] as string) || "pass";
         const gs = (grouped["guard-status"] as string) || "skip";
+        const scorerStatus = normalizeScorerStatus(grouped["scorer-status"] as string | undefined);
         const iteration = parsePositiveInt(grouped.iteration as string | undefined, "iteration");
+        let scoreComponents: Record<string, number> | undefined;
+        if (grouped["score-components"]) {
+          try {
+            const parsed = JSON.parse(grouped["score-components"] as string);
+            if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+              throw new Error('score-components must be a JSON object with string keys and numeric values, e.g., {"accuracy": 0.8, "coverage": 0.6}');
+            }
+            scoreComponents = parsed as Record<string, number>;
+          } catch (e) {
+            console.error(`Invalid --score-components: ${(e as Error).message}`);
+            return 1;
+          }
+        }
         if (dryRun) {
           console.log("[dry-run] Would record experiment result:");
           console.log(JSON.stringify({
             decision: grouped.decision,
             metric_value: grouped["metric-value"],
             instrument_value: grouped["instrument-value"],
+            scorer_status: scorerStatus,
             verify_status: normalizeResultStatus(vs, "verify_status"),
             guard_status: normalizeResultStatus(gs, "guard_status"),
             hypothesis: grouped.hypothesis,
@@ -955,6 +1096,7 @@ const main = async (): Promise<number> => {
             labels: grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined,
             note: grouped.note,
             iteration,
+            score_components: scoreComponents,
           }, null, 2));
           return 0;
         }
@@ -971,9 +1113,11 @@ const main = async (): Promise<number> => {
           grouped.hypothesis as string | undefined,
           grouped["change-summary"] as string,
           grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined,
-          grouped.note as string | undefined,
-          iteration,
-        );
+            grouped.note as string | undefined,
+            iteration,
+            undefined,
+            scorerStatus,
+          );
         printJson(state);
         break;
       }
@@ -1077,6 +1221,28 @@ const main = async (): Promise<number> => {
       }
       case "goal": {
         const subCmd = cmdArgs[0];
+        if (subCmd?.startsWith("--")) {
+          const { resolvePath, readGoalDoc } = await import("./helpers.js");
+          const { GOAL_DEFAULT } = await import("./constants.js");
+          const goalPath = resolvePath(grouped.repo as string | undefined, grouped["goal-path"] as string | undefined, GOAL_DEFAULT);
+          if (!existsSync(goalPath)) {
+            console.log("No goal document found. Run 'autoresearch init' first.");
+            break;
+          }
+          const doc = readGoalDoc(goalPath);
+          if (useJson) {
+            printJson(doc);
+            break;
+          }
+          console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
+          console.log(`Metric:           ${formatDisplayValue(doc.metric)} (${formatDisplayValue(doc.direction)})`);
+          console.log(`Verify:           ${formatDisplayValue(doc.verify)}`);
+          if (doc.guard) console.log(`Guard:            ${formatDisplayValue(doc.guard)}`);
+          if (doc.file_map) console.log(`File map:         ${formatDisplayValue(doc.file_map)}`);
+          if (doc.constraints) console.log(`Constraints:      ${formatDisplayValue(doc.constraints)}`);
+          if (doc.stop_conditions) console.log(`Stop conditions:  ${formatDisplayValue(doc.stop_conditions)}`);
+          break;
+        }
         if (!subCmd || subCmd === "help" || HELP_FLAGS.includes(subCmd)) {
           console.error("Usage: autoresearch goal <subcommand> [options]");
           console.error("");
@@ -1094,7 +1260,7 @@ const main = async (): Promise<number> => {
           console.error("  --iterations    Iteration cap");
           console.error("  --duration      Wall-clock cap (e.g., 5h or 300m)");
           console.error("  --template      Preset template: performance, quality, coverage, custom");
-          console.error("  --goal-path     Output file path (default: GOAL.md)");
+          console.error("  --goal-path     Output file path (default: .autoresearch/goal.md)");
           console.error("  --dry-run       Preview without writing the file");
           console.error("  --json          Output result as JSON");
           console.error("");
@@ -1122,7 +1288,7 @@ const main = async (): Promise<number> => {
         const { GOAL_TEMPLATES, getGoalTemplate, buildGoalDocument, buildGoalInitResult } = await import("./goal-init.js");
         const { GOAL_DEFAULT } = await import("./constants.js");
         const { resolvePath } = await import("./helpers.js");
-        const { writeFileSync, existsSync: goalExistsSync } = await import("fs");
+        const { existsSync: goalExistsSync } = await import("fs");
 
         const templateId = (goalGrouped.template as string | undefined) ?? "custom";
         if (!GOAL_TEMPLATES.find((t) => t.id === templateId)) {
@@ -1219,7 +1385,7 @@ const main = async (): Promise<number> => {
           if (useGoalJson) {
             printJson({ ...result, dry_run: true });
           } else {
-            console.log("[dry-run] Would write GOAL.md to: " + goalPath);
+            console.log("[dry-run] Would write goal document to: " + goalPath);
             console.log("");
             console.log(document);
           }
@@ -1231,7 +1397,7 @@ const main = async (): Promise<number> => {
           if (verbose) console.error(`[verbose] Overwriting existing ${goalPath}`);
         }
 
-        writeFileSync(goalPath, document, "utf-8");
+        atomicWriteTextInRepo(goalGrouped.repo as string | undefined, goalPath, document);
 
         if (useGoalJson) {
           printJson(result);
