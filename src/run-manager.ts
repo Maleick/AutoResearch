@@ -303,6 +303,7 @@ export function makeStatePayload(
         num_drafts: config.num_drafts ?? 1,
         branch_selection_policy: config.branch_selection_policy ?? "best",
         baseline_iteration: 0,
+        branch_policy_overrides: config.branch_policy_overrides,
       })
     : undefined;
 
