@@ -1225,36 +1225,9 @@ const main = async (): Promise<number> => {
         break;
       }
       case "goal": {
-<<<<<<< HEAD
         const rawSubCmd = cmdArgs[0];
         const subCmd = rawSubCmd && !rawSubCmd.startsWith("-") ? rawSubCmd : undefined;
         if ((!subCmd && cmdArgs.length === 0) || subCmd === "help" || (subCmd && HELP_FLAGS.includes(subCmd))) {
-=======
-        const subCmd = cmdArgs[0];
-        if (subCmd?.startsWith("--")) {
-          const { resolvePath, readGoalDoc } = await import("./helpers.js");
-          const { GOAL_DEFAULT } = await import("./constants.js");
-          const goalPath = resolvePath(grouped.repo as string | undefined, grouped["goal-path"] as string | undefined, GOAL_DEFAULT);
-          if (!existsSync(goalPath)) {
-            console.log("No goal document found. Run 'autoresearch init' first.");
-            break;
-          }
-          const doc = readGoalDoc(goalPath);
-          if (useJson) {
-            printJson(doc);
-            break;
-          }
-          console.log(`Goal:             ${formatDisplayValue(doc.goal)}`);
-          console.log(`Metric:           ${formatDisplayValue(doc.metric)} (${formatDisplayValue(doc.direction)})`);
-          console.log(`Verify:           ${formatDisplayValue(doc.verify)}`);
-          if (doc.guard) console.log(`Guard:            ${formatDisplayValue(doc.guard)}`);
-          if (doc.file_map) console.log(`File map:         ${formatDisplayValue(doc.file_map)}`);
-          if (doc.constraints) console.log(`Constraints:      ${formatDisplayValue(doc.constraints)}`);
-          if (doc.stop_conditions) console.log(`Stop conditions:  ${formatDisplayValue(doc.stop_conditions)}`);
-          break;
-        }
-        if (!subCmd || subCmd === "help" || HELP_FLAGS.includes(subCmd)) {
->>>>>>> origin/chore/repo-cleanup-release-recovery
           console.error("Usage: autoresearch goal <subcommand> [options]");
           console.error("");
           console.error("Subcommands:");
