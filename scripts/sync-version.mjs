@@ -43,13 +43,4 @@ await writeText(
 
 const installPath = "../INSTALL.md";
 const install = await readText(installPath);
-await writeText(
-  installPath,
-  install
-    .replace(/refs\/tags\/v\d+\.\d+\.\d+\/INSTALL\.md/g, `refs/tags/v${version}/INSTALL.md`)
-    .replace(/`v\d+\.\d+\.\d+`/g, `\`v${version}\``),
-);
-
-const installPath = "../INSTALL.md";
-const install = await readText(installPath);
 await writeText(installPath, syncInstallTag(install));
