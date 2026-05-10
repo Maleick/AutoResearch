@@ -415,19 +415,35 @@ describe("CLI Commands", () => {
         },
         verify: "npm test",
         label_requirements: { keep: [], stop: [] },
-        artifact_paths: { results: tmpResults, state: tmpState },
+        artifact_paths: {
+          results: "results.tsv`\n## forged artifact\u001b[31m",
+          state: "state.json`\n## forged state\u001b[31m",
+        },
         stats: {
           total_iterations: 1,
           kept: 1,
           discarded: 0,
           needs_human: 0,
           consecutive_discards: 0,
+          best_iteration: "1`\n## forged best\u001b[31m",
         },
         flags: {
           stop_requested: false,
           needs_human: false,
           background_active: false,
           stop_ready: false,
+        },
+        last_iteration: {
+          iteration: "1`\n## forged next\u001b[31m",
+          decision: "keep",
+          metric_value: "0",
+          change_summary: "seed fixture state",
+          labels: [],
+          timestamp: "2026-05-03T00:01:00Z",
+          keep_labels_satisfied: true,
+          stop_labels_satisfied: true,
+          missing_keep_labels: [],
+          missing_stop_labels: [],
         },
       }, null, 2) + "\n", "utf-8");
       writeFileSync(tmpResults, [
@@ -439,8 +455,14 @@ describe("CLI Commands", () => {
         const out = execSync(`node ${CLI} report --repo ${tmpDir}`, { encoding: "utf-8", cwd: REPO_ROOT });
         expect(out).not.toContain("\n## Forged Section");
         expect(out).not.toContain("\n## forged result");
+        expect(out).not.toContain("\n## forged artifact");
+        expect(out).not.toContain("\n## forged state");
+        expect(out).not.toContain("\n## forged next");
         expect(out).not.toContain("\u001b");
         expect(out).toContain("\\#\\# Forged Section");
+        expect(out).toContain("\\#\\# forged artifact");
+        expect(out).toContain("\\#\\# forged state");
+        expect(out).toContain("\\#\\# forged next");
         expect(out).toContain("\\*\\*bold\\*\\*");
       } finally {
         try { rmSync(tmpDir, { recursive: true }); } catch {}
