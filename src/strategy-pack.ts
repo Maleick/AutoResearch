@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "fs";
-import { join } from "path";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, realpathSync } from "fs";
+import { isAbsolute, join, relative } from "path";
 import { utcNow, resolvePath, parseRunState, readJsonFile, readGoalDoc } from "./helpers.js";
 import { STATE_DEFAULT, GOAL_DEFAULT } from "./constants.js";
 
@@ -115,8 +115,30 @@ export function listPacks(repo?: string): Array<{ name: string; path: string }> 
     .sort((a, b) => b.name.localeCompare(a.name));
 }
 
+function isValidPackName(name: string): boolean {
+  return name.endsWith(".md")
+    && !name.includes("..")
+    && !name.includes("/")
+    && !name.includes("\\");
+}
+
+function isWithinDir(parent: string, child: string): boolean {
+  const relativePath = relative(parent, child);
+  return relativePath !== "" && !relativePath.startsWith("..") && !isAbsolute(relativePath);
+}
+
 export function readPack(repo: string | undefined, name: string): string | null {
-  const packPath = join(resolvePacksDir(repo), name);
+  if (!isValidPackName(name)) return null;
+
+  const packsDir = resolvePacksDir(repo);
+  if (!existsSync(packsDir)) return null;
+
+  const packPath = join(packsDir, name);
   if (!existsSync(packPath)) return null;
-  return readFileSync(packPath, "utf-8");
+
+  const realPacksDir = realpathSync(packsDir);
+  const realPackPath = realpathSync(packPath);
+  if (!isWithinDir(realPacksDir, realPackPath)) return null;
+
+  return readFileSync(realPackPath, "utf-8");
 }

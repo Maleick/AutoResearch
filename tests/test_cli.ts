@@ -1482,5 +1482,41 @@ describe("CLI Commands", () => {
       const out = execSync(`node ${CLI} pack list --repo ${tmpDir}`, { encoding: "utf-8" });
       expect(out).toContain("strategy-test");
     });
+
+    it("rejects pack inspect path traversal", () => {
+      mkdirSync(resolve(tmpDir, ".autoresearch", "packs"), { recursive: true });
+
+      let threw = false;
+      try {
+        execFileSync("node", [CLI, "pack", "inspect", "../../package.json", "--repo", tmpDir], { encoding: "utf-8", stdio: "pipe" });
+      } catch (e) {
+        threw = true;
+        const stdout = (e as { stdout?: string }).stdout ?? "";
+        const stderr = (e as { stderr?: string }).stderr ?? "";
+        expect(stdout).not.toContain('"name": "opencode-autoresearch"');
+        expect(stderr).toContain("Pack not found: ../../package.json");
+      }
+      if (!threw) throw new Error("Expected command to exit non-zero but it succeeded");
+    });
+
+    it("rejects pack inspect symlinks outside packs directory", () => {
+      const packsDir = resolve(tmpDir, ".autoresearch", "packs");
+      mkdirSync(packsDir, { recursive: true });
+      const secretPath = resolve(tmpDir, "secret.md");
+      writeFileSync(secretPath, "secret pack data", "utf-8");
+      symlinkSync(secretPath, resolve(packsDir, "secret.md"));
+
+      let threw = false;
+      try {
+        execFileSync("node", [CLI, "pack", "inspect", "secret.md", "--repo", tmpDir], { encoding: "utf-8", stdio: "pipe" });
+      } catch (e) {
+        threw = true;
+        const stdout = (e as { stdout?: string }).stdout ?? "";
+        const stderr = (e as { stderr?: string }).stderr ?? "";
+        expect(stdout).not.toContain("secret pack data");
+        expect(stderr).toContain("Pack not found: secret.md");
+      }
+      if (!threw) throw new Error("Expected command to exit non-zero but it succeeded");
+    });
   });
 });
