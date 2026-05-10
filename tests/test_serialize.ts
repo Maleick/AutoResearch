@@ -31,6 +31,18 @@ describe("Serialize", () => {
       expect(stableJsonStringify(42)).toBe("42");
       expect(stableJsonStringify("hello")).toBe('"hello"');
     });
+
+    it("omits undefined object properties", () => {
+      const out = stableJsonStringify({ z: undefined, a: 1 });
+      expect(out).toBe('{"a":1}');
+      expect(JSON.parse(out)).toEqual({ a: 1 });
+    });
+
+    it("serializes undefined array entries as null", () => {
+      const out = stableJsonStringify([1, undefined, 3]);
+      expect(out).toBe("[1,null,3]");
+      expect(JSON.parse(out)).toEqual([1, null, 3]);
+    });
   });
 
   describe("stableJsonWrite", () => {
@@ -38,6 +50,12 @@ describe("Serialize", () => {
       const out = stableJsonWrite({ a: 1 });
       expect(out.endsWith("\n")).toBe(true);
       expect(out).not.toContain("\r");
+    });
+
+    it("does not write undefined object properties as invalid JSON", () => {
+      const out = stableJsonWrite({ a: undefined, b: 1 });
+      expect(out).toBe('{\n  "b": 1\n}\n');
+      expect(JSON.parse(out)).toEqual({ b: 1 });
     });
   });
 

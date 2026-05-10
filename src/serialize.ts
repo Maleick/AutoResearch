@@ -1,18 +1,34 @@
-export function stableJsonStringify(value: unknown, space?: number): string {
-  if (value === null || value === undefined) {
-    return JSON.stringify(value);
+type JsonSerializationContext = "root" | "array" | "object";
+
+function stableJsonStringifyValue(
+  value: unknown,
+  space: number | undefined,
+  context: JsonSerializationContext,
+): string | undefined {
+  if (value === undefined || typeof value === "function" || typeof value === "symbol") {
+    return context === "array" || context === "root" ? "null" : undefined;
+  }
+
+  if (value === null) {
+    return "null";
   }
 
   if (Array.isArray(value)) {
-    const items = value.map((item) => stableJsonStringify(item, space));
+    const items = Array.from({ length: value.length }, (_, index) => {
+      return stableJsonStringifyValue(value[index], space, "array") ?? "null";
+    });
     return "[" + items.join(",") + "]";
   }
 
   if (typeof value === "object") {
     const keys = Object.keys(value as Record<string, unknown>).sort();
-    const entries = keys.map((key) => {
+    const entries = keys.flatMap((key) => {
+      const v = stableJsonStringifyValue((value as Record<string, unknown>)[key], space, "object");
+      if (v === undefined) {
+        return [];
+      }
+
       const k = JSON.stringify(key);
-      const v = stableJsonStringify((value as Record<string, unknown>)[key], space);
       return `${k}:${space ? " " : ""}${v}`;
     });
 
@@ -26,6 +42,10 @@ export function stableJsonStringify(value: unknown, space?: number): string {
   }
 
   return JSON.stringify(value);
+}
+
+export function stableJsonStringify(value: unknown, space?: number): string {
+  return stableJsonStringifyValue(value, space, "root") ?? "null";
 }
 
 export function normalizeLineEndings(text: string): string {
