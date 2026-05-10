@@ -1925,7 +1925,7 @@ const main = async (): Promise<number> => {
           manifest.tasks = manifest.tasks.filter((t) => t.status === "pending" || t.status === "leased");
           manifest.updated_at = new Date().toISOString();
           const removed = before - manifest.tasks.length;
-          await writeManifest(queuePath, manifest);
+          await writeManifest(queuePath, manifest, grouped.repo as string | undefined);
 
           if (useJson) {
             printJson({ removed });
