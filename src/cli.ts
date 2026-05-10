@@ -476,7 +476,7 @@ const main = async (): Promise<number> => {
           grouped["state-path"] as string | undefined,
         );
         if (useJson) {
-          printJson(snapshot);
+          printJsonEnvelope("status", snapshot);
         } else {
           const s = snapshot;
           const stats = s.stats;
@@ -524,7 +524,7 @@ const main = async (): Promise<number> => {
         const flags = s.flags;
 
         if (useJson) {
-          printJson(snapshot);
+          printJsonEnvelope("explain", snapshot);
           break;
         }
 
@@ -957,7 +957,7 @@ const main = async (): Promise<number> => {
         };
 
         if (useJson) {
-          printJson(schemas);
+          printJsonEnvelope("contract", schemas);
           break;
         }
 
@@ -1481,7 +1481,7 @@ const main = async (): Promise<number> => {
            grouped["state-path"] as string | undefined,
          );
          if (useJson) {
-           printJson(digest);
+           printJsonEnvelope("digest", digest);
          } else {
            console.log(`# Auto Research Digest`);
            console.log(`\n**Run ID:** ${formatMarkdownField(digest.run_id || "—")}`);
