@@ -1128,11 +1128,11 @@ const main = async (): Promise<number> => {
           const s = state.stats;
           const total = s.total_iterations;
           const successRate = total > 0 ? ((s.kept / total) * 100).toFixed(1) : "0";
-          console.log(`- **Progress:** ${s.kept} kept / ${total} total iterations (${successRate}% success rate)`);
+          console.log(`- **Progress:** ${formatMarkdownField(s.kept)} kept / ${formatMarkdownField(total)} total iterations (${formatMarkdownField(successRate)}% success rate)`);
           
           if (state.iterations_cap) {
             const progressPct = ((total / state.iterations_cap) * 100).toFixed(1);
-            console.log(`- **Cap:** ${total} / ${state.iterations_cap} iterations (${progressPct}% of cap)`);
+            console.log(`- **Cap:** ${formatMarkdownField(total)} / ${formatMarkdownField(state.iterations_cap)} iterations (${formatMarkdownField(progressPct)}% of cap)`);
           }
           
           if (state.created_at) {
@@ -1140,22 +1140,22 @@ const main = async (): Promise<number> => {
             const endedAtMs = state.updated_at ? Date.parse(state.updated_at) : Date.now();
             if (!Number.isNaN(startedAtMs) && !Number.isNaN(endedAtMs) && endedAtMs >= startedAtMs) {
               const elapsedMin = Math.round((endedAtMs - startedAtMs) / 1000 / 60);
-              console.log(`- **Elapsed:** ${elapsedMin} minutes`);
+              console.log(`- **Elapsed:** ${formatMarkdownField(elapsedMin)} minutes`);
             }
           }
           
           // Next candidate
           if (state.last_iteration && state.last_iteration.decision === "keep") {
-            console.log(`- **Next candidate:** Iteration ${state.last_iteration.iteration} (kept)`);
+            console.log(`- **Next candidate:** Iteration ${formatMarkdownField(state.last_iteration.iteration)} (kept)`);
           } else if (s.best_iteration) {
-            console.log(`- **Best candidate:** Iteration ${s.best_iteration}`);
+            console.log(`- **Best candidate:** Iteration ${formatMarkdownField(s.best_iteration)}`);
           }
         }
         
         // Artifact pointers
         console.log(`\n## Artifacts`);
-        console.log(`- State: \`${state.artifact_paths?.state || ".autoresearch/state.json"}\``);
-        console.log(`- Results: \`${state.artifact_paths?.results || "autoresearch-results.tsv"}\``);
+        console.log(`- State: ${formatMarkdownField(state.artifact_paths?.state || ".autoresearch/state.json")}`);
+        console.log(`- Results: ${formatMarkdownField(state.artifact_paths?.results || "autoresearch-results.tsv")}`);
         if (grouped.repo) {
           console.log(`- Repository: ${formatMarkdownField(grouped.repo as string)}`);
         }
