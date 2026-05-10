@@ -1,6 +1,6 @@
 {
   "name": "opencode-autoresearch",
-  "version": "3.13.1",
+  "version": "3.14.2",
   "description": "Autonomous recursive self-improvement engine for OpenCode and Hermes Agent. Subagent-first iteration loop with mechanical verification.",
   "author": {
     "name": "Maleick",
