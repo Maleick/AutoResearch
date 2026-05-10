@@ -1,5 +1,5 @@
-import { planCompaction, executeCompaction } from "../src/compaction.js";
-import { mkdirSync, writeFileSync, rmSync, existsSync, utimesSync } from "fs";
+import { planCompaction, executeCompaction, rollbackCompaction } from "../src/compaction.js";
+import { mkdirSync, writeFileSync, rmSync, existsSync, utimesSync, readFileSync, symlinkSync } from "fs";
 import { resolve } from "path";
 
 const REPO_ROOT = process.cwd();
@@ -93,4 +93,56 @@ describe("Compaction", () => {
     expect(result.spaceReclaimed).toBeGreaterThanOrEqual(10);
     expect(existsSync(runDir)).toBe(false);
   });
+  it("rolls back archived files inside the autoresearch directory", () => {
+    const autoDir = resolve(tmpDir, ".autoresearch");
+    const runDir = resolve(autoDir, "run-old-1");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(resolve(runDir, "state.json"), "archived");
+
+    const plan = planCompaction(tmpDir, 0);
+    const result = executeCompaction(tmpDir, plan, false);
+    expect(result.success).toBe(true);
+    expect(result.rollbackPath).not.toBeNull();
+    expect(existsSync(runDir)).toBe(false);
+
+    expect(rollbackCompaction(result.rollbackPath!)).toBe(true);
+    expect(readFileSync(resolve(runDir, "state.json"), "utf-8")).toBe("archived");
+  });
+
+  it("rejects rollback manifests with destinations outside .autoresearch", () => {
+    const rollbackDir = resolve(tmpDir, ".autoresearch", "archive", "malicious");
+    const outsideDir = resolve(tmpDir, "outside-target");
+    mkdirSync(rollbackDir, { recursive: true });
+    mkdirSync(outsideDir, { recursive: true });
+    writeFileSync(resolve(outsideDir, "secret.txt"), "keep");
+    writeFileSync(resolve(rollbackDir, "outside-target"), "replacement");
+    writeFileSync(
+      resolve(rollbackDir, "manifest.json"),
+      JSON.stringify({ files: [outsideDir] }),
+    );
+
+    expect(rollbackCompaction(rollbackDir)).toBe(false);
+    expect(readFileSync(resolve(outsideDir, "secret.txt"), "utf-8")).toBe("keep");
+  });
+
+  it("rejects rollback destinations that traverse symlinked directories", () => {
+    const rollbackDir = resolve(tmpDir, ".autoresearch", "archive", "malicious");
+    const outsideDir = resolve(tmpDir, "outside-link-target");
+    const logsLink = resolve(tmpDir, ".autoresearch", "logs");
+    const destination = resolve(logsLink, "old.log");
+    mkdirSync(rollbackDir, { recursive: true });
+    mkdirSync(outsideDir, { recursive: true });
+    symlinkSync(outsideDir, logsLink, "dir");
+    writeFileSync(resolve(outsideDir, "old.log"), "keep");
+    writeFileSync(resolve(rollbackDir, "old.log"), "replacement");
+    writeFileSync(
+      resolve(rollbackDir, "manifest.json"),
+      JSON.stringify({ files: [destination] }),
+    );
+
+    expect(rollbackCompaction(rollbackDir)).toBe(false);
+    expect(readFileSync(resolve(outsideDir, "old.log"), "utf-8")).toBe("keep");
+  });
+
+
 });

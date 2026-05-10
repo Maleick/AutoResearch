@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync, readdirSync, readFileSync } from "fs";
-import { resolve, join, basename } from "path";
+import { existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync, readdirSync, readFileSync, realpathSync } from "fs";
+import { resolve, join, basename, dirname, isAbsolute, relative } from "path";
 
 export interface CompactionPlan {
   filesToArchive: string[];
@@ -182,28 +182,131 @@ export function executeCompaction(
   return result;
 }
 
-export function rollbackCompaction(rollbackPath: string): boolean {
-  if (!existsSync(rollbackPath)) {
+function isPathInside(childPath: string, parentPath: string): boolean {
+  const relationship = relative(parentPath, childPath);
+  return relationship === "" || (!relationship.startsWith("..") && !isAbsolute(relationship));
+}
+
+function getRollbackAutoresearchDir(rollbackDir: string): string | null {
+  const archiveDir = dirname(rollbackDir);
+  if (basename(archiveDir) !== "archive") {
+    return null;
+  }
+
+  const autoresearchDir = dirname(archiveDir);
+  if (basename(autoresearchDir) !== ".autoresearch") {
+    return null;
+  }
+
+  return autoresearchDir;
+}
+
+function nearestExistingPath(path: string): string | null {
+  let current = path;
+  while (!existsSync(current)) {
+    const parent = dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+
+  return current;
+}
+
+function isRollbackDestinationAllowed(
+  destinationPath: string,
+  autoresearchDir: string,
+  archiveRoot: string,
+  realAutoresearchDir: string,
+  realArchiveRoot: string,
+): boolean {
+  if (
+    !isPathInside(destinationPath, autoresearchDir) ||
+    isPathInside(destinationPath, archiveRoot) ||
+    destinationPath === autoresearchDir
+  ) {
     return false;
   }
 
-  const manifestPath = resolve(rollbackPath, "manifest.json");
+  const existingDestinationPath = nearestExistingPath(destinationPath);
+  if (!existingDestinationPath) {
+    return false;
+  }
+
+  const realDestinationPath = realpathSync(existingDestinationPath);
+  return isPathInside(realDestinationPath, realAutoresearchDir) && !isPathInside(realDestinationPath, realArchiveRoot);
+}
+
+interface RollbackOperation {
+  archivePath: string;
+  destinationPath: string;
+}
+
+export function rollbackCompaction(rollbackPath: string): boolean {
+  const rollbackDir = resolve(rollbackPath);
+  if (!existsSync(rollbackDir)) {
+    return false;
+  }
+
+  const autoresearchDir = getRollbackAutoresearchDir(rollbackDir);
+  if (!autoresearchDir) {
+    return false;
+  }
+
+  const archiveRoot = dirname(rollbackDir);
+  const manifestPath = resolve(rollbackDir, "manifest.json");
   if (!existsSync(manifestPath)) {
     return false;
   }
 
   try {
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    const realAutoresearchDir = realpathSync(autoresearchDir);
+    const realArchiveRoot = realpathSync(archiveRoot);
+    const manifest: unknown = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    if (
+      typeof manifest !== "object" ||
+      manifest === null ||
+      !("files" in manifest) ||
+      !Array.isArray(manifest.files)
+    ) {
+      return false;
+    }
 
+    const operations: RollbackOperation[] = [];
     for (const filePath of manifest.files) {
-      const baseName = basename(filePath);
-      const archivePath = join(rollbackPath, baseName);
+      if (typeof filePath !== "string" || filePath.length === 0) {
+        return false;
+      }
+
+      const destinationPath = resolve(filePath);
+      if (
+        !isRollbackDestinationAllowed(
+          destinationPath,
+          autoresearchDir,
+          archiveRoot,
+          realAutoresearchDir,
+          realArchiveRoot,
+        )
+      ) {
+        return false;
+      }
+
+      const archivePath = resolve(rollbackDir, basename(destinationPath));
+      if (!isPathInside(archivePath, rollbackDir) || archivePath === manifestPath) {
+        return false;
+      }
+
+      operations.push({ archivePath, destinationPath });
+    }
+
+    for (const { archivePath, destinationPath } of operations) {
       if (existsSync(archivePath)) {
         // Remove any file that might have been created in place
-        if (existsSync(filePath)) {
-          rmSync(filePath, { recursive: true, force: true });
+        if (existsSync(destinationPath)) {
+          rmSync(destinationPath, { recursive: true, force: true });
         }
-        renameSync(archivePath, filePath);
+        renameSync(archivePath, destinationPath);
       }
     }
 
