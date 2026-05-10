@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import { resolveRepo } from "./helpers.js";
+import { resolveRepo, sanitizeForTerminal } from "./helpers.js";
 import { VERSION } from "./constants.js";
 
 export interface WhatsNew {
@@ -95,14 +95,14 @@ export function getWhatsNew(repo?: string): WhatsNew | null {
 
 export function formatWhatsNew(wn: WhatsNew): string {
   const lines: string[] = [];
-  lines.push(`What's New in ${wn.version}`);
+  lines.push(`What's New in ${sanitizeForTerminal(wn.version)}`);
   lines.push("=".repeat(lines[0].length));
   lines.push("");
 
   if (wn.features.length > 0) {
     lines.push("Features:");
     for (const f of wn.features) {
-      lines.push(`  + ${f}`);
+      lines.push(`  + ${sanitizeForTerminal(f)}`);
     }
     lines.push("");
   }
@@ -110,7 +110,7 @@ export function formatWhatsNew(wn: WhatsNew): string {
   if (wn.fixes.length > 0) {
     lines.push("Fixes:");
     for (const f of wn.fixes) {
-      lines.push(`  - ${f}`);
+      lines.push(`  - ${sanitizeForTerminal(f)}`);
     }
     lines.push("");
   }
@@ -118,7 +118,7 @@ export function formatWhatsNew(wn: WhatsNew): string {
   if (wn.breaking.length > 0) {
     lines.push("BREAKING:");
     for (const b of wn.breaking) {
-      lines.push(`  ! ${b}`);
+      lines.push(`  ! ${sanitizeForTerminal(b)}`);
     }
     lines.push("");
   }
