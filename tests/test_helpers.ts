@@ -717,6 +717,18 @@ describe("parseRunState", () => {
     expect(() => mod.parseRunState(state)).toThrow("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
   });
 
+  it("throws on invalid context_pressure", () => {
+    const base = validState();
+    const state = { ...base, flags: { ...base.flags, context_pressure: "high" } };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: flags.context_pressure must be an object");
+  });
+
+  it("throws on non-array context_pressure warnings", () => {
+    const base = validState();
+    const state = { ...base, flags: { ...base.flags, context_pressure: { warnings: "warn" } } };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: flags.context_pressure.warnings must be an array");
+  });
+
   it("throws on non-array draft_pool.active_drafts", () => {
     const state = { ...validState(), draft_pool: { active_drafts: { discarded: true } } };
     expect(() => mod.parseRunState(state)).toThrow("Invalid state: draft_pool.active_drafts must be an array");
@@ -730,5 +742,10 @@ describe("parseRunState", () => {
   it("throws on non-string last_iteration.note", () => {
     const state = { ...validState(), last_iteration: { note: { text: "blocked" } } };
     expect(() => mod.parseRunState(state)).toThrow("Invalid state: last_iteration.note must be a string");
+  });
+
+  it("throws on non-string last_iteration.stage", () => {
+    const state = { ...validState(), last_iteration: { stage: { name: "improve" } } };
+    expect(() => mod.parseRunState(state)).toThrow("Invalid state: last_iteration.stage must be a string");
   });
 });

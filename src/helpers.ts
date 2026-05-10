@@ -350,6 +350,15 @@ export function parseRunState(value: unknown): RunState {
   if (typeof flags.stop_requested !== "boolean" || typeof flags.needs_human !== "boolean" || typeof flags.background_active !== "boolean" || typeof flags.stop_ready !== "boolean") {
     throw new AutoresearchError("Invalid state: flags must have stop_requested, needs_human, background_active, stop_ready");
   }
+  if (flags.context_pressure !== undefined) {
+    if (typeof flags.context_pressure !== "object" || flags.context_pressure === null || Array.isArray(flags.context_pressure)) {
+      throw new AutoresearchError("Invalid state: flags.context_pressure must be an object");
+    }
+    const contextPressure = flags.context_pressure as Record<string, unknown>;
+    if (contextPressure.warnings !== undefined && !Array.isArray(contextPressure.warnings)) {
+      throw new AutoresearchError("Invalid state: flags.context_pressure.warnings must be an array");
+    }
+  }
 
   if (obj.draft_pool !== undefined && obj.draft_pool !== null) {
     if (typeof obj.draft_pool !== "object" || Array.isArray(obj.draft_pool)) {
@@ -373,6 +382,9 @@ export function parseRunState(value: unknown): RunState {
     const lastIteration = obj.last_iteration as Record<string, unknown>;
     if (lastIteration.note !== undefined && typeof lastIteration.note !== "string") {
       throw new AutoresearchError("Invalid state: last_iteration.note must be a string");
+    }
+    if (lastIteration.stage !== undefined && typeof lastIteration.stage !== "string") {
+      throw new AutoresearchError("Invalid state: last_iteration.stage must be a string");
     }
   }
 

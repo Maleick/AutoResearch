@@ -498,7 +498,7 @@ const main = async (): Promise<number> => {
           console.log(`Results: ${s.results_rows} rows`);
           const lastIter = s.last_iteration;
           if (lastIter && lastIter.iteration) {
-            const stageTag = lastIter.stage ? ` [${lastIter.stage}]` : "";
+            const stageTag = lastIter.stage ? ` [${formatDisplayValue(lastIter.stage)}]` : "";
             console.log(`Last:    iter ${formatDisplayValue(lastIter.iteration)}${stageTag} — ${formatDisplayValue(lastIter.decision)} (${formatMetricValue(lastIter.metric_value)})`);
             if (lastIter.score_components != null && typeof lastIter.score_components === "object") {
               const parts = Object.entries(lastIter.score_components as Record<string, number>)
@@ -513,8 +513,9 @@ const main = async (): Promise<number> => {
           if (flags?.stop_requested) console.log("⏹  Stop requested");
           if (flags?.context_pressure) {
             const cp = flags.context_pressure;
-            if (cp.warnings.length > 0) {
-              for (const w of cp.warnings) console.log(`🆘 Context pressure: ${w}`);
+            const warnings = Array.isArray(cp.warnings) ? cp.warnings : [];
+            if (warnings.length > 0) {
+              for (const w of warnings) console.log(`🆘 Context pressure: ${formatDisplayValue(w)}`);
             }
           }
         }
