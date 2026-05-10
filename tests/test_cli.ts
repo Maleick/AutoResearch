@@ -716,6 +716,54 @@ describe("CLI Commands", () => {
         try { rmSync(tmpDir, { recursive: true }); } catch {}
       }
     });
+
+    it("creates evidence-gated issue candidates from regular score history", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-suggest-evidence");
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      try {
+        mkdirSync(resolve(tmpDir, ".autoresearch"), { recursive: true });
+        writeFileSync(scoreHistoryPath, [
+          JSON.stringify({ timestamp: "2026-05-08T10:00:00Z", iteration: 1, decision: "discard" }),
+          JSON.stringify({ timestamp: "2026-05-08T10:01:00Z", iteration: 2, decision: "discard" }),
+          JSON.stringify({ timestamp: "2026-05-08T10:02:00Z", iteration: 3, decision: "discard" }),
+        ].join("\n") + "\n", "utf-8");
+
+        const out = execFileSync("node", [CLI, "suggest", "--evidence", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT });
+
+        expect(out).toContain("Evidence-Gated Issue Candidate:");
+        expect(out).toContain("3 discards in 1 cluster");
+      } finally {
+        try { rmSync(tmpDir, { recursive: true }); } catch {}
+      }
+    });
+
+    it("refuses evidence-gated score history symlinks", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-suggest-evidence-symlink");
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      const targetPath = resolve(tmpDir, "outside-score-history.jsonl");
+      try {
+        mkdirSync(resolve(tmpDir, ".autoresearch"), { recursive: true });
+        writeFileSync(targetPath, JSON.stringify({ iteration: 1, decision: "discard" }) + "\n", "utf-8");
+        symlinkSync(targetPath, scoreHistoryPath);
+
+        expect(() => execFileSync("node", [CLI, "suggest", "--evidence", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT })).toThrow(/Refusing to read score history symlink/);
+      } finally {
+        try { rmSync(tmpDir, { recursive: true }); } catch {}
+      }
+    });
+
+    it("refuses oversized evidence-gated score history files", () => {
+      const tmpDir = resolve(REPO_ROOT, ".autoresearch-test-suggest-evidence-oversized");
+      const scoreHistoryPath = resolve(tmpDir, ".autoresearch", "score-history.jsonl");
+      try {
+        mkdirSync(resolve(tmpDir, ".autoresearch"), { recursive: true });
+        writeFileSync(scoreHistoryPath, " ".repeat((10 * 1024 * 1024) + 1), "utf-8");
+
+        expect(() => execFileSync("node", [CLI, "suggest", "--evidence", "--repo", tmpDir], { encoding: "utf-8", cwd: REPO_ROOT })).toThrow(/Score history is too large to read safely/);
+      } finally {
+        try { rmSync(tmpDir, { recursive: true }); } catch {}
+      }
+    });
   });
 
   describe("record command with labels", () => {

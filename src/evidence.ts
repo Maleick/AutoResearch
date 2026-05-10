@@ -1,6 +1,38 @@
-import { existsSync, readFileSync } from "fs";
+import { closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, openSync, readFileSync } from "fs";
 import { resolvePath } from "./helpers.js";
 import { SCORE_HISTORY_DEFAULT } from "./constants.js";
+
+const MAX_SCORE_HISTORY_BYTES = 10 * 1024 * 1024;
+
+const readScoreHistoryFile = (filePath: string): string => {
+  const linkStats = lstatSync(filePath);
+  if (linkStats.isSymbolicLink()) {
+    throw new Error(`Refusing to read score history symlink: ${filePath}`);
+  }
+  if (!linkStats.isFile()) {
+    throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
+  }
+  if (linkStats.size > MAX_SCORE_HISTORY_BYTES) {
+    throw new Error(`Score history is too large to read safely (${linkStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
+  }
+  if (typeof fsConstants.O_NOFOLLOW !== "number") {
+    throw new Error(`Refusing to read score history because this platform does not support O_NOFOLLOW: ${filePath}`);
+  }
+
+  const fd = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  try {
+    const fileStats = fstatSync(fd);
+    if (!fileStats.isFile()) {
+      throw new Error(`Refusing to read non-regular score history file: ${filePath}`);
+    }
+    if (fileStats.size > MAX_SCORE_HISTORY_BYTES) {
+      throw new Error(`Score history is too large to read safely (${fileStats.size} bytes; max ${MAX_SCORE_HISTORY_BYTES} bytes): ${filePath}`);
+    }
+    return readFileSync(fd, "utf-8");
+  } finally {
+    closeSync(fd);
+  }
+};
 
 export interface FailureCluster {
   pattern: string;
@@ -34,7 +66,7 @@ export function detectFailureClusters(
   const historyPath = resolvePath(repo, scoreHistoryPath, SCORE_HISTORY_DEFAULT);
   if (!existsSync(historyPath)) return [];
 
-  const lines = readFileSync(historyPath, "utf-8")
+  const lines = readScoreHistoryFile(historyPath)
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
