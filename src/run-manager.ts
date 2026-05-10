@@ -1,4 +1,4 @@
-import type { RunConfig, RunState, SupervisorSnapshot } from "./types.js";
+import type { RunConfig, RunStage, RunState, SupervisorSnapshot } from "./types.js";
 import {
   utcNow,
   ensureParent,
@@ -38,7 +38,7 @@ export async function initializeRun(
     throw new AutoresearchError(`${statePath} already exists. Use --fresh-start to archive.`);
   }
 
-  const header = "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\tid\tparent_id\tbranch\tstage\tagent\n";
+  const header = "timestamp\titeration\tdecision\tmetric_value\tinstrument_value\tverify_status\tguard_status\thypothesis\tchange_summary\tlabels\tnote\tid\tparent_id\tbranch\tstage\tagent\tselected_action\n";
   ensureParent(resultsPath);
   if (!existsSync(resultsPath)) {
     writeFileSync(resultsPath, header, "utf-8");
@@ -78,7 +78,7 @@ export async function appendIteration(
   scoreHistoryPathValue?: string,
   scorerStatusOrScoreComponents?: string | Record<string, number>,
   scoreComponentsValue?: Record<string, number>,
-  lineage?: { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string },
+  lineage?: { id?: string; parent_id?: string; branch?: string; stage?: string; agent?: string; selected_action?: string },
 ): Promise<RunState> {
   const resultsPath = resolvePath(repo, resultsPathValue, RESULTS_DEFAULT);
   const statePath = resolvePath(repo, statePathValue, STATE_DEFAULT);
@@ -111,8 +111,9 @@ export async function appendIteration(
   const lineageId = inferredLineage?.id ?? `${state.run_id}-iter-${currentIteration}`;
   const lineageParentId = inferredLineage?.parent_id ?? (currentIteration > 1 ? `${state.run_id}-iter-${currentIteration - 1}` : "");
   const lineageBranch = inferredLineage?.branch ?? state.draft_pool?.best_branch_id ?? "main";
-  const lineageStage = inferredLineage?.stage ?? "experiment";
+  const lineageStage = (inferredLineage?.stage as RunStage) ?? state.last_iteration?.stage ?? "improve";
   const lineageAgent = inferredLineage?.agent ?? "orchestrator";
+  const selectedAction = (inferredLineage as Record<string, unknown> & { selected_action?: string })?.selected_action;
 
   const resultRow = [
     now,
@@ -131,6 +132,7 @@ export async function appendIteration(
     lineageBranch,
     lineageStage,
     lineageAgent,
+    selectedAction ?? "",
   ].join("\t") + "\n";
 
   appendFileSync(resultsPath, resultRow, "utf-8");
@@ -154,6 +156,9 @@ export async function appendIteration(
   };
   if (scoreComponents != null) {
     scoreRecord.score_components = scoreComponents;
+  }
+  if (selectedAction) {
+    scoreRecord.selected_action = selectedAction;
   }
   await appendTextFileNoFollow(scoreHistoryPath, JSON.stringify(scoreRecord) + "\n", "score history file");
 
@@ -218,10 +223,23 @@ export async function appendIteration(
     stage: lineageStage,
     agent: lineageAgent,
     score_components: scoreComponents,
+    selected_action: selectedAction,
   };
-  if (scoreComponents != null) {
+  if (scoreComponents != null && newState.last_iteration) {
     newState.last_iteration.score_components = scoreComponents;
   }
+
+  const logEntry = {
+    iteration: currentIteration,
+    timestamp: now,
+    stage: lineageStage,
+    decision: effectiveDecision,
+    metric_value: metricValue,
+    change_summary: changeSummary,
+    selected_action: selectedAction,
+    labels: labelList,
+  };
+  newState.iteration_log = [...(newState.iteration_log ?? []), logEntry];
 
   atomicWriteJson(statePath, newState);
   return newState;
@@ -551,6 +569,9 @@ export async function buildSupervisorSnapshot(
     subagent_pool: state.subagent_pool,
     continuation_policy: state.continuation_policy,
     draft_pool: state.draft_pool,
+    iteration_log: state.iteration_log,
+    action_catalog: state.action_catalog,
+    preservation_policy: state.preservation_policy,
     max_debug_depth: state.max_debug_depth,
     branch_failure_budget: state.branch_failure_budget,
     budget_exhausted: state.budget_exhausted || reason === "debug_depth_exhausted" || reason === "branch_failure_budget_exhausted",

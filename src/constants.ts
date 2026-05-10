@@ -12,3 +12,12 @@ export const GOAL_DEFAULT = ".autoresearch/goal.md";
 export const MEMORY_CONSOLIDATION_THRESHOLD = 3;
 export const MAX_DRAFTS = 64;
 export const MEMORY_EXPIRY_DAYS = 30;
+
+export const RUN_STAGES = ["draft", "debug", "improve", "verify", "complete"] as const;
+export const STAGE_TRANSITIONS: Record<string, string[]> = {
+  draft: ["debug", "draft"],
+  debug: ["improve", "debug", "draft"],
+  improve: ["verify", "improve", "debug"],
+  verify: ["complete", "improve", "verify"],
+  complete: [],
+};

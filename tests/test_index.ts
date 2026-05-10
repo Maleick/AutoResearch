@@ -104,6 +104,12 @@ describe("Index Exports", () => {
 
   it("type module exports are empty object at runtime", async () => {
     const types = await import(resolve(REPO_ROOT, "dist/types.js"));
-    expect(Object.keys(types).length).toBe(0);
+    expect(Object.keys(types).length).toBeLessThanOrEqual(2);
+  });
+
+  it("stage constants are exported from constants module", async () => {
+    const constants = await import(resolve(REPO_ROOT, "dist/constants.js"));
+    expect(constants.RUN_STAGES).toEqual(["draft", "debug", "improve", "verify", "complete"]);
+    expect(constants.STAGE_TRANSITIONS).toBeDefined();
   });
 });

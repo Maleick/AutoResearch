@@ -38,6 +38,9 @@ export interface RunConfig {
   branch_failure_budget?: number;
   budget_exhausted?: boolean;
   budget_blocker_reason?: string;
+  stage?: RunStage;
+  action_catalog?: ActionCatalogEntry[];
+  preservation_policy?: PreservationPolicy;
 }
 
 export interface SupervisorSnapshot {
@@ -60,6 +63,9 @@ export interface SupervisorSnapshot {
   continuation_policy?: Record<string, unknown>;
   subagent_guidance?: Record<string, unknown>;
   draft_pool?: DraftPoolConfig;
+  iteration_log?: IterationLogEntry[];
+  action_catalog?: ActionCatalogEntry[];
+  preservation_policy?: PreservationPolicy;
   max_debug_depth?: number;
   branch_failure_budget?: number;
   budget_exhausted?: boolean;
@@ -89,11 +95,19 @@ export interface RunStats {
   branch_failures?: Record<string, number>;
 }
 
+export interface ContextPressure {
+  artifact_count: number;
+  artifact_size_bytes: number;
+  last_compact_at?: string;
+  warnings: string[];
+}
+
 export interface RunFlags {
   stop_requested: boolean;
   needs_human: boolean;
   background_active: boolean;
   stop_ready: boolean;
+  context_pressure?: ContextPressure;
 }
 
 export interface LastIteration {
@@ -113,9 +127,39 @@ export interface LastIteration {
   id?: string;
   parent_id?: string;
   branch?: string;
-  stage?: string;
+  stage?: RunStage;
   agent?: string;
   score_components?: Record<string, number>;
+  selected_action?: string;
+}
+
+export type RunStage = "draft" | "debug" | "improve" | "verify" | "complete";
+
+export interface IterationLogEntry {
+  iteration: number;
+  timestamp: string;
+  stage: RunStage;
+  decision: string;
+  metric_value?: string;
+  change_summary: string;
+  selected_action?: string;
+  labels: string[];
+}
+
+export interface ActionCatalogEntry {
+  id: string;
+  name: string;
+  description: string;
+  expected_impact: "high" | "medium" | "low";
+  stage?: RunStage;
+  tags: string[];
+}
+
+export interface PreservationPolicy {
+  max_artifacts: number;
+  max_artifact_size_bytes: number;
+  compact_candidates: string[];
+  retention_days: number;
 }
 
 export type OperatingMode = "converge" | "continuous" | "supervised";
@@ -159,6 +203,9 @@ export interface RunState {
   stats: RunStats;
   flags: RunFlags;
   last_iteration?: LastIteration;
+  iteration_log?: IterationLogEntry[];
+  action_catalog?: ActionCatalogEntry[];
+  preservation_policy?: PreservationPolicy;
   draft_pool?: DraftPoolConfig;
   budget_exhausted?: boolean;
   budget_blocker_reason?: string;

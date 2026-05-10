@@ -541,10 +541,10 @@ describe("appendIteration", () => {
 
     expect(result.last_iteration.score_components).toEqual({ branch: 0.75, stage: 1 });
     expect(result.last_iteration.branch).toBe("main");
-    expect(result.last_iteration.stage).toBe("experiment");
+    expect(result.last_iteration.stage).toBe("improve");
     expect(scoreHistory.score_components).toEqual({ branch: 0.75, stage: 1 });
     expect(scoreHistory.branch).toBe("main");
-    expect(scoreHistory.stage).toBe("experiment");
+    expect(scoreHistory.stage).toBe("improve");
   });
 
   it("writes a provided instrument value to the results file and state", async () => {

@@ -498,17 +498,25 @@ const main = async (): Promise<number> => {
           console.log(`Results: ${s.results_rows} rows`);
           const lastIter = s.last_iteration;
           if (lastIter && lastIter.iteration) {
-            console.log(`Last:    iter ${formatDisplayValue(lastIter.iteration)} — ${formatDisplayValue(lastIter.decision)} (${formatMetricValue(lastIter.metric_value)})`);
+            const stageTag = lastIter.stage ? ` [${lastIter.stage}]` : "";
+            console.log(`Last:    iter ${formatDisplayValue(lastIter.iteration)}${stageTag} — ${formatDisplayValue(lastIter.decision)} (${formatMetricValue(lastIter.metric_value)})`);
             if (lastIter.score_components != null && typeof lastIter.score_components === "object") {
               const parts = Object.entries(lastIter.score_components as Record<string, number>)
                 .map(([k, v]) => `${formatDisplayValue(k)}:${typeof v === "number" ? v.toFixed(4) : formatDisplayValue(v)}`)
                 .join(", ");
               if (parts.length > 0) console.log(`  Components: [${parts}]`);
             }
+            if (lastIter.selected_action) console.log(`  Action:   ${formatDisplayValue(lastIter.selected_action)}`);
           }
           const flags = s.flags;
           if (flags?.needs_human) console.log("⚠  Needs human input");
           if (flags?.stop_requested) console.log("⏹  Stop requested");
+          if (flags?.context_pressure) {
+            const cp = flags.context_pressure;
+            if (cp.warnings.length > 0) {
+              for (const w of cp.warnings) console.log(`🆘 Context pressure: ${w}`);
+            }
+          }
         }
         break;
       }
@@ -1339,7 +1347,7 @@ const main = async (): Promise<number> => {
       }
       case "completion": {
         const shell = grouped.shell as string || "bash";
-        const commands = ["init", "goal", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "export", "completion", "help"];
+        const commands = ["init", "goal", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "pack", "export", "completion", "help"];
         const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--branch-policy-overrides", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell", "--goal-path", "--template"];
         
         if (shell === "bash" || shell === "zsh") {
@@ -1483,10 +1491,19 @@ const main = async (): Promise<number> => {
             note: grouped.note,
             iteration,
             score_components: scoreComponents,
+            stage: grouped.stage || "improve",
+            selected_action: grouped["selected-action"],
           }, null, 2));
           return 0;
         }
         const { appendIteration } = await import("./run-manager.js");
+
+        const lineage: Record<string, unknown> = {};
+        const stage = grouped.stage as string | undefined;
+        if (stage) lineage.stage = stage;
+        const selectedAction = grouped["selected-action"] as string | undefined;
+        if (selectedAction) lineage.selected_action = selectedAction;
+
         const state = await appendIteration(
           grouped.repo as string | undefined,
           grouped["results-path"] as string | undefined,
@@ -1504,6 +1521,7 @@ const main = async (): Promise<number> => {
           undefined,
           scorerStatus,
           scoreComponents,
+          Object.keys(lineage).length > 0 ? lineage : undefined,
           );
 
         printJsonEnvelope("record", state);
@@ -1974,7 +1992,7 @@ const main = async (): Promise<number> => {
           );
           if (!result) { console.error("No run state found. Complete a run first."); return 1; }
           if (useJson) {
-            printJson({ exported: result.path, pack: result.pack });
+            printJsonEnvelope("pack", { exported: result.path, pack: result.pack });
           } else {
             console.log(`Strategy pack exported: ${result.path}`);
             console.log(`  Goal:    ${result.pack.goal}`);
@@ -1988,7 +2006,7 @@ const main = async (): Promise<number> => {
           const { listPacks } = await import("./strategy-pack.js");
           const packs = listPacks(grouped.repo as string | undefined);
           if (useJson) {
-            printJson({ packs });
+            printJsonEnvelope("pack", { packs });
           } else if (packs.length === 0) {
             console.log("No strategy packs found.");
           } else {
