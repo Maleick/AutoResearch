@@ -53,6 +53,7 @@ const usage = (): void => {
   console.error("  resume     Resume a background run");
   console.error("  record     Record an experiment result");
   console.error("  queue      Manage background task queue");
+  console.error("  pack       Export and inspect strategy packs");
   console.error("  leaderboard Show local leaderboard across runs");
   console.error("  doctor     Verify package installation and version");
   console.error("  help       Show this help");
@@ -1910,6 +1911,62 @@ const main = async (): Promise<number> => {
               console.log(`  ${icon} ${task.id}  [${task.status}]  ${task.goal}`);
             }
           }
+        }
+        break;
+      }
+      case "pack": {
+        const subCmd = cmdArgs[0] || "help";
+
+        if (subCmd === "help" || (subCmd !== "export" && subCmd !== "list" && subCmd !== "inspect")) {
+          console.error("Usage: autoresearch pack <subcommand> [options]");
+          console.error("Subcommands:");
+          console.error("  export   Export validated run as a strategy pack");
+          console.error("  list     List available strategy packs");
+          console.error("  inspect  View a specific strategy pack");
+          break;
+        }
+
+        if (subCmd === "export") {
+          const { exportPack } = await import("./strategy-pack.js");
+          const result = exportPack(
+            grouped.repo as string | undefined,
+            grouped["state-path"] as string | undefined,
+            grouped["goal-path"] as string | undefined,
+          );
+          if (!result) { console.error("No run state found. Complete a run first."); return 1; }
+          if (useJson) {
+            printJson({ exported: result.path, pack: result.pack });
+          } else {
+            console.log(`Strategy pack exported: ${result.path}`);
+            console.log(`  Goal:    ${result.pack.goal}`);
+            console.log(`  Metric:  ${result.pack.metric}`);
+            console.log(`  Success: ${result.pack.evidence.success_rate}`);
+          }
+          break;
+        }
+
+        if (subCmd === "list") {
+          const { listPacks } = await import("./strategy-pack.js");
+          const packs = listPacks(grouped.repo as string | undefined);
+          if (useJson) {
+            printJson({ packs });
+          } else if (packs.length === 0) {
+            console.log("No strategy packs found.");
+          } else {
+            console.log(`Strategy Packs (${packs.length}):`);
+            for (const p of packs) console.log(`  ${p.name}`);
+          }
+          break;
+        }
+
+        if (subCmd === "inspect") {
+          const name = cmdArgs[1];
+          if (!name) { console.error("Usage: autoresearch pack inspect <name>"); return 1; }
+          const { readPack } = await import("./strategy-pack.js");
+          const content = readPack(grouped.repo as string | undefined, name);
+          if (!content) { console.error(`Pack not found: ${name}`); return 1; }
+          console.log(content);
+          break;
         }
         break;
       }
