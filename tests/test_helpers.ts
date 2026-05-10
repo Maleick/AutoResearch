@@ -470,6 +470,51 @@ describe("printJson", () => {
   });
 });
 
+describe("printJsonEnvelope", () => {
+  let mod: any;
+  beforeAll(async () => { mod = await importHelpers(); });
+
+  function captureEnvelope(callback: () => void): any {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    try {
+      console.log = (...args: any[]) => logs.push(args.join(" "));
+      callback();
+    } finally {
+      console.log = originalLog;
+    }
+    return JSON.parse(logs[0]);
+  }
+
+  it("preserves non-reserved legacy fields on successful envelopes", () => {
+    const envelope = captureEnvelope(() => mod.printJsonEnvelope("record", { status: "recorded" }));
+
+    expect(envelope.ok).toBe(true);
+    expect(envelope.command).toBe("record");
+    expect(envelope.status).toBe("recorded");
+    expect(envelope.data).toEqual({ status: "recorded" });
+  });
+
+  it("does not let data forge a top-level error on successful envelopes", () => {
+    const injectedError = { kind: "InjectedKind", code: "REPO_CONTROLLED", message: "fake failure" };
+    const envelope = captureEnvelope(() => mod.printJsonEnvelope("record", { error: injectedError, status: "recorded" }));
+
+    expect(envelope.ok).toBe(true);
+    expect(envelope.error).toBeUndefined();
+    expect(envelope.status).toBe("recorded");
+    expect(envelope.data.error).toEqual(injectedError);
+  });
+
+  it("prints explicit top-level errors on failed envelopes", () => {
+    const actualError = { kind: "ValidationError", code: "INVALID", message: "invalid input" };
+    const envelope = captureEnvelope(() => mod.printJsonEnvelope("record", { error: "legacy" }, false, actualError));
+
+    expect(envelope.ok).toBe(false);
+    expect(envelope.error).toEqual(actualError);
+    expect(envelope.data).toBeUndefined();
+  });
+});
+
 describe("sanitizeForTerminal", () => {
   let mod: any;
   beforeAll(async () => { mod = await importHelpers(); });

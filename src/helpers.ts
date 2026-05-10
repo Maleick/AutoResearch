@@ -33,7 +33,8 @@ function legacyJsonFields(data: unknown): Record<string, unknown> {
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     return {};
   }
-  return data as Record<string, unknown>;
+  const { error: _reservedError, ...fields } = data as Record<string, unknown>;
+  return fields;
 }
 
 export function printJsonEnvelope(command: string, data: unknown, ok = true, error?: JsonEnvelope["error"]): void {
