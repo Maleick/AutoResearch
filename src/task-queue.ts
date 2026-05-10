@@ -1,5 +1,6 @@
-import { existsSync, writeFileSync } from "fs";
-import { utcNow, resolvePath, readJsonFile, ensureParent } from "./helpers.js";
+import { existsSync } from "fs";
+import { dirname, resolve } from "path";
+import { utcNow, resolvePath, readJsonFile, atomicWriteTextInRepo } from "./helpers.js";
 
 export interface TaskLease {
   lease_id: string;
@@ -77,9 +78,13 @@ export async function readManifest(queuePath: string): Promise<TaskQueueManifest
   }
 }
 
-export async function writeManifest(queuePath: string, manifest: TaskQueueManifest): Promise<void> {
-  ensureParent(queuePath);
-  writeFileSync(queuePath, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+export async function writeManifest(
+  queuePath: string,
+  manifest: TaskQueueManifest,
+  repo?: string,
+): Promise<void> {
+  const repoRoot = repo ?? dirname(dirname(resolve(queuePath)));
+  atomicWriteTextInRepo(repoRoot, queuePath, JSON.stringify(manifest, null, 2) + "\n");
 }
 
 export async function enqueueTasks(
@@ -91,7 +96,7 @@ export async function enqueueTasks(
   const newTasks = items.map((item) => createTask(item.goal, item.metric, item.verify));
   manifest.tasks.push(...newTasks);
   manifest.updated_at = utcNow();
-  await writeManifest(queuePath, manifest);
+  await writeManifest(queuePath, manifest, repo);
   return newTasks;
 }
 
