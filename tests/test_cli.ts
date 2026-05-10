@@ -1120,6 +1120,11 @@ describe("CLI Commands", () => {
           needs_human: false,
           background_active: false,
           stop_ready: false,
+          context_pressure: {
+            artifact_count: 1,
+            artifact_size_bytes: 128,
+            warnings: [`warning ${controlText}`],
+          },
         },
         last_iteration: {
           iteration: 1,
@@ -1132,6 +1137,7 @@ describe("CLI Commands", () => {
           stop_labels_satisfied: true,
           missing_keep_labels: [],
           missing_stop_labels: [],
+          stage: `improve${controlText}`,
         },
       }, null, 2) + "\n", "utf-8");
       writeFileSync(resultsPath, [
