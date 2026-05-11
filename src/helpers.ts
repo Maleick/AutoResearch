@@ -61,7 +61,7 @@ export function sanitizeForTerminal(value: unknown): string {
 }
 
 export function utcNow(): string {
-  return new Date().toISOString().replace("Z", "+00:00").split("+")[0] + "Z";
+  return new Date().toISOString();
 }
 
 export function resolveRepo(repo?: string): string {

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync, readdirSync, readFileSync, realpathSync } from "fs";
+import { existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync, readdirSync, readFileSync, realpathSync, type Dirent } from "fs";
 import { resolve, join, basename, dirname, isAbsolute, relative } from "path";
 
 export interface CompactionPlan {
@@ -62,13 +62,13 @@ export function planCompaction(
   const runDirs = items.filter((item) => item.isDirectory() && item.name.startsWith("run-"));
 
   // Sort by modification time (newest first)
-  runDirs.sort((a: any, b: any) => {
+  runDirs.sort((a: Dirent, b: Dirent) => {
     const aStat = statSync(join(autoresearchDir, a.name));
     const bStat = statSync(join(autoresearchDir, b.name));
     return bStat.mtime.getTime() - aStat.mtime.getTime();
   });
 
-  runDirs.forEach((dir: any, index: number) => {
+  runDirs.forEach((dir: Dirent, index: number) => {
     const dirPath = join(autoresearchDir, dir.name);
     if (index < preserveIterations) {
       plan.filesToPreserve.push(dirPath);
