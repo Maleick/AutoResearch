@@ -1573,4 +1573,43 @@ describe("CLI Commands", () => {
       if (!threw) throw new Error("Expected command to exit non-zero but it succeeded");
     });
   });
+
+  describe("doctor", () => {
+    it("shows version and package info", () => {
+      const out = execFileSync("node", [CLI, "doctor"], { encoding: "utf-8", stdio: "pipe" });
+      expect(out).toContain(packageJson.version);
+      expect(out).toContain("opencode-autoresearch");
+      expect(out).toContain("commands");
+      expect(out).toContain("skills");
+      expect(out).toContain("hooks");
+    });
+
+    it("shows machine-readable JSON with --json", () => {
+      const out = execFileSync("node", [CLI, "doctor", "--json"], { encoding: "utf-8", stdio: "pipe" });
+      const parsed = JSON.parse(out);
+      expect(parsed.command).toBe("doctor");
+      expect(parsed.data.version).toBe(packageJson.version);
+      expect(parsed.data.skill_name).toBe("autoresearch");
+      expect(parsed.data.checks_passed).toBe(true);
+      expect(parsed.data.checks.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("goal init", () => {
+    const goalTmpDir = resolve(REPO_ROOT, ".autoresearch-test-goal-init");
+    const goalPath = resolve(goalTmpDir, ".autoresearch", "goal.md");
+
+    beforeAll(() => {
+      mkdirSync(goalTmpDir, { recursive: true });
+      execFileSync("node", [CLI, "goal", "init", "--goal", "test goal", "--metric", "test_metric", "--direction", "higher", "--verify", "echo ok", "--repo", goalTmpDir, "--goal-path", goalPath], { encoding: "utf-8", stdio: "pipe" });
+    });
+    afterAll(() => { try { rmSync(goalTmpDir, { recursive: true }); } catch {} });
+
+    it("creates a goal document with required flags", () => {
+      const content = readFileSync(goalPath, "utf-8");
+      expect(content).toContain("test goal");
+      expect(content).toContain("test_metric");
+      expect(content).toContain("higher");
+    });
+  });
 });

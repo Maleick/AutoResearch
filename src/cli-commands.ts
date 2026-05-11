@@ -163,7 +163,6 @@ export async function handleStatus(grouped: CommandGroup, useJson: boolean): Pro
 
 /* ── explain ── */
 export async function handleExplain(grouped: CommandGroup, useJson: boolean): Promise<number> {
-  const { buildSupervisorSnapshot } = await import("./run-manager.js");
   const snapshot = await buildSupervisorSnapshot(
     grouped.repo as string | undefined,
     grouped["results-path"] as string | undefined,
@@ -891,7 +890,6 @@ export async function handleLaunch(grouped: CommandGroup, dryRun: boolean): Prom
     console.log(JSON.stringify({ ...config, launch_path: launchPath }, null, 2));
     return 0;
   }
-  const { initializeRun } = await import("./run-manager.js");
   const state = await initializeRun(
     grouped.repo as string | undefined,
     grouped["results-path"] as string | undefined,
