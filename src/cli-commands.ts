@@ -6,7 +6,12 @@ import {
   sanitizeForTerminal, getInstalledPackagePath, getInstalledPackageInfo,
   readUpdateCache, getGlobalNpmPrefix, readGoalDoc, atomicWriteTextInRepo,
   resolvePath, readJsonFile, normalizeResultStatus, normalizeScorerStatus,
+  AutoresearchError, normalizeDirection, normalizeMode,
 } from "./helpers.js";
+import {
+  initializeRun, appendIteration, setStopRequested, resumeBackgroundRun,
+  completeRun, buildSupervisorSnapshot, buildRunDigest,
+} from "./run-manager.js";
 import {
   VERSION, PACKAGE_NAME, SKILL_NAME,
   MAX_DRAFTS, RESULTS_DEFAULT, STATE_DEFAULT, LAUNCH_DEFAULT,
@@ -68,7 +73,7 @@ export async function handleInit(
     }, null, 2));
     return 0;
   }
-  const { initializeRun } = await import("./run-manager.js");
+  
   const config = {
     goal: ensureOption(grouped.goal) as string,
     metric: ensureOption(grouped.metric || grouped["outcome-metric"]) as string,
@@ -110,7 +115,7 @@ export async function handleInit(
 
 /* ── status ── */
 export async function handleStatus(grouped: CommandGroup, useJson: boolean): Promise<number> {
-  const { buildSupervisorSnapshot } = await import("./run-manager.js");
+  
   const snapshot = await buildSupervisorSnapshot(
     ensureOption(grouped.repo) as string | undefined,
     ensureOption(grouped["results-path"]) as string | undefined,
@@ -374,7 +379,7 @@ export async function handleScores(grouped: CommandGroup, useJson: boolean): Pro
 
 /* ── score ── */
 export async function handleScore(grouped: CommandGroup, useJson: boolean): Promise<number> {
-  const { AutoresearchError: AErr } = await import("./helpers.js");
+  const AErr = AutoresearchError;
   const scorerCmd = ensureOption(grouped.scorer) as string | undefined;
   if (!scorerCmd) {
     throw new AErr("No scorer provided. Pass --scorer <cmd> to run a scorer explicitly.");
@@ -554,7 +559,7 @@ export async function handleSummary(grouped: CommandGroup, useJson: boolean): Pr
 
 /* ── validate ── */
 export async function handleValidate(grouped: CommandGroup, useJson: boolean): Promise<number> {
-  const { normalizeDirection, normalizeMode } = await import("./helpers.js");
+  
   const errors: string[] = [];
   if (!grouped.goal) errors.push("Missing required: --goal");
   if (!grouped.metric && !grouped["outcome-metric"]) errors.push("Missing required: --metric or --outcome-metric");
@@ -908,7 +913,7 @@ export async function handleLaunch(grouped: CommandGroup, dryRun: boolean): Prom
 /* ── complete ── */
 export async function handleComplete(grouped: CommandGroup, dryRun: boolean): Promise<number> {
   if (dryRun) { console.log("[dry-run] Would mark run complete"); return 0; }
-  const { completeRun } = await import("./run-manager.js");
+  
   const state = await completeRun(ensureOption(grouped.repo) as string | undefined, ensureOption(grouped["state-path"]) as string | undefined);
   printJsonEnvelope("complete", { status: "completed", run_id: state.run_id });
   return 0;
@@ -917,7 +922,7 @@ export async function handleComplete(grouped: CommandGroup, dryRun: boolean): Pr
 /* ── stop ── */
 export async function handleStop(grouped: CommandGroup, dryRun: boolean): Promise<number> {
   if (dryRun) { console.log("[dry-run] Would request stop"); return 0; }
-  const { setStopRequested } = await import("./run-manager.js");
+  
   const state = await setStopRequested(ensureOption(grouped.repo) as string | undefined, ensureOption(grouped["state-path"]) as string | undefined);
   printJsonEnvelope("stop", { status: "stop_requested", run_id: state.run_id });
   return 0;
@@ -926,7 +931,7 @@ export async function handleStop(grouped: CommandGroup, dryRun: boolean): Promis
 /* ── resume ── */
 export async function handleResume(grouped: CommandGroup, dryRun: boolean): Promise<number> {
   if (dryRun) { console.log("[dry-run] Would resume background run"); return 0; }
-  const { resumeBackgroundRun } = await import("./run-manager.js");
+  
   const state = await resumeBackgroundRun(ensureOption(grouped.repo) as string | undefined, ensureOption(grouped["state-path"]) as string | undefined);
   printJsonEnvelope("resume", { status: "resumed", run_id: state.run_id });
   return 0;
@@ -961,7 +966,7 @@ export async function handleRecord(grouped: CommandGroup, dryRun: boolean): Prom
     }, null, 2));
     return 0;
   }
-  const { appendIteration } = await import("./run-manager.js");
+  
   const lineage: Record<string, unknown> = {};
   const stage = ensureOption(grouped.stage) as string | undefined;
   if (stage) lineage.stage = stage;
@@ -990,7 +995,7 @@ export async function handleRecord(grouped: CommandGroup, dryRun: boolean): Prom
 /* ── digest ── */
 export async function handleDigest(grouped: CommandGroup, useJson: boolean, dryRun: boolean): Promise<number> {
   if (dryRun) { console.log("[dry-run] Would generate digest"); return 0; }
-  const { buildRunDigest } = await import("./run-manager.js");
+  
   const digest = await buildRunDigest(
     ensureOption(grouped.repo) as string | undefined,
     ensureOption(grouped["results-path"]) as string | undefined,
