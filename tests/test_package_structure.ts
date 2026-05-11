@@ -169,6 +169,15 @@ describe("hooks/", () => {
     expect(stop).not.toContain("readFileSync('$STATUS_FILE'");
   });
 
+  it("keeps status hook read-only with respect to git remotes", () => {
+    const status = readFileSync(resolve(REPO_ROOT, "hooks/status.sh"), "utf-8");
+
+    expect(status).not.toContain("git pull");
+    expect(status).not.toContain("git fetch");
+    expect(status).not.toContain("git rev-parse");
+    expect(status).not.toContain("git log");
+  });
+
   it("rejects symlinked stop state files", () => {
     const tempRoot = mkdtempSync(resolve(tmpdir(), "autoresearch-hook-"));
     try {
