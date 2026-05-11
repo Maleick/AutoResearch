@@ -28,33 +28,27 @@ import {
 
 export type CommandGroup = Record<string, string | string[]>;
 
-const ensureOption = (v: unknown): string | string[] | undefined => {
-  if (typeof v === "string") return v;
-  if (Array.isArray(v)) return v;
-  return undefined;
-};
-
 /* ── wizard ── */
 export async function handleWizard(grouped: CommandGroup, _useJson: boolean): Promise<number> {
   const { buildSetupSummary } = await import("./wizard.js");
   const config = {
-    goal: ensureOption(grouped.goal) as string | undefined,
-    scope: ensureOption(grouped.scope) as string | undefined,
-    metric: ensureOption(grouped.metric) as string | undefined,
-    direction: ensureOption(grouped.direction) as string | undefined,
-    verify: ensureOption(grouped.verify) as string | undefined,
-    guard: ensureOption(grouped.guard) as string | undefined,
-    mode: ensureOption(grouped.mode) as string | undefined,
-    iterations: parsePositiveInt(ensureOption(grouped.iterations) as string | undefined, "iterations"),
-    max_no_progress: parsePositiveInt(ensureOption(grouped["max-no-progress"]) as string | undefined, "max-no-progress"),
-    duration: ensureOption(grouped.duration) as string | undefined,
-    memory_path: ensureOption(grouped["memory-path"]) as string | undefined,
+    goal: grouped.goal as string | undefined,
+    scope: grouped.scope as string | undefined,
+    metric: grouped.metric as string | undefined,
+    direction: grouped.direction as string | undefined,
+    verify: grouped.verify as string | undefined,
+    guard: grouped.guard as string | undefined,
+    mode: grouped.mode as string | undefined,
+    iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
+    max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
+    duration: grouped.duration as string | undefined,
+    memory_path: grouped["memory-path"] as string | undefined,
     required_keep_labels: grouped["required-keep-labels"] as string[] | undefined,
     required_stop_labels: grouped["required-stop-labels"] as string[] | undefined,
-    stop_condition: ensureOption(grouped["stop-condition"]) as string | undefined,
-    rollback_strategy: ensureOption(grouped["rollback-strategy"]) as string | undefined,
+    stop_condition: grouped["stop-condition"] as string | undefined,
+    rollback_strategy: grouped["rollback-strategy"] as string | undefined,
   };
-  printJsonEnvelope("wizard", buildSetupSummary(ensureOption(grouped.repo) as string | undefined, config));
+  printJsonEnvelope("wizard", buildSetupSummary(grouped.repo as string | undefined, config));
   return 0;
 }
 
@@ -75,39 +69,39 @@ export async function handleInit(
   }
   
   const config = {
-    goal: ensureOption(grouped.goal) as string,
-    metric: ensureOption(grouped.metric || grouped["outcome-metric"]) as string,
-    direction: ensureOption(grouped.direction || grouped["outcome-direction"]) as string || "lower",
-    verify: ensureOption(grouped.verify) as string,
-    mode: ensureOption(grouped.mode) as string || "foreground",
-    scope: ensureOption(grouped.scope) as string | undefined,
-    guard: ensureOption(grouped.guard) as string | undefined,
-    scorer: ensureOption(grouped.scorer) as string | undefined,
-    iterations: parsePositiveInt(ensureOption(grouped.iterations) as string | undefined, "iterations"),
-    max_no_progress: parsePositiveInt(ensureOption(grouped["max-no-progress"]) as string | undefined, "max-no-progress"),
-    duration: ensureOption(grouped.duration) as string | undefined,
-    memory_path: ensureOption(grouped["memory-path"]) as string | undefined,
+    goal: grouped.goal as string,
+    metric: (grouped.metric || grouped["outcome-metric"]) as string,
+    direction: (grouped.direction || grouped["outcome-direction"]) as string || "lower",
+    verify: grouped.verify as string,
+    mode: grouped.mode as string || "foreground",
+    scope: grouped.scope as string | undefined,
+    guard: grouped.guard as string | undefined,
+    scorer: grouped.scorer as string | undefined,
+    iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
+    max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
+    duration: grouped.duration as string | undefined,
+    memory_path: grouped["memory-path"] as string | undefined,
     required_keep_labels: grouped["required-keep-labels"] as string[] | undefined,
     required_stop_labels: grouped["required-stop-labels"] as string[] | undefined,
-    run_tag: ensureOption(grouped["run-tag"]) as string | undefined,
-    stop_condition: ensureOption(grouped["stop-condition"]) as string | undefined,
-    baseline: ensureOption(grouped.baseline) as string | undefined,
-    num_drafts: parsePositiveInt(ensureOption(grouped["num-drafts"]) as string | undefined, "num_drafts", { max: MAX_DRAFTS }) ?? 1,
-    branch_selection_policy: normalizeBranchPolicy(ensureOption(grouped["branch-policy"]) as string | undefined),
-    branch_policy_overrides: parseBranchPolicyOverrides(ensureOption(grouped["branch-policy-overrides"]) as string | undefined),
-    outcome_metric: ensureOption(grouped["outcome-metric"]) as string | undefined,
-    outcome_direction: ensureOption(grouped["outcome-direction"]) as string | undefined,
-    instrument_metric: ensureOption(grouped["instrument-metric"]) as string | undefined,
-    instrument_direction: ensureOption(grouped["instrument-direction"]) as string | undefined,
-    max_debug_depth: parsePositiveInt(ensureOption(grouped["max-debug-depth"]) as string | undefined, "max_debug_depth"),
-    branch_failure_budget: parsePositiveInt(ensureOption(grouped["branch-failure-budget"]) as string | undefined, "branch_failure_budget"),
+    run_tag: grouped["run-tag"] as string | undefined,
+    stop_condition: grouped["stop-condition"] as string | undefined,
+    baseline: grouped.baseline as string | undefined,
+    num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts", { max: MAX_DRAFTS }) ?? 1,
+    branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
+    branch_policy_overrides: parseBranchPolicyOverrides(grouped["branch-policy-overrides"] as string | undefined),
+    outcome_metric: grouped["outcome-metric"] as string | undefined,
+    outcome_direction: grouped["outcome-direction"] as string | undefined,
+    instrument_metric: grouped["instrument-metric"] as string | undefined,
+    instrument_direction: grouped["instrument-direction"] as string | undefined,
+    max_debug_depth: parsePositiveInt(grouped["max-debug-depth"] as string | undefined, "max_debug_depth"),
+    branch_failure_budget: parsePositiveInt(grouped["branch-failure-budget"] as string | undefined, "branch_failure_budget"),
   };
   const state = await initializeRun(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
-    ensureOption(grouped["state-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["results-path"] as string | undefined,
+    grouped["state-path"] as string | undefined,
     config,
-    ensureOption(grouped["fresh-start"]) === "true",
+    grouped["fresh-start"] === "true",
   );
   printJson(state);
   return 0;
@@ -117,9 +111,9 @@ export async function handleInit(
 export async function handleStatus(grouped: CommandGroup, useJson: boolean): Promise<number> {
   
   const snapshot = await buildSupervisorSnapshot(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
-    ensureOption(grouped["state-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["results-path"] as string | undefined,
+    grouped["state-path"] as string | undefined,
   );
   if (useJson) {
     printJsonEnvelope("status", snapshot);
@@ -171,9 +165,9 @@ export async function handleStatus(grouped: CommandGroup, useJson: boolean): Pro
 export async function handleExplain(grouped: CommandGroup, useJson: boolean): Promise<number> {
   const { buildSupervisorSnapshot } = await import("./run-manager.js");
   const snapshot = await buildSupervisorSnapshot(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
-    ensureOption(grouped["state-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["results-path"] as string | undefined,
+    grouped["state-path"] as string | undefined,
   );
   const s = snapshot;
   const stats = s.stats;
@@ -222,8 +216,8 @@ export async function handleExplain(grouped: CommandGroup, useJson: boolean): Pr
 /* ── history ── */
 export async function handleHistory(grouped: CommandGroup, useJson: boolean): Promise<number> {
   const resultsPath = resolvePath(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["results-path"] as string | undefined,
     RESULTS_DEFAULT,
   );
   if (!existsSync(resultsPath)) {
@@ -236,7 +230,7 @@ export async function handleHistory(grouped: CommandGroup, useJson: boolean): Pr
     console.log("No iteration records yet.");
     return 0;
   }
-  const limit = parsePositiveInt(ensureOption(grouped.limit) as string | undefined, "limit") ?? 10;
+  const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
   const headers = lines[0].split("\t");
   const records = lines.slice(1).reverse().slice(0, limit);
   if (useJson) {
@@ -268,16 +262,16 @@ export async function handleHistory(grouped: CommandGroup, useJson: boolean): Pr
 /* ── scores ── */
 export async function handleScores(grouped: CommandGroup, useJson: boolean): Promise<number> {
   const scoreHistoryPath = resolvePath(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["score-history-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["score-history-path"] as string | undefined,
     SCORE_HISTORY_DEFAULT,
   );
   if (!existsSync(scoreHistoryPath)) {
     console.log("No score history found.");
     return 0;
   }
-  const limit = parsePositiveInt(ensureOption(grouped.limit) as string | undefined, "limit") ?? 10;
-  const showTopComponents = ensureOption(grouped["top-components"]) === "true";
+  const limit = parsePositiveInt(grouped.limit as string | undefined, "limit") ?? 10;
+  const showTopComponents = grouped["top-components"] === "true";
   if (showTopComponents) {
     const allLines = readScoreHistoryFile(scoreHistoryPath)
       .split("\n").map((l: string) => l.trim()).filter(Boolean);
@@ -380,11 +374,11 @@ export async function handleScores(grouped: CommandGroup, useJson: boolean): Pro
 /* ── score ── */
 export async function handleScore(grouped: CommandGroup, useJson: boolean): Promise<number> {
   const AErr = AutoresearchError;
-  const scorerCmd = ensureOption(grouped.scorer) as string | undefined;
+  const scorerCmd = grouped.scorer as string | undefined;
   if (!scorerCmd) {
     throw new AErr("No scorer provided. Pass --scorer <cmd> to run a scorer explicitly.");
   }
-  const repoBase = resolveRepo(ensureOption(grouped.repo) as string | undefined);
+  const repoBase = resolveRepo(grouped.repo as string | undefined);
   let rawOutput: string;
   try {
     rawOutput = execSync(scorerCmd, { encoding: "utf-8", cwd: repoBase, stdio: ["ignore", "pipe", "pipe"] });
@@ -425,8 +419,8 @@ export async function handleScore(grouped: CommandGroup, useJson: boolean): Prom
 /* ── config ── */
 export async function handleConfig(grouped: CommandGroup, useJson: boolean): Promise<number> {
   const statePath = resolvePath(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["state-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["state-path"] as string | undefined,
     STATE_DEFAULT,
   );
   if (!existsSync(statePath)) {
@@ -516,8 +510,8 @@ export async function handleContract(useJson: boolean): Promise<number> {
 /* ── summary ── */
 export async function handleSummary(grouped: CommandGroup, useJson: boolean): Promise<number> {
   const resultsPath = resolvePath(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["results-path"] as string | undefined,
     RESULTS_DEFAULT,
   );
   if (!existsSync(resultsPath)) {
@@ -563,9 +557,9 @@ export async function handleValidate(grouped: CommandGroup, useJson: boolean): P
   const errors: string[] = [];
   if (!grouped.goal) errors.push("Missing required: --goal");
   if (!grouped.metric && !grouped["outcome-metric"]) errors.push("Missing required: --metric or --outcome-metric");
-  try { if (grouped.direction) normalizeDirection(ensureOption(grouped.direction) as string); }
+  try { if (grouped.direction) normalizeDirection(grouped.direction as string); }
   catch (e) { errors.push(`Invalid direction: ${(e as Error).message}`); }
-  try { if (grouped.mode) normalizeMode(ensureOption(grouped.mode) as string); }
+  try { if (grouped.mode) normalizeMode(grouped.mode as string); }
   catch (e) { errors.push(`Invalid mode: ${(e as Error).message}`); }
   if (!grouped.verify) errors.push("Missing required: --verify");
   if (useJson) {
@@ -589,13 +583,13 @@ export async function handleValidate(grouped: CommandGroup, useJson: boolean): P
 /* ── report ── */
 export async function handleReport(grouped: CommandGroup, useJson: boolean): Promise<number> {
   const statePath = resolvePath(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["state-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["state-path"] as string | undefined,
     STATE_DEFAULT,
   );
   const resultsPath = resolvePath(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["results-path"] as string | undefined,
     RESULTS_DEFAULT,
   );
   if (!existsSync(statePath)) {
@@ -670,7 +664,7 @@ export async function handleReport(grouped: CommandGroup, useJson: boolean): Pro
   console.log(`\n## Artifacts`);
   console.log(`- State: ${formatMarkdownField(state.artifact_paths?.state || ".autoresearch/state.json")}`);
   console.log(`- Results: ${formatMarkdownField(state.artifact_paths?.results || "autoresearch-results.tsv")}`);
-  if (grouped.repo) console.log(`- Repository: ${formatMarkdownField(ensureOption(grouped.repo) as string)}`);
+  if (grouped.repo) console.log(`- Repository: ${formatMarkdownField(grouped.repo as string)}`);
   if (state.draft_pool && state.draft_pool.active_drafts) {
     const failedBranches = state.draft_pool.active_drafts.filter((d: { status: string }) => d.status === "discarded");
     if (failedBranches.length > 0) {
@@ -719,15 +713,15 @@ export async function handleReport(grouped: CommandGroup, useJson: boolean): Pro
 
 /* ── suggest ── */
 export async function handleSuggest(grouped: CommandGroup, useJson: boolean): Promise<number> {
-  const evidenceGated = ensureOption(grouped["evidence"]) === "true";
+  const evidenceGated = grouped.evidence === "true";
   if (evidenceGated) {
     const { generateIssueCandidate } = await import("./evidence.js");
     const candidate = generateIssueCandidate(
-      ensureOption(grouped.repo) as string | undefined,
-      ensureOption(grouped.goal) as string | undefined,
-      ensureOption(grouped.metric) as string | undefined,
-      ensureOption(grouped.verify) as string | undefined,
-      ensureOption(grouped["score-history-path"]) as string | undefined,
+      grouped.repo as string | undefined,
+      grouped.goal as string | undefined,
+      grouped.metric as string | undefined,
+      grouped.verify as string | undefined,
+      grouped["score-history-path"] as string | undefined,
     );
     if (!candidate) {
       if (useJson) {
@@ -750,8 +744,8 @@ export async function handleSuggest(grouped: CommandGroup, useJson: boolean): Pr
     return 0;
   }
   const memoryPath = resolvePath(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["memory-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["memory-path"] as string | undefined,
     MEMORY_DEFAULT,
   );
   if (!existsSync(memoryPath)) {
@@ -776,16 +770,16 @@ export async function handleSuggest(grouped: CommandGroup, useJson: boolean): Pr
 /* ── export ── */
 export async function handleExport(grouped: CommandGroup): Promise<number> {
   const resultsPath = resolvePath(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["results-path"] as string | undefined,
     RESULTS_DEFAULT,
   );
   const statePath = resolvePath(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["state-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["state-path"] as string | undefined,
     STATE_DEFAULT,
   );
-  const format = ensureOption(grouped.format) as string || "json";
+  const format = grouped.format as string || "json";
   if (!existsSync(resultsPath) || !existsSync(statePath)) {
     console.error("No run data found.");
     return 1;
@@ -831,7 +825,7 @@ export async function handleExport(grouped: CommandGroup): Promise<number> {
 
 /* ── completion ── */
 export async function handleCompletion(grouped: CommandGroup): Promise<number> {
-  const shell = ensureOption(grouped.shell) as string || "bash";
+  const shell = grouped.shell as string || "bash";
   const commands = ["init", "goal", "wizard", "status", "explain", "history", "config", "summary", "suggest", "launch", "complete", "stop", "resume", "record", "doctor", "pack", "export", "completion"];
   const options = ["--repo", "--goal", "--metric", "--direction", "--verify", "--guard", "--mode", "--scope", "--iterations", "--duration", "--num-drafts", "--branch-policy", "--json", "--results-path", "--state-path", "--fresh-start", "--memory-path", "--format", "--shell"];
   if (shell === "bash" || shell === "zsh") {
@@ -860,36 +854,36 @@ export async function handleCompletion(grouped: CommandGroup): Promise<number> {
 /* ── launch ── */
 export async function handleLaunch(grouped: CommandGroup, dryRun: boolean): Promise<number> {
   const config = {
-    goal: ensureOption(grouped.goal) as string,
-    metric: ensureOption(grouped.metric || grouped["outcome-metric"]) as string,
-    direction: ensureOption(grouped.direction || grouped["outcome-direction"]) as string || "lower",
-    verify: ensureOption(grouped.verify) as string,
+    goal: grouped.goal as string,
+    metric: (grouped.metric || grouped["outcome-metric"]) as string,
+    direction: (grouped.direction || grouped["outcome-direction"]) as string || "lower",
+    verify: grouped.verify as string,
     mode: "background",
-    scope: ensureOption(grouped.scope) as string | undefined,
-    guard: ensureOption(grouped.guard) as string | undefined,
-    scorer: ensureOption(grouped.scorer) as string | undefined,
-    iterations: parsePositiveInt(ensureOption(grouped.iterations) as string | undefined, "iterations"),
-    max_no_progress: parsePositiveInt(ensureOption(grouped["max-no-progress"]) as string | undefined, "max-no-progress"),
-    max_debug_depth: parsePositiveInt(ensureOption(grouped["max-debug-depth"]) as string | undefined, "max_debug_depth"),
-    branch_failure_budget: parsePositiveInt(ensureOption(grouped["branch-failure-budget"]) as string | undefined, "branch_failure_budget"),
-    duration: ensureOption(grouped.duration) as string | undefined,
-    memory_path: ensureOption(grouped["memory-path"]) as string | undefined,
+    scope: grouped.scope as string | undefined,
+    guard: grouped.guard as string | undefined,
+    scorer: grouped.scorer as string | undefined,
+    iterations: parsePositiveInt(grouped.iterations as string | undefined, "iterations"),
+    max_no_progress: parsePositiveInt(grouped["max-no-progress"] as string | undefined, "max-no-progress"),
+    max_debug_depth: parsePositiveInt(grouped["max-debug-depth"] as string | undefined, "max_debug_depth"),
+    branch_failure_budget: parsePositiveInt(grouped["branch-failure-budget"] as string | undefined, "branch_failure_budget"),
+    duration: grouped.duration as string | undefined,
+    memory_path: grouped["memory-path"] as string | undefined,
     required_keep_labels: grouped["required-keep-labels"] as string[] | undefined,
     required_stop_labels: grouped["required-stop-labels"] as string[] | undefined,
-    run_tag: ensureOption(grouped["run-tag"]) as string | undefined,
-    stop_condition: ensureOption(grouped["stop-condition"]) as string | undefined,
-    baseline: ensureOption(grouped.baseline) as string | undefined,
-    num_drafts: parsePositiveInt(ensureOption(grouped["num-drafts"]) as string | undefined, "num_drafts", { max: MAX_DRAFTS }) ?? 1,
-    branch_selection_policy: normalizeBranchPolicy(ensureOption(grouped["branch-policy"]) as string | undefined),
-    branch_policy_overrides: parseBranchPolicyOverrides(ensureOption(grouped["branch-policy-overrides"]) as string | undefined),
-    outcome_metric: ensureOption(grouped["outcome-metric"]) as string | undefined,
-    outcome_direction: ensureOption(grouped["outcome-direction"]) as string | undefined,
-    instrument_metric: ensureOption(grouped["instrument-metric"]) as string | undefined,
-    instrument_direction: ensureOption(grouped["instrument-direction"]) as string | undefined,
+    run_tag: grouped["run-tag"] as string | undefined,
+    stop_condition: grouped["stop-condition"] as string | undefined,
+    baseline: grouped.baseline as string | undefined,
+    num_drafts: parsePositiveInt(grouped["num-drafts"] as string | undefined, "num_drafts", { max: MAX_DRAFTS }) ?? 1,
+    branch_selection_policy: normalizeBranchPolicy(grouped["branch-policy"] as string | undefined),
+    branch_policy_overrides: parseBranchPolicyOverrides(grouped["branch-policy-overrides"] as string | undefined),
+    outcome_metric: grouped["outcome-metric"] as string | undefined,
+    outcome_direction: grouped["outcome-direction"] as string | undefined,
+    instrument_metric: grouped["instrument-metric"] as string | undefined,
+    instrument_direction: grouped["instrument-direction"] as string | undefined,
   };
   const launchPath = resolvePath(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["launch-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["launch-path"] as string | undefined,
     LAUNCH_DEFAULT,
   );
   if (dryRun) {
@@ -899,11 +893,11 @@ export async function handleLaunch(grouped: CommandGroup, dryRun: boolean): Prom
   }
   const { initializeRun } = await import("./run-manager.js");
   const state = await initializeRun(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
-    ensureOption(grouped["state-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["results-path"] as string | undefined,
+    grouped["state-path"] as string | undefined,
     config,
-    ensureOption(grouped["fresh-start"]) === "true",
+    grouped["fresh-start"] === "true",
   );
   writeFileSync(launchPath, JSON.stringify({ run_id: state.run_id, goal: state.goal, mode: "background" }, null, 2) + "\n", "utf-8");
   printJsonEnvelope("launch", { status: "launched", run_id: state.run_id, launch_path: launchPath });
@@ -914,7 +908,7 @@ export async function handleLaunch(grouped: CommandGroup, dryRun: boolean): Prom
 export async function handleComplete(grouped: CommandGroup, dryRun: boolean): Promise<number> {
   if (dryRun) { console.log("[dry-run] Would mark run complete"); return 0; }
   
-  const state = await completeRun(ensureOption(grouped.repo) as string | undefined, ensureOption(grouped["state-path"]) as string | undefined);
+  const state = await completeRun(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
   printJsonEnvelope("complete", { status: "completed", run_id: state.run_id });
   return 0;
 }
@@ -923,7 +917,7 @@ export async function handleComplete(grouped: CommandGroup, dryRun: boolean): Pr
 export async function handleStop(grouped: CommandGroup, dryRun: boolean): Promise<number> {
   if (dryRun) { console.log("[dry-run] Would request stop"); return 0; }
   
-  const state = await setStopRequested(ensureOption(grouped.repo) as string | undefined, ensureOption(grouped["state-path"]) as string | undefined);
+  const state = await setStopRequested(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
   printJsonEnvelope("stop", { status: "stop_requested", run_id: state.run_id });
   return 0;
 }
@@ -932,21 +926,21 @@ export async function handleStop(grouped: CommandGroup, dryRun: boolean): Promis
 export async function handleResume(grouped: CommandGroup, dryRun: boolean): Promise<number> {
   if (dryRun) { console.log("[dry-run] Would resume background run"); return 0; }
   
-  const state = await resumeBackgroundRun(ensureOption(grouped.repo) as string | undefined, ensureOption(grouped["state-path"]) as string | undefined);
+  const state = await resumeBackgroundRun(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
   printJsonEnvelope("resume", { status: "resumed", run_id: state.run_id });
   return 0;
 }
 
 /* ── record ── */
 export async function handleRecord(grouped: CommandGroup, dryRun: boolean): Promise<number> {
-  const vs = ensureOption(grouped["verify-status"]) as string || "pass";
-  const gs = ensureOption(grouped["guard-status"]) as string || "skip";
-  const scorerStatus = normalizeScorerStatus(ensureOption(grouped["scorer-status"]) as string | undefined);
-  const iteration = parsePositiveInt(ensureOption(grouped.iteration) as string | undefined, "iteration");
+  const vs = grouped["verify-status"] as string || "pass";
+  const gs = grouped["guard-status"] as string || "skip";
+  const scorerStatus = normalizeScorerStatus(grouped["scorer-status"] as string | undefined);
+  const iteration = parsePositiveInt(grouped.iteration as string | undefined, "iteration");
   let scoreComponents: Record<string, number> | undefined;
   if (grouped["score-components"]) {
     try {
-      const parsed = JSON.parse(ensureOption(grouped["score-components"]) as string);
+      const parsed = JSON.parse(grouped["score-components"] as string);
       if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
         throw new Error('score-components must be a JSON object');
       }
@@ -968,23 +962,23 @@ export async function handleRecord(grouped: CommandGroup, dryRun: boolean): Prom
   }
   
   const lineage: Record<string, unknown> = {};
-  const stage = ensureOption(grouped.stage) as string | undefined;
+  const stage = grouped.stage as string | undefined;
   if (stage) lineage.stage = stage;
-  const selectedAction = ensureOption(grouped["selected-action"]) as string | undefined;
+  const selectedAction = grouped["selected-action"] as string | undefined;
   if (selectedAction) lineage.selected_action = selectedAction;
   const state = await appendIteration(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
-    ensureOption(grouped["state-path"]) as string | undefined,
-    ensureOption(grouped.decision) as string,
-    ensureOption(grouped["metric-value"]) as string | undefined,
-    ensureOption(grouped["instrument-value"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["results-path"] as string | undefined,
+    grouped["state-path"] as string | undefined,
+    grouped.decision as string,
+    grouped["metric-value"] as string | undefined,
+    grouped["instrument-value"] as string | undefined,
     normalizeResultStatus(vs, "verify_status"),
     normalizeResultStatus(gs, "guard_status"),
-    ensureOption(grouped.hypothesis) as string | undefined,
-    ensureOption(grouped["change-summary"]) as string,
+    grouped.hypothesis as string | undefined,
+    grouped["change-summary"] as string,
     grouped.labels ? (Array.isArray(grouped.labels) ? grouped.labels : [grouped.labels]) : undefined,
-    ensureOption(grouped.note) as string | undefined,
+    grouped.note as string | undefined,
     iteration, undefined, scorerStatus, scoreComponents,
     Object.keys(lineage).length > 0 ? lineage : undefined,
   );
@@ -997,9 +991,9 @@ export async function handleDigest(grouped: CommandGroup, useJson: boolean, dryR
   if (dryRun) { console.log("[dry-run] Would generate digest"); return 0; }
   
   const digest = await buildRunDigest(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
-    ensureOption(grouped["state-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["results-path"] as string | undefined,
+    grouped["state-path"] as string | undefined,
   );
   if (useJson) {
     printJsonEnvelope("digest", digest);
@@ -1046,7 +1040,7 @@ export async function handleDigest(grouped: CommandGroup, useJson: boolean, dryR
 
 /* ── doctor ── */
 export async function handleDoctor(grouped: CommandGroup, useJson: boolean): Promise<number> {
-  const base = resolveRepo(ensureOption(grouped.repo) as string | undefined);
+  const base = resolveRepo(grouped.repo as string | undefined);
   const checks: Array<{ name: string; ok: boolean; detail?: string }> = [];
   const cmdDir = resolve(base, "commands");
   const skillsDir = resolve(base, "skills/autoresearch");
@@ -1115,7 +1109,7 @@ export async function handleDoctor(grouped: CommandGroup, useJson: boolean): Pro
     return 1;
   }
   console.log(`\nAll ${checks.length} checks passed.`);
-  if (ensureOption(grouped["whats-new"]) === "true") {
+  if (grouped["whats-new"] === "true") {
     const { getWhatsNew, formatWhatsNew } = await import("./whats-new.js");
     const wn2 = getWhatsNew(base);
     if (wn2) console.log("\n" + formatWhatsNew(wn2));
@@ -1140,8 +1134,8 @@ export async function handleGoal(
   }
   if (!subCmd) {
     const goalPath = resolvePath(
-      ensureOption(grouped.repo) as string | undefined,
-      ensureOption(grouped["goal-path"]) as string | undefined,
+      grouped.repo as string | undefined,
+      grouped["goal-path"] as string | undefined,
       GOAL_DEFAULT,
     );
     if (!existsSync(goalPath)) { console.log("No goal document found."); return 0; }
@@ -1169,7 +1163,7 @@ export async function handleGoal(
   const useGoalJson = goalGrouped.json === "true";
   const isGoalDryRun = goalGrouped["dry-run"] === "true";
   const { GOAL_TEMPLATES, getGoalTemplate, buildGoalDocument, buildGoalInitResult } = await import("./goal-init.js");
-  const templateId = (ensureOption(goalGrouped.template) as string | undefined) ?? "custom";
+  const templateId = (goalGrouped.template as string | undefined) ?? "custom";
   if (!GOAL_TEMPLATES.find((t: { id: string }) => t.id === templateId)) {
     console.error(`Unknown template: ${templateId}. Valid: ${GOAL_TEMPLATES.map((t: { id: string }) => t.id).join(", ")}`);
     return 1;
@@ -1233,8 +1227,8 @@ export async function handleGoal(
     rl.close();
   }
   const goalPath = resolvePath(
-    ensureOption(goalGrouped.repo) as string | undefined,
-    ensureOption(goalGrouped["goal-path"]) as string | undefined,
+    goalGrouped.repo as string | undefined,
+    goalGrouped["goal-path"] as string | undefined,
     GOAL_DEFAULT,
   );
   const document = buildGoalDocument(config as Parameters<typeof buildGoalDocument>[0]);
@@ -1244,7 +1238,7 @@ export async function handleGoal(
     else { console.log("[dry-run] Would write goal document to: " + goalPath + "\n"); console.log(document); }
     return 0;
   }
-  atomicWriteTextInRepo(ensureOption(goalGrouped.repo) as string | undefined, goalPath, document);
+  atomicWriteTextInRepo(goalGrouped.repo as string | undefined, goalPath, document);
   if (useGoalJson) { printJsonEnvelope("goal", result); }
   else {
     console.log(`\u2713 Goal definition written to ${goalPath}`);
@@ -1272,8 +1266,8 @@ export async function handleQueue(grouped: CommandGroup, cmdArgs: string[], useJ
     }
     const { enqueueTasks } = await import("./task-queue.js");
     const tasks = await enqueueTasks(
-      ensureOption(grouped.repo) as string | undefined,
-      [{ goal: ensureOption(grouped.goal) as string, metric: ensureOption(grouped.metric) as string, verify: ensureOption(grouped.verify) as string }],
+      grouped.repo as string | undefined,
+      [{ goal: grouped.goal as string, metric: grouped.metric as string, verify: grouped.verify as string }],
     );
     if (useJson) { printJson({ enqueued: tasks }); }
     else { for (const t of tasks) console.log(`Enqueued: ${t.id} - ${t.goal}`); }
@@ -1281,19 +1275,19 @@ export async function handleQueue(grouped: CommandGroup, cmdArgs: string[], useJ
   }
   if (subCmd === "clean") {
     const { listTasks, writeManifest, resolveQueuePath } = await import("./task-queue.js");
-    const queuePath = resolveQueuePath(ensureOption(grouped.repo) as string | undefined);
-    const manifest = await listTasks(ensureOption(grouped.repo) as string | undefined);
+    const queuePath = resolveQueuePath(grouped.repo as string | undefined);
+    const manifest = await listTasks(grouped.repo as string | undefined);
     const before = manifest.tasks.length;
     manifest.tasks = manifest.tasks.filter((t: { status: string }) => t.status === "pending" || t.status === "leased");
     manifest.updated_at = new Date().toISOString();
-    await writeManifest(queuePath, manifest, ensureOption(grouped.repo) as string | undefined);
+    await writeManifest(queuePath, manifest, grouped.repo as string | undefined);
     const removed = before - manifest.tasks.length;
     if (useJson) { printJson({ removed }); }
     else { console.log(`Cleaned ${removed} completed/failed tasks. ${manifest.tasks.length} remain.`); }
     return 0;
   }
   const { listTasks } = await import("./task-queue.js");
-  const manifest = await listTasks(ensureOption(grouped.repo) as string | undefined);
+  const manifest = await listTasks(grouped.repo as string | undefined);
   if (useJson) { printJson(manifest); }
   else {
     if (manifest.tasks.length === 0) { console.log("No tasks in queue."); }
@@ -1318,7 +1312,7 @@ export async function handlePack(grouped: CommandGroup, cmdArgs: string[], useJs
   }
   if (subCmd === "export") {
     const { exportPack } = await import("./strategy-pack.js");
-    const result = exportPack(ensureOption(grouped.repo) as string | undefined, ensureOption(grouped["state-path"]) as string | undefined);
+    const result = exportPack(grouped.repo as string | undefined, grouped["state-path"] as string | undefined);
     if (!result) { console.error("No run state found."); return 1; }
     if (useJson) { printJsonEnvelope("pack", { exported: result.path, pack: result.pack }); }
     else {
@@ -1331,7 +1325,7 @@ export async function handlePack(grouped: CommandGroup, cmdArgs: string[], useJs
   }
   if (subCmd === "list") {
     const { listPacks } = await import("./strategy-pack.js");
-    const packs = listPacks(ensureOption(grouped.repo) as string | undefined);
+    const packs = listPacks(grouped.repo as string | undefined);
     if (useJson) { printJsonEnvelope("pack", { packs }); }
     else { console.log(packs.length === 0 ? "No strategy packs found." : `Strategy Packs (${packs.length}):`); for (const p of packs) console.log(`  ${p.name}`); }
     return 0;
@@ -1340,7 +1334,7 @@ export async function handlePack(grouped: CommandGroup, cmdArgs: string[], useJs
     const name = cmdArgs[1];
     if (!name) { console.error("Usage: autoresearch pack inspect <name>"); return 1; }
     const { readPack } = await import("./strategy-pack.js");
-    const content = readPack(ensureOption(grouped.repo) as string | undefined, name);
+    const content = readPack(grouped.repo as string | undefined, name);
     if (!content) { console.error(`Pack not found: ${name}`); return 1; }
     console.log(content);
     return 0;
@@ -1351,27 +1345,27 @@ export async function handlePack(grouped: CommandGroup, cmdArgs: string[], useJs
 /* ── leaderboard ── */
 export async function handleLeaderboard(grouped: CommandGroup, useJson: boolean): Promise<number> {
   const { generateLeaderboard, formatLeaderboardMarkdown, formatLeaderboardText } = await import("./leaderboard.js");
-  const repo = resolveRepo(ensureOption(grouped.repo) as string | undefined);
+  const repo = resolveRepo(grouped.repo as string | undefined);
   const leaderboard = generateLeaderboard(repo);
   if (useJson) { printJson(leaderboard); return 0; }
   if (leaderboard.entries.length === 0) { console.log("No runs found."); return 0; }
-  if (ensureOption(grouped.format) === "markdown") { console.log(formatLeaderboardMarkdown(leaderboard)); }
+  if (grouped.format === "markdown") { console.log(formatLeaderboardMarkdown(leaderboard)); }
   else { console.log(formatLeaderboardText(leaderboard)); }
   return 0;
 }
 
 /* ── worker ── */
 export async function handleWorker(grouped: CommandGroup, useJson: boolean): Promise<number> {
-  const once = ensureOption(grouped["once"]) === "true";
+  const once = grouped.once === "true";
   if (!once) {
     console.error("worker requires --once flag");
     return 1;
   }
   const { workerOnce } = await import("./worker.js");
   const result = workerOnce(
-    ensureOption(grouped.repo) as string | undefined,
-    ensureOption(grouped["state-path"]) as string | undefined,
-    ensureOption(grouped["results-path"]) as string | undefined,
+    grouped.repo as string | undefined,
+    grouped["state-path"] as string | undefined,
+    grouped["results-path"] as string | undefined,
   );
   if (useJson) { printJsonEnvelope("worker", result); }
   else {
