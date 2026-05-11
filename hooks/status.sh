@@ -1,6 +1,10 @@
 #!/bin/sh
 # Status hook for Auto Research
 # Prints current run status from the state file.
+#
+# NOTE: This hook intentionally does NOT auto-sync. It must remain read-only
+# with respect to git remotes so that `npm test` and status checks never
+# mutate repository state.
 
 set -e
 
