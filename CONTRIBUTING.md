@@ -75,5 +75,5 @@ npm test
 For doc-heavy changes, also grep for stale repo or brand references:
 
 ```bash
-rg -n "claude-autoresearch|research-results.tsv|autoresearch-state.json|plugins/codex-autoresearch|plugins/autoresearch/|.claude-plugin" README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md wiki docs plugins skills
+rg -n "opencode-autoresearch|autoresearch-results.tsv|autoresearch-state.json|plugins/codex-autoresearch|plugins/autoresearch/|.opencode-plugin" README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md wiki docs plugins skills
 ```

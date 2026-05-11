@@ -85,25 +85,25 @@ For reproducible installs in CI or production environments, pin to a specific ve
 **Plugin array (pinned):**
 ```json
 {
-  "plugin": ["opencode-autoresearch@3.13.1"]
+  "plugin": ["opencode-autoresearch@3.14.2"]
 }
 ```
 
 **npm global (pinned):**
 ```bash
-npm install -g opencode-autoresearch@3.13.1
+npm install -g opencode-autoresearch@3.14.2
 ```
 
 **npm global (with lockfile):**
 ```bash
-npm install -g opencode-autoresearch@3.13.1
+npm install -g opencode-autoresearch@3.14.2
 npm shrinkwrap  # Creates npm-shrinkwrap.json for reproducibility
 ```
 
 **Verify package integrity:**
 ```bash
-npm view opencode-autoresearch@3.13.1 dist.shasum
-npm pack opencode-autoresearch@3.13.1 --dry-run
+npm view opencode-autoresearch@3.14.2 dist.shasum
+npm pack opencode-autoresearch@3.14.2 --dry-run
 ```
 
 ### Upgrade and Rollback
