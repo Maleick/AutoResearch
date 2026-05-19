@@ -1369,12 +1369,13 @@ export async function handleWorker(grouped: CommandGroup, useJson: boolean): Pro
   else {
     if (result.ready) {
       console.log(`\u2713 Ready for iteration ${result.iteration}`);
-      console.log(`  Run ID:  ${result.run_id}`);
-      console.log(`  Status:  ${result.status}`);
-      console.log(`  Goal:    ${result.goal}`);
+      console.log(`  Run ID:  ${formatDisplayValue(result.run_id)}`);
+      console.log(`  Status:  ${formatDisplayValue(result.status)}`);
+      console.log(`  Goal:    ${formatDisplayValue(result.goal)}`);
+      if (result.metric) console.log(`  Metric:  ${formatDisplayValue(result.metric)}`);
     } else {
-      console.log(`\u2717 Not ready: ${result.reason || "unknown"}`);
-      console.log(`  Run ID: ${result.run_id}`);
+      console.log(`\u2717 Not ready: ${formatDisplayValue(result.reason || "unknown")}`);
+      console.log(`  Run ID: ${formatDisplayValue(result.run_id)}`);
     }
   }
   return result.ready ? 0 : 1;
